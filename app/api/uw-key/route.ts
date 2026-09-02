@@ -6,13 +6,28 @@ import { getUnusualWhalesKey, setRuntimeUnusualWhalesKey } from "@/lib/uw";
 
 export const dynamic = "force-dynamic";
 
+function keyLockedByHost(): boolean {
+  return process.env.VERCEL === "1" && Boolean(process.env.UNUSUAL_WHALES_API_KEY?.trim());
+}
+
 export async function GET() {
   return Response.json({
     configured: getUnusualWhalesKey().length > 0,
+    locked: keyLockedByHost(),
   });
 }
 
 export async function POST(request: NextRequest) {
+  if (keyLockedByHost()) {
+    return Response.json(
+      {
+        error:
+          "This hosted copy already has a live Unusual Whales key on the server. You do not need to paste it again.",
+      },
+      { status: 409 },
+    );
+  }
+
   let body: { key?: string };
   try {
     body = (await request.json()) as { key?: string };

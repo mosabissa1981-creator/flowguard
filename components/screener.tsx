@@ -89,6 +89,7 @@ export function Screener({
   const [watchlistOnly, setWatchlistOnly] = useState(false);
 
   const [uwConfigured, setUwConfigured] = useState(initialUwConfigured);
+  const [uwLocked, setUwLocked] = useState(false);
 
   const [watchlist, setWatchlist] = usePersistentState<WatchTarget[]>(
     WATCHLIST_KEY,
@@ -139,8 +140,11 @@ export function Screener({
     let stale = false;
     void (async () => {
       try {
-        const status = await fetchJson<{ configured: boolean }>("/api/uw-key");
-        if (!stale) setUwConfigured(status.configured);
+        const status = await fetchJson<{ configured: boolean; locked?: boolean }>("/api/uw-key");
+        if (!stale) {
+          setUwConfigured(status.configured);
+          setUwLocked(Boolean(status.locked));
+        }
       } catch {
         // Status is optional; the connect form still works.
       }
@@ -333,6 +337,7 @@ export function Screener({
         <TideBar tide={data?.tide ?? null} />
         <UwKeyForm
           configured={uwConfigured || data?.source === "live"}
+          locked={uwLocked}
           onConfigured={() => {
             setUwConfigured(true);
             setRefreshing(true);

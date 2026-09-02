@@ -15,6 +15,17 @@ npm run dev
 
 Open [http://localhost:43127](http://localhost:43127). Without a key, FlowGuard serves a local mock tape so the UI is fully usable.
 
+## Hosted (stable URL)
+
+Tunnels on a cloud agent are temporary. The lasting copy is a Vercel production deploy:
+
+```bash
+npx vercel login
+npx vercel --prod --yes -e UNUSUAL_WHALES_API_KEY="$UNUSUAL_WHALES_API_KEY"
+```
+
+Set `UNUSUAL_WHALES_API_KEY` as a Production environment variable on the Vercel project. Never commit `.env.local`. On the hosted URL the key is already on the server; you do not paste it from the phone.
+
 ```bash
 npm run build
 npm start

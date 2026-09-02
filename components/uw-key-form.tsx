@@ -4,9 +4,11 @@ import { useState } from "react";
 
 export function UwKeyForm({
   configured,
+  locked = false,
   onConfigured,
 }: {
   configured: boolean;
+  locked?: boolean;
   onConfigured: () => void;
 }) {
   const [saving, setSaving] = useState(false);
@@ -14,6 +16,20 @@ export function UwKeyForm({
   const [saved, setSaved] = useState(false);
   const [failed, setFailed] = useState(false);
   const live = configured || saved;
+
+  if (locked && live) {
+    return (
+      <div className="rounded-lg border border-border/70 bg-muted/20 p-3">
+        <div className="text-[10px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
+          Unusual Whales API
+        </div>
+        <p className="mt-1 text-xs text-emerald-300">
+          Live data is on. This hosted copy already has the key on the server. You do not need to
+          paste it on your phone.
+        </p>
+      </div>
+    );
+  }
 
   async function save(key: string) {
     const trimmed = key.trim();
