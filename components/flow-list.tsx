@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConvictionMeter } from "@/components/conviction-meter";
+import { HoldWindowCopy } from "@/components/hold-window-copy";
 import { ScoreChips } from "@/components/score-chips";
 import type { RankedFlow } from "@/lib/types";
 import {
@@ -123,6 +124,7 @@ export function FlowList({
                       {row.alert.has_sweep ? "SWEEP" : row.alert.has_floor ? "FLOOR" : "PRINT"}
                       {row.alert.all_opening_trades ? " · OPEN" : ""}
                     </div>
+                    <HoldWindowCopy hold={row.holdWindow} compact className="mt-1.5 max-w-56" />
                   </td>
                   <td className="px-3 py-3 font-mono text-sm text-amber-200">
                     {formatPremium(row.alert.total_premium)}
@@ -202,6 +204,7 @@ export function FlowList({
                 <div className="mt-3">
                   <ScoreChips chips={row.chips} limit={4} compact />
                 </div>
+                <HoldWindowCopy hold={row.holdWindow} compact className="mt-2" />
               </button>
               <div className="mt-2 flex gap-1">
                 <Button size="sm" variant="outline" onClick={() => onPinTicker(row.alert.ticker)}>

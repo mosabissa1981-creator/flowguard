@@ -60,7 +60,7 @@ Click a row for the detail drawer: score chips, ask/bid split, market tide, tick
 
 The manager book sits on the same Unusual Whales tape. It does not pick stocks.
 
-- **Picks of the Day** — `GET /api/picks` takes the unusual-flow tape, applies **strict anti-fade**, keeps conviction ≥ 55, and returns the top 5–10 setups by conviction with a plain-English thesis and fade risks.
+- **Picks of the Day** — `GET /api/picks` takes the unusual-flow tape, applies **strict anti-fade**, keeps conviction ≥ 55, and returns the top 5–10 setups by conviction with a plain-English thesis, fade risks, and an explicit options hold window (intraday–2 sessions, 2–7 sessions, or up to ~1–2 weeks — never hold to expiry, never a stock hold).
 - **Watchlist** — pin a ticker or a specific option contract. Stored in `localStorage` (`flowguard.watchlist`). Toggle *Watchlist only* to filter the tape.
 - **Manager notes** — optional note per alert id (`flowguard.notes`).
 - **Dismiss** — hide an alert from picks and the tape (`flowguard.dismissed`). Restore one name or restore all.

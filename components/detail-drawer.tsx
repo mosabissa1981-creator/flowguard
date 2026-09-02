@@ -15,6 +15,7 @@ import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import { ConvictionMeter } from "@/components/conviction-meter";
+import { HoldWindowCopy } from "@/components/hold-window-copy";
 import { ScoreChips } from "@/components/score-chips";
 import { TideBar } from "@/components/tide-bar";
 import { cn } from "@/lib/utils";
@@ -217,6 +218,7 @@ export function DetailDrawer({
                         </Badge>
                       )}
                     </div>
+                    <HoldWindowCopy hold={row.holdWindow} className="mt-2 max-w-sm" />
                   </div>
                   <div className="text-right">
                     <div className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">

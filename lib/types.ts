@@ -62,6 +62,12 @@ export type NetPremTick = {
   put_volume?: number;
 };
 
+export type HoldWindow = {
+  label: string;
+  line: string;
+  exit: string;
+};
+
 export type RankedFlow = {
   rank: number;
   score: number;
@@ -69,6 +75,7 @@ export type RankedFlow = {
   fadeProne: boolean;
   dte: number;
   askShare: number;
+  holdWindow: HoldWindow;
   marketTideBias: TideBias | null;
   tickerTideBias: TideBias | null;
   alert: FlowAlert;

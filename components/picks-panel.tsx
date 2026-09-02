@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ConvictionMeter } from "@/components/conviction-meter";
+import { HoldWindowCopy } from "@/components/hold-window-copy";
 import { cn } from "@/lib/utils";
 import type { DailyPick } from "@/lib/types";
 import { formatDte, formatExpiry, formatPremium, formatStrike } from "@/lib/format";
@@ -42,7 +43,8 @@ export function PicksPanel({
           <h2 className="font-medium">Highest-conviction options setups after strict anti-fade</h2>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
             Same Unusual Whales tape and conviction score as the live feed. Lottery DTE, tiny
-            premium, bid-side dumps, and fighting-tide prints are already cut.
+            premium, bid-side dumps, and fighting-tide prints are already cut. Each pick has an
+            options hold window — never a stock hold, never hold to expiry.
           </p>
         </div>
         <Badge className="rounded-md bg-amber-500/15 text-amber-200">
@@ -102,6 +104,8 @@ export function PicksPanel({
                   </button>
                   <ConvictionMeter score={pick.score} />
                 </div>
+
+                <HoldWindowCopy hold={pick.holdWindow} />
 
                 <p className="text-sm leading-relaxed text-foreground/90">{pick.thesis}</p>
 

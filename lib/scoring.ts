@@ -1,4 +1,5 @@
 import type { FlowAlert, RankedFlow, ScoreChip, TideSnapshot } from "@/lib/types";
+import { buildHoldWindow } from "@/lib/hold-window";
 import { askShare, clamp, daysToExpiry, toNumber } from "@/lib/numbers";
 
 const BASE_SCORE = 32;
@@ -266,7 +267,7 @@ export function scoreAlert(
     ["lottery", "tiny", "bid-dom", "fight-tide"].includes(c.id),
   );
 
-  return {
+  const scored = {
     score: Math.round(clamp(score, 0, 100)),
     chips,
     fadeProne,
@@ -275,6 +276,11 @@ export function scoreAlert(
     marketTideBias: tapeBias,
     tickerTideBias: localBias,
     alert,
+  };
+
+  return {
+    ...scored,
+    holdWindow: buildHoldWindow(scored),
   };
 }
 
