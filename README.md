@@ -17,14 +17,16 @@ Open [http://localhost:43127](http://localhost:43127). Without a key, FlowGuard 
 
 ## Hosted (stable URL)
 
-Tunnels on a cloud agent are temporary. The lasting copy is a Vercel production deploy:
+Open **[https://flowguard-zeta.vercel.app](https://flowguard-zeta.vercel.app)** on your phone. Bookmark it. That copy stays up; it is not a tunnel.
+
+`UNUSUAL_WHALES_API_KEY` is a Production secret on the Vercel project. It is not in git. On the hosted URL you do not paste the key.
+
+To publish again from this repo:
 
 ```bash
 npx vercel login
-npx vercel --prod --yes -e UNUSUAL_WHALES_API_KEY="$UNUSUAL_WHALES_API_KEY"
+npx vercel --prod --yes --project flowguard
 ```
-
-Set `UNUSUAL_WHALES_API_KEY` as a Production environment variable on the Vercel project. Never commit `.env.local`. On the hosted URL the key is already on the server; you do not paste it from the phone.
 
 ```bash
 npm run build
