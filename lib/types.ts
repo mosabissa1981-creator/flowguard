@@ -94,3 +94,16 @@ export type FlowResponse = {
   rawCount: number;
   warning?: string;
 };
+
+export type DailyPick = RankedFlow & {
+  thesis: string;
+  fadeRisks: string[];
+};
+
+export type PicksResponse = {
+  source: "live" | "mock";
+  fetchedAt: string;
+  picks: DailyPick[];
+  tide: TideSnapshot | null;
+  warning?: string;
+};

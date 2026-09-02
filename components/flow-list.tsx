@@ -1,5 +1,8 @@
+import { Pin, EyeOff } from "lucide-react";
+
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConvictionMeter } from "@/components/conviction-meter";
 import { ScoreChips } from "@/components/score-chips";
@@ -13,6 +16,7 @@ import {
   formatStrike,
 } from "@/lib/format";
 import { toNumber } from "@/lib/numbers";
+import { isWatched, type WatchTarget } from "@/lib/manager";
 
 function SideBadge({ type }: { type: "call" | "put" }) {
   return (
@@ -45,11 +49,17 @@ function AskBidSplit({ askShare }: { askShare: number }) {
 export function FlowList({
   items,
   selectedId,
+  watchlist,
   onSelect,
+  onPinTicker,
+  onDismiss,
 }: {
   items: RankedFlow[];
   selectedId: string | null;
+  watchlist: WatchTarget[];
   onSelect: (id: string) => void;
+  onPinTicker: (ticker: string) => void;
+  onDismiss: (row: RankedFlow) => void;
 }) {
   return (
     <>
@@ -66,11 +76,13 @@ export function FlowList({
               <th className="px-3 py-2.5 font-medium">Vol/OI</th>
               <th className="px-3 py-2.5 font-medium">Why</th>
               <th className="px-3 py-2.5 font-medium">Time</th>
+              <th className="px-3 py-2.5 font-medium">Mgr</th>
             </tr>
           </thead>
           <tbody>
             {items.map((row) => {
               const selected = row.alert.id === selectedId;
+              const watched = isWatched(watchlist, row.alert.ticker, row.alert.option_chain);
               return (
                 <tr
                   key={row.alert.id}
@@ -79,6 +91,7 @@ export function FlowList({
                     "cursor-pointer border-t border-border/60 transition-colors hover:bg-muted/35",
                     selected && "bg-muted/50",
                     row.fadeProne && "opacity-80",
+                    watched && "bg-amber-400/5",
                   )}
                 >
                   <td className="px-3 py-3 font-mono text-xs text-muted-foreground">
@@ -88,8 +101,9 @@ export function FlowList({
                     <ConvictionMeter score={row.score} />
                   </td>
                   <td className="px-3 py-3">
-                    <div className="font-mono text-sm font-semibold tracking-wide">
+                    <div className="flex items-center gap-1.5 font-mono text-sm font-semibold tracking-wide">
                       {row.alert.ticker}
+                      {watched ? <Pin className="size-3 text-amber-300" /> : null}
                     </div>
                     <div className="text-[11px] text-muted-foreground">
                       {row.alert.alert_rule || "Flow"}
@@ -125,6 +139,26 @@ export function FlowList({
                   <td className="px-3 py-3 font-mono text-[11px] text-muted-foreground">
                     {formatRelativeTime(row.alert.created_at)}
                   </td>
+                  <td className="px-2 py-3" onClick={(event) => event.stopPropagation()}>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        size="icon-xs"
+                        variant="ghost"
+                        aria-label={`Pin ${row.alert.ticker}`}
+                        onClick={() => onPinTicker(row.alert.ticker)}
+                      >
+                        <Pin className={watched ? "text-amber-300" : undefined} />
+                      </Button>
+                      <Button
+                        size="icon-xs"
+                        variant="ghost"
+                        aria-label="Dismiss alert"
+                        onClick={() => onDismiss(row)}
+                      >
+                        <EyeOff />
+                      </Button>
+                    </div>
+                  </td>
                 </tr>
               );
             })}
@@ -135,38 +169,49 @@ export function FlowList({
       <div className="grid gap-2 lg:hidden">
         {items.map((row) => {
           const selected = row.alert.id === selectedId;
+          const watched = isWatched(watchlist, row.alert.ticker, row.alert.option_chain);
           return (
-            <button
+            <div
               key={row.alert.id}
-              type="button"
-              onClick={() => onSelect(row.alert.id)}
               className={cn(
                 "rounded-xl border border-border/80 bg-card/80 p-3 text-left",
                 selected && "ring-1 ring-amber-400/40",
+                watched && "border-amber-400/30",
               )}
             >
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-base font-semibold">{row.alert.ticker}</span>
-                    <SideBadge type={row.alert.type} />
+              <button type="button" className="w-full text-left" onClick={() => onSelect(row.alert.id)}>
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-base font-semibold">{row.alert.ticker}</span>
+                      <SideBadge type={row.alert.type} />
+                      {watched ? <Pin className="size-3 text-amber-300" /> : null}
+                    </div>
+                    <div className="mt-1 font-mono text-xs text-muted-foreground">
+                      {formatStrike(row.alert.strike)} {formatExpiry(row.alert.expiry)} ·{" "}
+                      {formatDte(row.dte)}
+                    </div>
                   </div>
-                  <div className="mt-1 font-mono text-xs text-muted-foreground">
-                    {formatStrike(row.alert.strike)} {formatExpiry(row.alert.expiry)} ·{" "}
-                    {formatDte(row.dte)}
+                  <div className="text-right">
+                    <div className="font-mono text-sm text-amber-200">
+                      {formatPremium(row.alert.total_premium)}
+                    </div>
+                    <ConvictionMeter score={row.score} size="sm" />
                   </div>
                 </div>
-                <div className="text-right">
-                  <div className="font-mono text-sm text-amber-200">
-                    {formatPremium(row.alert.total_premium)}
-                  </div>
-                  <ConvictionMeter score={row.score} size="sm" />
+                <div className="mt-3">
+                  <ScoreChips chips={row.chips} limit={4} compact />
                 </div>
+              </button>
+              <div className="mt-2 flex gap-1">
+                <Button size="sm" variant="outline" onClick={() => onPinTicker(row.alert.ticker)}>
+                  <Pin /> Pin
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => onDismiss(row)}>
+                  <EyeOff /> Dismiss
+                </Button>
               </div>
-              <div className="mt-3">
-                <ScoreChips chips={row.chips} limit={4} compact />
-              </div>
-            </button>
+            </div>
           );
         })}
       </div>

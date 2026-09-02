@@ -6,8 +6,8 @@ export default function Home() {
       <Screener />
       <footer className="border-t border-border/70 px-6 py-4 text-center text-xs text-muted-foreground">
         FlowGuard screens options flow only. It does not route orders, place trades, or give
-        investment advice. Data from Unusual Whales when an API key is configured; otherwise a
-        local mock tape.
+        investment advice. Watchlist, notes, and dismissed alerts stay in this browser.
+        Data from Unusual Whales when an API key is configured; otherwise a local mock tape.
       </footer>
     </div>
   );

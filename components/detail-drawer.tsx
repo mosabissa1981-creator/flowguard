@@ -10,8 +10,10 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Textarea } from "@/components/ui/textarea";
 import { ConvictionMeter } from "@/components/conviction-meter";
 import { ScoreChips } from "@/components/score-chips";
 import { TideBar } from "@/components/tide-bar";
@@ -29,6 +31,7 @@ import {
   formatStrike,
 } from "@/lib/format";
 import { toNumber } from "@/lib/numbers";
+import { EyeOff, Pin, PinOff } from "lucide-react";
 
 function Sparkline({ ticks }: { ticks: NetPremTick[] }) {
   const values = ticks.map(
@@ -80,11 +83,25 @@ export function DetailDrawer({
   marketTide,
   open,
   onOpenChange,
+  note,
+  onNote,
+  tickerPinned,
+  contractPinned,
+  onPinTicker,
+  onPinContract,
+  onDismiss,
 }: {
   row: RankedFlow | null;
   marketTide: TideSnapshot | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  note?: string;
+  onNote?: (id: string, note: string) => void;
+  tickerPinned?: boolean;
+  contractPinned?: boolean;
+  onPinTicker?: (ticker: string) => void;
+  onPinContract?: (row: RankedFlow) => void;
+  onDismiss?: (row: RankedFlow) => void;
 }) {
   const [tickCache, setTickCache] = useState<{
     ticker: string;
@@ -210,6 +227,49 @@ export function DetailDrawer({
                     </div>
                   </div>
                 </div>
+
+                <div className="flex flex-wrap gap-1.5">
+                  {onPinTicker ? (
+                    <Button
+                      size="sm"
+                      variant={tickerPinned ? "secondary" : "outline"}
+                      onClick={() => onPinTicker(alert.ticker)}
+                    >
+                      {tickerPinned ? <PinOff /> : <Pin />}
+                      {tickerPinned ? "Unpin ticker" : "Pin ticker"}
+                    </Button>
+                  ) : null}
+                  {onPinContract && alert.option_chain ? (
+                    <Button
+                      size="sm"
+                      variant={contractPinned ? "secondary" : "outline"}
+                      onClick={() => onPinContract(row)}
+                    >
+                      {contractPinned ? <PinOff /> : <Pin />}
+                      {contractPinned ? "Unpin contract" : "Pin contract"}
+                    </Button>
+                  ) : null}
+                  {onDismiss ? (
+                    <Button size="sm" variant="destructive" onClick={() => onDismiss(row)}>
+                      <EyeOff />
+                      Dismiss
+                    </Button>
+                  ) : null}
+                </div>
+
+                {onNote ? (
+                  <label className="block">
+                    <span className="mb-1 block text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+                      Manager note
+                    </span>
+                    <Textarea
+                      value={note ?? ""}
+                      placeholder="Optional note for this setup."
+                      className="min-h-20 text-sm"
+                      onChange={(event) => onNote(alert.id, event.target.value)}
+                    />
+                  </label>
+                ) : null}
 
                 <div className="grid grid-cols-2 gap-2">
                   <Field label="Spot" value={formatPrice(alert.underlying_price)} />
