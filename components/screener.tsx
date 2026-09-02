@@ -66,21 +66,29 @@ function toQuery(filters: FlowFilters): string {
   return params.toString();
 }
 
-export function Screener() {
+export function Screener({
+  initialFlow,
+  initialPicks,
+  initialUwConfigured = false,
+}: {
+  initialFlow?: FlowResponse | null;
+  initialPicks?: PicksResponse | null;
+  initialUwConfigured?: boolean;
+}) {
   const [filters, setFilters] = useState<FlowFilters>(DEFAULT_FILTERS);
   const [debounced, setDebounced] = useState<FlowFilters>(DEFAULT_FILTERS);
   const [paused, setPaused] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!initialFlow);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [data, setData] = useState<FlowResponse | null>(null);
-  const [picksData, setPicksData] = useState<PicksResponse | null>(null);
-  const [picksLoading, setPicksLoading] = useState(true);
+  const [data, setData] = useState<FlowResponse | null>(initialFlow ?? null);
+  const [picksData, setPicksData] = useState<PicksResponse | null>(initialPicks ?? null);
+  const [picksLoading, setPicksLoading] = useState(!initialPicks);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [secondsLeft, setSecondsLeft] = useState(REFRESH_MS / 1000);
   const [watchlistOnly, setWatchlistOnly] = useState(false);
 
-  const [uwConfigured, setUwConfigured] = useState(false);
+  const [uwConfigured, setUwConfigured] = useState(initialUwConfigured);
 
   const [watchlist, setWatchlist] = usePersistentState<WatchTarget[]>(
     WATCHLIST_KEY,

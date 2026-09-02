@@ -2,9 +2,6 @@
 
 import { useState } from "react";
 
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-
 export function UwKeyForm({
   configured,
   onConfigured,
@@ -12,14 +9,20 @@ export function UwKeyForm({
   configured: boolean;
   onConfigured: () => void;
 }) {
-  const [key, setKey] = useState("");
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [failed, setFailed] = useState(false);
   const live = configured || saved;
 
-  async function save() {
+  async function save(key: string) {
+    const trimmed = key.trim();
+    if (trimmed.length < 8) {
+      setFailed(true);
+      setMessage("Paste the full Unusual Whales key, then tap Connect live.");
+      return;
+    }
+
     setSaving(true);
     setMessage(null);
     setFailed(false);
@@ -27,7 +30,7 @@ export function UwKeyForm({
       const response = await fetch("/api/uw-key", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ key }),
+        body: JSON.stringify({ key: trimmed }),
       });
       const payload = (await response.json()) as { configured?: boolean; error?: string };
       if (!response.ok) {
@@ -35,7 +38,6 @@ export function UwKeyForm({
         setMessage(payload.error ?? "Could not save key.");
         return;
       }
-      setKey("");
       setSaved(true);
       setMessage("Live Unusual Whales connected. Refreshing tape.");
       onConfigured();
@@ -52,29 +54,39 @@ export function UwKeyForm({
       className="rounded-lg border border-border/70 bg-muted/20 p-3"
       onSubmit={(event) => {
         event.preventDefault();
-        void save();
+        const form = event.currentTarget;
+        const value = String(new FormData(form).get("key") ?? "");
+        void save(value);
+        const field = form.elements.namedItem("key");
+        if (field instanceof HTMLInputElement) field.value = "";
       }}
     >
       <div className="text-[10px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
         Unusual Whales API
       </div>
       <p className="mt-1 text-xs text-muted-foreground">
-        Paste your Bearer key. It is sent only to this server, never stored in the browser, and
-        never shown again.
+        Paste your Bearer key, then tap Connect live. It is sent only to this server and never
+        stored on the phone.
       </p>
       <div className="mt-2 flex flex-col gap-2 sm:flex-row">
-        <Input
+        <input
+          name="key"
           type="password"
+          inputMode="text"
           autoComplete="off"
+          autoCorrect="off"
+          autoCapitalize="none"
           spellCheck={false}
-          placeholder={live ? "Key on file — paste a new one to replace" : "UNUSUAL_WHALES_API_KEY"}
-          value={key}
-          className="font-mono"
-          onChange={(event) => setKey(event.target.value)}
+          placeholder={live ? "Key on file — paste a new one to replace" : "Paste Unusual Whales API key"}
+          className="h-11 w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 font-mono text-base outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
         />
-        <Button type="submit" disabled={saving || key.trim().length < 8}>
+        <button
+          type="submit"
+          disabled={saving}
+          className="inline-flex h-11 shrink-0 items-center justify-center rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-50"
+        >
           {saving ? "Checking…" : live ? "Replace key" : "Connect live"}
-        </Button>
+        </button>
       </div>
       {message ? (
         <p className={`mt-2 text-xs ${failed ? "text-rose-300" : "text-emerald-300"}`}>{message}</p>

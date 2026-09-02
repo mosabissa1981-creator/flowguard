@@ -1,9 +1,24 @@
 import { Screener } from "@/components/screener";
+import { DEFAULT_FILTERS } from "@/lib/filters";
+import { loadRankedFlow } from "@/lib/flow-service";
+import { loadDailyPicks } from "@/lib/picks";
+import { hasUnusualWhalesKey } from "@/lib/uw";
 
-export default function Home() {
+export const dynamic = "force-dynamic";
+
+export default async function Home() {
+  const [initialFlow, initialPicks] = await Promise.all([
+    loadRankedFlow(DEFAULT_FILTERS),
+    loadDailyPicks(),
+  ]);
+
   return (
     <div className="flex min-h-full flex-1 flex-col">
-      <Screener />
+      <Screener
+        initialFlow={initialFlow}
+        initialPicks={initialPicks}
+        initialUwConfigured={hasUnusualWhalesKey()}
+      />
       <footer className="border-t border-border/70 px-6 py-4 text-center text-xs text-muted-foreground">
         FlowGuard screens options flow only. It does not route orders, place trades, or give
         investment advice. Watchlist, notes, and dismissed alerts stay in this browser.
