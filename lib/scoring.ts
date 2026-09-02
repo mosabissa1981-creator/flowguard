@@ -1,7 +1,7 @@
 import type { FlowAlert, RankedFlow, ScoreChip, TideSnapshot } from "@/lib/types";
 import { askShare, clamp, daysToExpiry, toNumber } from "@/lib/numbers";
 
-const BASE_SCORE = 42;
+const BASE_SCORE = 32;
 
 function chip(
   id: string,
@@ -32,7 +32,7 @@ export function scoreAlert(
   const aggressive = share >= 0.55;
 
   if (share >= 0.8) {
-    const delta = 16;
+    const delta = 12;
     score += delta;
     chips.push(
       chip(
@@ -44,7 +44,7 @@ export function scoreAlert(
       ),
     );
   } else if (share >= 0.6) {
-    const delta = 9;
+    const delta = 6;
     score += delta;
     chips.push(
       chip(
@@ -56,7 +56,7 @@ export function scoreAlert(
       ),
     );
   } else if (share < 0.4) {
-    const delta = -18;
+    const delta = -16;
     score += delta;
     chips.push(
       chip(
@@ -70,7 +70,7 @@ export function scoreAlert(
   }
 
   if (alert.all_opening_trades) {
-    const delta = 12;
+    const delta = 10;
     score += delta;
     chips.push(
       chip(
@@ -84,7 +84,7 @@ export function scoreAlert(
   }
 
   if (volOi >= 3) {
-    const delta = 12;
+    const delta = 8;
     score += delta;
     chips.push(
       chip(
@@ -96,7 +96,7 @@ export function scoreAlert(
       ),
     );
   } else if (volOi >= 1) {
-    const delta = 7;
+    const delta = 5;
     score += delta;
     chips.push(
       chip(
@@ -110,13 +110,13 @@ export function scoreAlert(
   }
 
   if (premium >= 1_000_000) {
-    const delta = 14;
+    const delta = 10;
     score += delta;
     chips.push(
       chip("whale", "Whale premium", "boost", delta, "Seven-figure notional. Size that tends to mean it."),
     );
   } else if (premium >= 250_000) {
-    const delta = 10;
+    const delta = 7;
     score += delta;
     chips.push(
       chip(
@@ -128,13 +128,13 @@ export function scoreAlert(
       ),
     );
   } else if (premium >= 75_000) {
-    const delta = 6;
+    const delta = 4;
     score += delta;
     chips.push(
       chip("prem-ok", "Solid premium", "boost", delta, "Premium clears a tradable unusual-flow bar."),
     );
   } else if (premium > 0 && premium < 25_000) {
-    const delta = -16;
+    const delta = -14;
     score += delta;
     chips.push(
       chip(
@@ -148,7 +148,7 @@ export function scoreAlert(
   }
 
   if (dte >= 7 && dte <= 45) {
-    const delta = 11;
+    const delta = 8;
     score += delta;
     chips.push(
       chip(
@@ -160,7 +160,7 @@ export function scoreAlert(
       ),
     );
   } else if (dte <= 2) {
-    const delta = -24;
+    const delta = -22;
     score += delta;
     chips.push(
       chip(
@@ -172,13 +172,13 @@ export function scoreAlert(
       ),
     );
   } else if (dte < 7) {
-    const delta = -8;
+    const delta = -6;
     score += delta;
     chips.push(
       chip("short-dte", "Short DTE", "penalty", delta, `${dte} DTE is still lottery-adjacent for swing entries.`),
     );
   } else if (dte > 90) {
-    const delta = -5;
+    const delta = -4;
     score += delta;
     chips.push(
       chip("long-dte", "Long-dated", "penalty", delta, `${dte} DTE. Conviction decays into calendar noise.`),
@@ -186,14 +186,14 @@ export function scoreAlert(
   }
 
   if (alert.has_sweep) {
-    const delta = 8;
+    const delta = 6;
     score += delta;
     chips.push(
       chip("sweep", "Sweep", "boost", delta, "Intermarket sweep — urgency across exchanges, not a resting block."),
     );
   }
   if (alert.has_floor) {
-    const delta = 6;
+    const delta = 5;
     score += delta;
     chips.push(
       chip("floor", "Floor", "boost", delta, "Floor print. Often institutional, less likely a retail lottery ticket."),
@@ -201,7 +201,7 @@ export function scoreAlert(
   }
 
   if (alert.has_singleleg && !alert.has_multileg) {
-    const delta = 6;
+    const delta = 4;
     score += delta;
     chips.push(
       chip(
@@ -213,7 +213,7 @@ export function scoreAlert(
       ),
     );
   } else if (alert.has_multileg) {
-    const delta = -8;
+    const delta = -6;
     score += delta;
     chips.push(
       chip(
@@ -236,7 +236,7 @@ export function scoreAlert(
     const aligned =
       (isCall && fightBias === "bullish") || (!isCall && fightBias === "bearish");
     if (aligned) {
-      const delta = 6;
+      const delta = 4;
       score += delta;
       chips.push(
         chip(
@@ -248,7 +248,7 @@ export function scoreAlert(
         ),
       );
     } else {
-      const delta = -12;
+      const delta = -10;
       score += delta;
       chips.push(
         chip(
