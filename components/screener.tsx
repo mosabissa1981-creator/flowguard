@@ -11,6 +11,7 @@ import { DetailDrawer } from "@/components/detail-drawer";
 import { TideBar } from "@/components/tide-bar";
 import { PicksPanel } from "@/components/picks-panel";
 import { WatchlistBar } from "@/components/watchlist-bar";
+import { UwKeyForm } from "@/components/uw-key-form";
 import { DEFAULT_FILTERS } from "@/lib/filters";
 import type { DailyPick, FlowFilters, FlowResponse, PicksResponse, RankedFlow } from "@/lib/types";
 import { formatClock } from "@/lib/format";
@@ -35,6 +36,21 @@ import {
 } from "@/lib/manager";
 
 const REFRESH_MS = 45_000;
+const FETCH_MS = 20_000;
+
+async function fetchJson<T>(url: string): Promise<T> {
+  const response = await fetch(url, {
+    cache: "no-store",
+    signal:
+      typeof AbortSignal !== "undefined" && typeof AbortSignal.timeout === "function"
+        ? AbortSignal.timeout(FETCH_MS)
+        : undefined,
+  });
+  if (!response.ok) {
+    throw new Error(`Request failed (${response.status})`);
+  }
+  return (await response.json()) as T;
+}
 
 function toQuery(filters: FlowFilters): string {
   const params = new URLSearchParams({
@@ -64,6 +80,8 @@ export function Screener() {
   const [secondsLeft, setSecondsLeft] = useState(REFRESH_MS / 1000);
   const [watchlistOnly, setWatchlistOnly] = useState(false);
 
+  const [uwConfigured, setUwConfigured] = useState(false);
+
   const [watchlist, setWatchlist] = usePersistentState<WatchTarget[]>(
     WATCHLIST_KEY,
     EMPTY_WATCHLIST,
@@ -83,61 +101,80 @@ export function Screener() {
   const dismissedIds = useMemo(() => new Set(dismissed.map((item) => item.id)), [dismissed]);
 
   const loadFlow = useCallback(async () => {
-    const response = await fetch(`/api/flow?${query}`, { cache: "no-store" });
-    if (!response.ok) throw new Error(`Screener route failed (${response.status})`);
-    return (await response.json()) as FlowResponse;
+    return fetchJson<FlowResponse>(`/api/flow?${query}`);
   }, [query]);
 
   const loadPicks = useCallback(async () => {
-    const response = await fetch("/api/picks", { cache: "no-store" });
-    if (!response.ok) throw new Error(`Picks route failed (${response.status})`);
-    return (await response.json()) as PicksResponse;
+    return fetchJson<PicksResponse>("/api/picks");
   }, []);
 
   const load = useCallback(async () => {
-    try {
-      const [flow, picks] = await Promise.all([loadFlow(), loadPicks()]);
-      setData(flow);
-      setPicksData(picks);
+    const [flowResult, picksResult] = await Promise.allSettled([loadFlow(), loadPicks()]);
+    if (flowResult.status === "fulfilled") {
+      setData(flowResult.value);
       setError(null);
-      setLoading(false);
-      setPicksLoading(false);
-      setRefreshing(false);
-      setSecondsLeft(REFRESH_MS / 1000);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not load flow.");
-      setLoading(false);
-      setPicksLoading(false);
-      setRefreshing(false);
+    } else {
+      setError(
+        flowResult.reason instanceof Error ? flowResult.reason.message : "Could not load flow.",
+      );
     }
+    if (picksResult.status === "fulfilled") {
+      setPicksData(picksResult.value);
+    }
+    setLoading(false);
+    setPicksLoading(false);
+    setRefreshing(false);
+    setSecondsLeft(REFRESH_MS / 1000);
   }, [loadFlow, loadPicks]);
 
   useEffect(() => {
-    const controller = new AbortController();
+    let stale = false;
+    void (async () => {
+      try {
+        const status = await fetchJson<{ configured: boolean }>("/api/uw-key");
+        if (!stale) setUwConfigured(status.configured);
+      } catch {
+        // Status is optional; the connect form still works.
+      }
+    })();
+    return () => {
+      stale = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let stale = false;
 
     void (async () => {
       try {
-        const [flowRes, picksRes] = await Promise.all([
-          fetch(`/api/flow?${query}`, { cache: "no-store", signal: controller.signal }),
-          fetch("/api/picks", { cache: "no-store", signal: controller.signal }),
-        ]);
-        if (!flowRes.ok) throw new Error(`Screener route failed (${flowRes.status})`);
-        if (!picksRes.ok) throw new Error(`Picks route failed (${picksRes.status})`);
-        setData((await flowRes.json()) as FlowResponse);
-        setPicksData((await picksRes.json()) as PicksResponse);
+        const flow = await fetchJson<FlowResponse>(`/api/flow?${query}`);
+        if (stale) return;
+        setData(flow);
         setError(null);
         setLoading(false);
-        setPicksLoading(false);
         setSecondsLeft(REFRESH_MS / 1000);
       } catch (err) {
-        if (err instanceof DOMException && err.name === "AbortError") return;
+        if (stale) return;
         setError(err instanceof Error ? err.message : "Could not load flow.");
         setLoading(false);
+      }
+    })();
+
+    void (async () => {
+      try {
+        const picks = await fetchJson<PicksResponse>("/api/picks");
+        if (stale) return;
+        setPicksData(picks);
+        setPicksLoading(false);
+      } catch {
+        if (stale) return;
         setPicksLoading(false);
       }
     })();
 
-    return () => controller.abort();
+    return () => {
+      stale = true;
+    };
   }, [query]);
 
   useEffect(() => {
@@ -286,6 +323,14 @@ export function Screener() {
           </div>
         </div>
         <TideBar tide={data?.tide ?? null} />
+        <UwKeyForm
+          configured={uwConfigured || data?.source === "live"}
+          onConfigured={() => {
+            setUwConfigured(true);
+            setRefreshing(true);
+            void load();
+          }}
+        />
         <div className="flex flex-wrap items-center justify-between gap-2 font-mono text-[11px] text-muted-foreground">
           <span>
             {data

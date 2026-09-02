@@ -6,8 +6,17 @@ import { tideFromPremiums, toBool, toNumber } from "@/lib/numbers";
 const UW_BASE = "https://api.unusualwhales.com";
 const CLIENT_ID = "100001";
 
+let runtimeKey = "";
+
+export function setRuntimeUnusualWhalesKey(key: string) {
+  runtimeKey = key.trim();
+  if (runtimeKey) {
+    process.env.UNUSUAL_WHALES_API_KEY = runtimeKey;
+  }
+}
+
 export function getUnusualWhalesKey(): string {
-  return process.env.UNUSUAL_WHALES_API_KEY?.trim() ?? "";
+  return runtimeKey || process.env.UNUSUAL_WHALES_API_KEY?.trim() || "";
 }
 
 export function hasUnusualWhalesKey(): boolean {

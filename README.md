@@ -22,7 +22,7 @@ npm start
 
 ## Live data
 
-Set `UNUSUAL_WHALES_API_KEY` in `.env.local`. The key is read only in Next.js Route Handlers and is never sent to the client.
+Set `UNUSUAL_WHALES_API_KEY` in `.env.local`, or paste it in the **Unusual Whales API** box in the app. The key is POSTed to `POST /api/uw-key`, checked against Unusual Whales, stored only on the server (`.env.local`), and never written to the browser or returned by any API.
 
 | FlowGuard route | Unusual Whales endpoint |
 | --- | --- |
