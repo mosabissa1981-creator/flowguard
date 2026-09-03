@@ -13,8 +13,14 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   const hasToken = Boolean(process.env.BLOB_READ_WRITE_TOKEN?.trim());
-  const watches = await loadStoredWatches();
-  return Response.json({ watches, count: watches.length, blobConfigured: hasToken });
+  let debug: string | null = null;
+  let watches: Awaited<ReturnType<typeof loadStoredWatches>> = [];
+  try {
+    watches = await loadStoredWatches();
+  } catch (error) {
+    debug = error instanceof Error ? error.message : String(error);
+  }
+  return Response.json({ watches, count: watches.length, blobConfigured: hasToken, debug });
 }
 
 export async function POST(request: NextRequest) {

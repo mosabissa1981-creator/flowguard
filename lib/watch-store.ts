@@ -15,21 +15,19 @@ export async function loadStoredWatches(): Promise<PriceWatch[]> {
   const token = blobToken();
   if (!token) return [];
 
-  try {
-    const meta = await head(BLOB_PATH);
-    const url = new URL(meta.url);
-    url.searchParams.set("_t", String(Date.now()));
+  const meta = await head(BLOB_PATH);
+  const url = new URL(meta.url);
+  url.searchParams.set("_t", String(Date.now()));
 
-    const response = await fetch(url.toString(), {
-      headers: { Authorization: `Bearer ${token}` },
-      cache: "no-store",
-    });
-    if (!response.ok) return [];
-    const parsed = (await response.json()) as { watches?: unknown };
-    return Array.isArray(parsed.watches) ? parsed.watches.filter(isPriceWatch) : [];
-  } catch {
-    return [];
+  const response = await fetch(url.toString(), {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: "no-store",
+  });
+  if (!response.ok) {
+    throw new Error(`Blob fetch ${response.status} ${response.statusText}`);
   }
+  const parsed = (await response.json()) as { watches?: unknown };
+  return Array.isArray(parsed.watches) ? parsed.watches.filter(isPriceWatch) : [];
 }
 
 export async function saveStoredWatches(watches: PriceWatch[]): Promise<boolean> {
