@@ -12,8 +12,9 @@ import { fireWebhook } from "@/lib/watch-webhook";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
+  const hasToken = Boolean(process.env.BLOB_READ_WRITE_TOKEN?.trim());
   const watches = await loadStoredWatches();
-  return Response.json({ watches, count: watches.length });
+  return Response.json({ watches, count: watches.length, blobConfigured: hasToken });
 }
 
 export async function POST(request: NextRequest) {
