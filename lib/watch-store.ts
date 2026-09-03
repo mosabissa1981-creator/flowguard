@@ -27,9 +27,7 @@ export async function loadStoredWatches(): Promise<PriceWatch[]> {
     headers: { Authorization: `Bearer ${token}` },
     cache: "no-store",
   });
-  if (!response.ok) {
-    throw new Error(`Blob fetch ${response.status}`);
-  }
+  if (!response.ok) return [];
   const parsed = (await response.json()) as { watches?: unknown };
   return Array.isArray(parsed.watches) ? parsed.watches.filter(isPriceWatch) : [];
 }

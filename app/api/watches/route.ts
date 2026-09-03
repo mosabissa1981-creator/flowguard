@@ -12,15 +12,13 @@ import { fireWebhook } from "@/lib/watch-webhook";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const hasToken = Boolean(process.env.BLOB_READ_WRITE_TOKEN?.trim());
-  let debug: string | null = null;
   let watches: Awaited<ReturnType<typeof loadStoredWatches>> = [];
   try {
     watches = await loadStoredWatches();
-  } catch (error) {
-    debug = error instanceof Error ? error.message : String(error);
+  } catch {
+    watches = [];
   }
-  return Response.json({ watches, count: watches.length, blobConfigured: hasToken, debug });
+  return Response.json({ watches, count: watches.length });
 }
 
 export async function POST(request: NextRequest) {
