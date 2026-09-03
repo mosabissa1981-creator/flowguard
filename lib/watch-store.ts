@@ -1,6 +1,6 @@
 import "server-only";
 
-import { put, list } from "@vercel/blob";
+import { put, head } from "@vercel/blob";
 
 import { isPriceWatch } from "@/lib/price-watches";
 import type { PriceWatch } from "@/lib/types";
@@ -16,11 +16,11 @@ export async function loadStoredWatches(): Promise<PriceWatch[]> {
   if (!token) return [];
 
   try {
-    const { blobs } = await list({ prefix: BLOB_PATH, limit: 1 });
-    const url = blobs[0]?.url;
-    if (!url) return [];
+    const meta = await head(BLOB_PATH);
+    const url = new URL(meta.url);
+    url.searchParams.set("_t", String(Date.now()));
 
-    const response = await fetch(url, {
+    const response = await fetch(url.toString(), {
       headers: { Authorization: `Bearer ${token}` },
       cache: "no-store",
     });
@@ -43,6 +43,7 @@ export async function saveStoredWatches(watches: PriceWatch[]): Promise<boolean>
       contentType: "application/json",
       addRandomSuffix: false,
       allowOverwrite: true,
+      cacheControlMaxAge: 0,
     });
     return true;
   } catch {
