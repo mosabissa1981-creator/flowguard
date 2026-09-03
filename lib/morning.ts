@@ -4,70 +4,55 @@ import { loadRankedFlow } from "@/lib/flow-service";
 import { buildPickCopy } from "@/lib/thesis";
 import { PICKS_FILTERS, MAX_PICKS } from "@/lib/picks";
 import type { MorningShortlistResponse } from "@/lib/types";
+import {
+  isInMorningWindow,
+  morningOlderThanParam,
+  morningWindowClosed,
+  sessionHasOpened,
+  tradingDateET,
+} from "@/lib/session";
 
-const MORNING_WINDOW_MINUTES = 30;
-
-function etNow(): Date {
-  return new Date(
-    new Date().toLocaleString("en-US", { timeZone: "America/New_York" }),
-  );
-}
-
-function tradingDateET(): string {
-  const et = etNow();
-  const y = et.getFullYear();
-  const m = String(et.getMonth() + 1).padStart(2, "0");
-  const d = String(et.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-}
-
-function morningCutoffET(): Date {
-  const et = etNow();
-  et.setHours(9, 30 + MORNING_WINDOW_MINUTES, 0, 0);
-  return et;
-}
-
-function marketOpenET(): Date {
-  const et = etNow();
-  et.setHours(9, 30, 0, 0);
-  return et;
-}
+const MAX_MORNING = 8;
 
 let cache: { date: string; data: MorningShortlistResponse } | null = null;
 
 export async function loadMorningShortlist(): Promise<MorningShortlistResponse> {
   const today = tradingDateET();
 
-  if (cache && cache.date === today) {
+  if (cache && cache.date === today && morningWindowClosed()) {
     return cache.data;
   }
 
-  const ranked = await loadRankedFlow({
-    ...PICKS_FILTERS,
-    minConviction: 55,
-    strictAntiFade: true,
-  });
+  const label = `Morning shortlist — frozen ${today} 9:30–10:00 ET`;
 
-  const openET = marketOpenET();
-  const cutoff = morningCutoffET();
+  if (!sessionHasOpened()) {
+    return {
+      source: "live",
+      fetchedAt: new Date().toISOString(),
+      tradingDate: today,
+      snapshotLabel: label,
+      frozen: true,
+      picks: [],
+      tide: null,
+      warning: `Morning window starts 9:30 ET ${today}.`,
+    };
+  }
 
-  const morningAlerts = ranked.items.filter((row) => {
-    const created = new Date(row.alert.created_at);
-    if (!Number.isFinite(created.getTime())) return true;
-    const createdET = new Date(
-      created.toLocaleString("en-US", { timeZone: "America/New_York" }),
-    );
-    return createdET >= openET && createdET <= cutoff;
-  });
+  const ranked = await loadRankedFlow(
+    {
+      ...PICKS_FILTERS,
+      minConviction: 55,
+      strictAntiFade: true,
+    },
+    { olderThan: morningOlderThanParam(), maxPages: 6 },
+  );
 
-  const pool = morningAlerts.length >= 3 ? morningAlerts : ranked.items;
+  const morningAlerts = ranked.items.filter((row) => isInMorningWindow(row.alert.created_at));
 
-  const picks = pool.slice(0, Math.min(MAX_PICKS, 8)).map((row) => {
+  const picks = morningAlerts.slice(0, Math.min(MAX_PICKS, MAX_MORNING)).map((row) => {
     const copy = buildPickCopy(row);
     return { ...row, ...copy };
   });
-
-  const label = `Morning shortlist — frozen ${today} 9:30–10:00 ET`;
 
   const result: MorningShortlistResponse = {
     source: ranked.source,
@@ -78,11 +63,14 @@ export async function loadMorningShortlist(): Promise<MorningShortlistResponse> 
     picks,
     tide: ranked.tide,
     warning:
-      morningAlerts.length < 3
-        ? "Pre-open window had fewer than 3 setups. Showing the top of the full tape instead."
+      morningAlerts.length === 0
+        ? `No setups in the 9:30–10:00 ET window on ${today}. Not substituting older whale floors.`
         : ranked.warning,
   };
 
-  cache = { date: today, data: result };
+  if (morningWindowClosed()) {
+    cache = { date: today, data: result };
+  }
+
   return result;
 }

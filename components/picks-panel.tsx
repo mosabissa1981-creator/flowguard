@@ -61,7 +61,7 @@ export function PicksPanel({
         <p className="text-sm text-muted-foreground">Building the book from ranked flow…</p>
       ) : picks.length === 0 ? (
         <p className="text-sm text-muted-foreground">
-          No setups cleared strict anti-fade. Restore dismissed alerts or wait for the next print.
+          No setups cleared strict anti-fade in today's session. Not filling from older floor alerts.
         </p>
       ) : (
         <div className="grid gap-3 lg:grid-cols-2">

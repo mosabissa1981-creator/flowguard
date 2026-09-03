@@ -39,9 +39,9 @@ Set `UNUSUAL_WHALES_API_KEY` in `.env.local`, or paste it in the **Unusual Whale
 
 | FlowGuard route | Unusual Whales endpoint |
 | --- | --- |
-| `GET /api/flow` | `GET /api/option-trades/flow-alerts` (`unusual=true` when the preset is on) |
-| `GET /api/picks` | Same flow alerts, scored and cut with strict anti-fade, top 10 by conviction |
-| `GET /api/morning` | Frozen morning shortlist — top 5–8 from the 9:30–10:00 ET window, cached for the trading day |
+| `GET /api/flow` | `GET /api/option-trades/flow-alerts` with `newer_than` = unix seconds of today's 9:30 ET open (paginated with `older_than`, `limit=200`). Never `unusual=true`. Expired contracts are dropped locally (`created_at` ≥ 9:30 ET and `expiry` ≥ today). |
+| `GET /api/picks` | Same **today-only** tape, scored and cut with strict anti-fade, top 10 by conviction. Empty session stays empty. |
+| `GET /api/morning` | Frozen morning shortlist — top 5–8 from **this session's** 9:30–10:00 ET window. No fallback to older whale floors. |
 | `GET /api/tide` | `GET /api/market/market-tide` |
 | `GET /api/ticker/{ticker}/net-prem` | `GET /api/stock/{ticker}/net-prem-ticks` |
 | `GET/POST /api/watches/check` | `GET /api/stock/{ticker}/option-contracts` (`option_symbol[]`) then `GET /api/option-contract/{id}/historic`; else last flow print |
@@ -53,8 +53,9 @@ Requests use `Authorization: Bearer …` and `UW-CLIENT-API-ID: 100001`. If a li
 
 - Min premium, DTE range, calls/puts, ticker
 - Min conviction
-- Unusual preset — passes `unusual=true` to Unusual Whales (live-flow defaults: volume>OI, size>OI, opening, OTM, single-leg, DTE≤60, ask-side≥50%, premium≥$10k)
+- Unusual preset — applied **locally** on today's session tape (opening, vol&gt;OI, size&gt;OI, sweep/floor, or a named alert rule such as RepeatedHits). Does **not** send `unusual=true` to Unusual Whales.
 - Strict anti-fade — hides 0–2 DTE, tiny premium, bid-dominant, and fighting-tide rows
+- **Session filter** — UW `GET /api/option-trades/flow-alerts` with documented `newer_than` (unix seconds of 9:30 ET). There is no `intraday_only` param; `hide_expired` is not on this endpoint (it exists on `/api/option-trades`). FlowGuard then keeps only `created_at` ≥ 9:30 ET today and unexpired contracts. Rank/conviction apply inside that window. Empty windows stay empty — they do not fill from multi-week `LowHistoricVolumeFloor` alerts. `unusual=true` is never sent (UW docs: that flag is a live-options-flow *criteria* preset, not a session cut).
 - Auto-refresh every 45s, with pause
 
 Click a row for the detail drawer: score chips, ask/bid split, market tide, ticker net-premium ticks, pin, note, and dismiss.
@@ -63,7 +64,7 @@ Click a row for the detail drawer: score chips, ask/bid split, market tide, tick
 
 The manager book sits on the same Unusual Whales tape. It does not pick stocks.
 
-- **Morning shortlist** — `GET /api/morning` freezes the top 5–8 setups from the 9:30–10:00 ET flow window. The list is computed deterministically from the session's first 30 minutes and does not churn with the live tape. Rolls over automatically on the next trading day. If the pre-open window has fewer than 3 setups, the full tape is used as a fallback (labeled).
+- **Morning shortlist** — `GET /api/morning` freezes the top 5–8 setups from the 9:30–10:00 ET window **of this session**. If that window is empty, the panel stays empty — it does not fall back to older whale floors. Cache freezes after 10:00 ET.
 - **Picks of the Day** — `GET /api/picks` takes the unusual-flow tape, applies **strict anti-fade**, keeps conviction ≥ 55, and returns the top 5–10 setups by conviction with a plain-English thesis, fade risks, and an explicit options hold window (intraday–2 sessions, 2–7 sessions, or up to ~1–2 weeks — never hold to expiry, never a stock hold).
 - **Watchlist** — pin a ticker or a specific option contract. Stored in `localStorage` (`flowguard.watchlist`). Toggle *Watchlist only* to filter the tape.
 - **Manager notes** — optional note per alert id (`flowguard.notes`).

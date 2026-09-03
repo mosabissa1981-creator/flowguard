@@ -70,7 +70,7 @@ export function MorningPanel({
         <p className="text-sm text-muted-foreground">Loading the morning shortlist…</p>
       ) : picks.length === 0 ? (
         <p className="text-sm text-muted-foreground">
-          No setups cleared strict anti-fade in the morning window.
+          No setups in the 9:30–10:00 ET window. Not substituting older whale floors.
         </p>
       ) : (
         <div className="grid gap-3 lg:grid-cols-2">

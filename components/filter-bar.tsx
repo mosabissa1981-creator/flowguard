@@ -137,10 +137,10 @@ export function FilterBar({
             checked={filters.unusual}
             onCheckedChange={(checked) => onChange({ ...filters, unusual: checked })}
           />
-          <span>
+            <span>
             Unusual preset
             <span className="ml-1 hidden text-xs text-muted-foreground sm:inline">
-              UW live-flow defaults
+              this session: opening / vol&gt;OI / sweep / floor / named rule
             </span>
           </span>
         </label>

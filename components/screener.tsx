@@ -613,9 +613,11 @@ export function Screener({
           <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
             {watchlistOnly
               ? "Nothing on the tape matches the watchlist. Unpin Watchlist only, or pin another name."
-              : dismissed.length > 0
+              : data?.warning
+                ? data.warning
+                : dismissed.length > 0
                 ? "Visible tape is empty. Restore dismissed alerts or loosen filters."
-                : "Loosen min premium, widen DTE, drop min conviction, or turn off strict anti-fade."}
+                : "No prints in the current US cash session matched these filters. Not filling from older whale floors."}
           </p>
         </div>
       ) : (

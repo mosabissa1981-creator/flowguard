@@ -67,6 +67,9 @@ function asString(value: unknown, fallback = ""): string {
   return String(value);
 }
 
+const FLOW_ALERT_TTL_MS = 15_000;
+const flowAlertCache = new Map<string, { at: number; alerts: FlowAlert[] }>();
+
 export function normalizeFlowAlert(raw: Record<string, unknown>): FlowAlert {
   const typeRaw = asString(raw.type, "call").toLowerCase();
   return {
@@ -101,28 +104,78 @@ export function normalizeFlowAlert(raw: Record<string, unknown>): FlowAlert {
 }
 
 export async function fetchFlowAlerts(params: {
-  unusual?: boolean;
   minPremium?: number;
   side?: "all" | "call" | "put";
   ticker?: string;
   limit?: number;
+  newerThan?: string;
+  olderThan?: string;
+  maxPages?: number;
 }): Promise<FlowAlert[]> {
-  const query: Record<string, string | number | boolean | undefined> = {
-    limit: params.limit ?? 100,
-    min_premium: params.minPremium && params.minPremium > 0 ? params.minPremium : undefined,
-    ticker_symbol: params.ticker ? params.ticker.toUpperCase() : undefined,
-  };
+  // Official flow-alerts params (OpenAPI PublicApi.OptionTradeController.flow_alerts):
+  // newer_than / older_than (unix seconds or ISO date YYYY-MM-DD). There is no
+  // `intraday_only` and no `hide_expired` on this endpoint (hide_expired exists on
+  // /api/option-trades). `unusual=true` is a live-options-flow *criteria* preset
+  // (vol>OI, size>OI, all-opening, OTM, …) — not a session filter — and without
+  // newer_than the feed is a rolling multi-week unusual-alert log (floor/historic).
+  const pageSize = Math.min(params.limit ?? 200, 200);
+  const maxPages = Math.min(Math.max(params.maxPages ?? 2, 1), 8);
+  const cacheKey = JSON.stringify({
+    minPremium: params.minPremium ?? 0,
+    side: params.side ?? "all",
+    ticker: params.ticker ?? "",
+    newerThan: params.newerThan ?? "",
+    olderThan: params.olderThan ?? "",
+    pageSize,
+    maxPages,
+  });
+  const cached = flowAlertCache.get(cacheKey);
+  if (cached && Date.now() - cached.at < FLOW_ALERT_TTL_MS) {
+    return cached.alerts;
+  }
 
-  if (params.unusual) query.unusual = true;
-  if (params.side === "call") query.is_call = true;
-  if (params.side === "put") query.is_put = true;
+  const collected: FlowAlert[] = [];
+  const seen = new Set<string>();
+  let olderThan = params.olderThan;
 
-  const payload = await uwGet<{ data?: Record<string, unknown>[] }>(
-    "/api/option-trades/flow-alerts",
-    query,
-  );
+  for (let page = 0; page < maxPages; page += 1) {
+    const query: Record<string, string | number | boolean | undefined> = {
+      limit: pageSize,
+      min_premium: params.minPremium && params.minPremium > 0 ? params.minPremium : undefined,
+      ticker_symbol: params.ticker ? params.ticker.toUpperCase() : undefined,
+      newer_than: params.newerThan,
+      older_than: olderThan,
+    };
+    // Never send unusual=true — that is a criteria preset, not a session filter.
+    if (params.side === "call") query.is_call = true;
+    if (params.side === "put") query.is_put = true;
 
-  return (payload.data ?? []).map(normalizeFlowAlert);
+    const payload = await uwGet<{ data?: Record<string, unknown>[] }>(
+      "/api/option-trades/flow-alerts",
+      query,
+    );
+    const batch = (payload.data ?? []).map(normalizeFlowAlert);
+    if (batch.length === 0) break;
+
+    let oldestMs = Number.POSITIVE_INFINITY;
+    let added = 0;
+    for (const alert of batch) {
+      const createdMs = new Date(alert.created_at).getTime();
+      if (Number.isFinite(createdMs) && createdMs < oldestMs) oldestMs = createdMs;
+      if (seen.has(alert.id)) continue;
+      seen.add(alert.id);
+      collected.push(alert);
+      added += 1;
+    }
+
+    if (batch.length < pageSize || added === 0 || !Number.isFinite(oldestMs)) break;
+    const nextOlder = String(Math.floor(oldestMs / 1000));
+    if (nextOlder === olderThan) break;
+    olderThan = nextOlder;
+  }
+
+  flowAlertCache.set(cacheKey, { at: Date.now(), alerts: collected });
+  return collected;
 }
 
 export async function fetchMarketTide(): Promise<TideSnapshot | null> {
