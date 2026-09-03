@@ -115,6 +115,12 @@ export type PicksResponse = {
   warning?: string;
 };
 
+export type MorningShortlistResponse = PicksResponse & {
+  tradingDate: string;
+  snapshotLabel: string;
+  frozen: true;
+};
+
 export type PriceWatchKind = "adverse" | "entry_approach";
 
 export type PriceWatchStatus = "ok" | "approaching" | "adverse";

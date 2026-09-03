@@ -1,15 +1,17 @@
 import { Screener } from "@/components/screener";
 import { DEFAULT_FILTERS } from "@/lib/filters";
 import { loadRankedFlow } from "@/lib/flow-service";
+import { loadMorningShortlist } from "@/lib/morning";
 import { loadDailyPicks } from "@/lib/picks";
 import { hasUnusualWhalesKey } from "@/lib/uw";
 
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
-  const [initialFlow, initialPicks] = await Promise.all([
+  const [initialFlow, initialPicks, initialMorning] = await Promise.all([
     loadRankedFlow(DEFAULT_FILTERS),
     loadDailyPicks(),
+    loadMorningShortlist(),
   ]);
 
   return (
@@ -17,6 +19,7 @@ export default async function Home() {
       <Screener
         initialFlow={initialFlow}
         initialPicks={initialPicks}
+        initialMorning={initialMorning}
         initialUwConfigured={hasUnusualWhalesKey()}
       />
       <footer className="border-t border-border/70 px-6 py-4 text-center text-xs text-muted-foreground">

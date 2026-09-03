@@ -9,6 +9,7 @@ import { FilterBar } from "@/components/filter-bar";
 import { FlowList, FlowListSkeleton } from "@/components/flow-list";
 import { DetailDrawer } from "@/components/detail-drawer";
 import { TideBar } from "@/components/tide-bar";
+import { MorningPanel } from "@/components/morning-panel";
 import { PicksPanel } from "@/components/picks-panel";
 import { PriceWatchesPanel } from "@/components/price-watches-panel";
 import { WatchlistBar } from "@/components/watchlist-bar";
@@ -19,6 +20,7 @@ import type {
   EvaluatedWatch,
   FlowFilters,
   FlowResponse,
+  MorningShortlistResponse,
   PicksResponse,
   PriceWatch,
   RankedFlow,
@@ -81,10 +83,12 @@ function toQuery(filters: FlowFilters): string {
 export function Screener({
   initialFlow,
   initialPicks,
+  initialMorning,
   initialUwConfigured = false,
 }: {
   initialFlow?: FlowResponse | null;
   initialPicks?: PicksResponse | null;
+  initialMorning?: MorningShortlistResponse | null;
   initialUwConfigured?: boolean;
 }) {
   const [filters, setFilters] = useState<FlowFilters>(DEFAULT_FILTERS);
@@ -99,6 +103,11 @@ export function Screener({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [secondsLeft, setSecondsLeft] = useState(REFRESH_MS / 1000);
   const [watchlistOnly, setWatchlistOnly] = useState(false);
+
+  const [morningData, setMorningData] = useState<MorningShortlistResponse | null>(
+    initialMorning ?? null,
+  );
+  const [morningLoading, setMorningLoading] = useState(!initialMorning);
 
   const [uwConfigured, setUwConfigured] = useState(initialUwConfigured);
   const [uwLocked, setUwLocked] = useState(false);
@@ -221,6 +230,28 @@ export function Screener({
       stale = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (morningData) {
+      setMorningLoading(false);
+      return;
+    }
+    let stale = false;
+    void (async () => {
+      try {
+        const morning = await fetchJson<MorningShortlistResponse>("/api/morning");
+        if (!stale) {
+          setMorningData(morning);
+          setMorningLoading(false);
+        }
+      } catch {
+        if (!stale) setMorningLoading(false);
+      }
+    })();
+    return () => {
+      stale = true;
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     let stale = false;
@@ -447,6 +478,16 @@ export function Screener({
           {data?.warning ? <span className="text-amber-300">{data.warning}</span> : null}
         </div>
       </header>
+
+      <MorningPanel
+        morning={morningData}
+        loading={morningLoading}
+        notes={notes}
+        onSelect={setSelectedId}
+        onNote={writeNote}
+        priceWatches={priceWatches}
+        onSavePriceWatch={savePriceWatch}
+      />
 
       <PicksPanel
         picks={visiblePicks}

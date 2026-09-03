@@ -41,6 +41,7 @@ Set `UNUSUAL_WHALES_API_KEY` in `.env.local`, or paste it in the **Unusual Whale
 | --- | --- |
 | `GET /api/flow` | `GET /api/option-trades/flow-alerts` (`unusual=true` when the preset is on) |
 | `GET /api/picks` | Same flow alerts, scored and cut with strict anti-fade, top 10 by conviction |
+| `GET /api/morning` | Frozen morning shortlist — top 5–8 from the 9:30–10:00 ET window, cached for the trading day |
 | `GET /api/tide` | `GET /api/market/market-tide` |
 | `GET /api/ticker/{ticker}/net-prem` | `GET /api/stock/{ticker}/net-prem-ticks` |
 | `POST /api/watches/check` | `GET /api/stock/{ticker}/option-contracts` (`option_symbol[]`) then `GET /api/option-contract/{id}/historic`; else last flow print |
@@ -62,6 +63,7 @@ Click a row for the detail drawer: score chips, ask/bid split, market tide, tick
 
 The manager book sits on the same Unusual Whales tape. It does not pick stocks.
 
+- **Morning shortlist** — `GET /api/morning` freezes the top 5–8 setups from the 9:30–10:00 ET flow window. The list is computed deterministically from the session's first 30 minutes and does not churn with the live tape. Rolls over automatically on the next trading day. If the pre-open window has fewer than 3 setups, the full tape is used as a fallback (labeled).
 - **Picks of the Day** — `GET /api/picks` takes the unusual-flow tape, applies **strict anti-fade**, keeps conviction ≥ 55, and returns the top 5–10 setups by conviction with a plain-English thesis, fade risks, and an explicit options hold window (intraday–2 sessions, 2–7 sessions, or up to ~1–2 weeks — never hold to expiry, never a stock hold).
 - **Watchlist** — pin a ticker or a specific option contract. Stored in `localStorage` (`flowguard.watchlist`). Toggle *Watchlist only* to filter the tape.
 - **Manager notes** — optional note per alert id (`flowguard.notes`).
