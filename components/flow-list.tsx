@@ -6,8 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConvictionMeter } from "@/components/conviction-meter";
 import { HoldWindowCopy } from "@/components/hold-window-copy";
+import { PickWatchControls } from "@/components/pick-watch-controls";
 import { ScoreChips } from "@/components/score-chips";
-import type { RankedFlow } from "@/lib/types";
+import type { PriceWatch, RankedFlow } from "@/lib/types";
 import {
   formatDte,
   formatExpiry,
@@ -54,6 +55,8 @@ export function FlowList({
   onSelect,
   onPinTicker,
   onDismiss,
+  priceWatches = [],
+  onSavePriceWatch,
 }: {
   items: RankedFlow[];
   selectedId: string | null;
@@ -61,6 +64,8 @@ export function FlowList({
   onSelect: (id: string) => void;
   onPinTicker: (ticker: string) => void;
   onDismiss: (row: RankedFlow) => void;
+  priceWatches?: PriceWatch[];
+  onSavePriceWatch?: (watch: PriceWatch) => void;
 }) {
   return (
     <>
@@ -206,7 +211,7 @@ export function FlowList({
                 </div>
                 <HoldWindowCopy hold={row.holdWindow} compact className="mt-2" />
               </button>
-              <div className="mt-2 flex gap-1">
+              <div className="mt-2 flex flex-wrap gap-1">
                 <Button size="sm" variant="outline" onClick={() => onPinTicker(row.alert.ticker)}>
                   <Pin /> Pin
                 </Button>
@@ -214,6 +219,22 @@ export function FlowList({
                   <EyeOff /> Dismiss
                 </Button>
               </div>
+              {onSavePriceWatch && row.alert.option_chain ? (
+                <div className="mt-2">
+                  <PickWatchControls
+                    seed={{
+                      ticker: row.alert.ticker,
+                      option_chain: row.alert.option_chain,
+                      strike: row.alert.strike,
+                      expiry: row.alert.expiry,
+                      type: row.alert.type,
+                      price: row.alert.price,
+                    }}
+                    watches={priceWatches}
+                    onSave={onSavePriceWatch}
+                  />
+                </div>
+              ) : null}
             </div>
           );
         })}

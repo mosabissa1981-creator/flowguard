@@ -1,50 +1,46 @@
 import "server-only";
 
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import path from "node:path";
+import { put, list, del } from "@vercel/blob";
 
 import { isPriceWatch } from "@/lib/price-watches";
 import type { PriceWatch } from "@/lib/types";
 
-function storePaths(): string[] {
-  const local = path.join(process.cwd(), "data", "watches.json");
-  if (process.env.VERCEL === "1") {
-    return ["/tmp/flowguard-watches.json", local];
-  }
-  return [local, "/tmp/flowguard-watches.json"];
-}
+const BLOB_PATH = "flowguard/watches.json";
 
-async function readFrom(file: string): Promise<PriceWatch[] | null> {
+async function blobUrl(): Promise<string | null> {
   try {
-    const raw = await readFile(file, "utf8");
-    const parsed = JSON.parse(raw) as { watches?: unknown };
-    const list = Array.isArray(parsed.watches) ? parsed.watches.filter(isPriceWatch) : [];
-    return list;
+    const { blobs } = await list({ prefix: BLOB_PATH, limit: 1 });
+    return blobs[0]?.url ?? null;
   } catch {
     return null;
   }
 }
 
 export async function loadStoredWatches(): Promise<PriceWatch[]> {
-  for (const file of storePaths()) {
-    const list = await readFrom(file);
-    if (list) return list;
+  try {
+    const url = await blobUrl();
+    if (!url) return [];
+    const response = await fetch(url, { cache: "no-store" });
+    if (!response.ok) return [];
+    const parsed = (await response.json()) as { watches?: unknown };
+    return Array.isArray(parsed.watches) ? parsed.watches.filter(isPriceWatch) : [];
+  } catch {
+    return [];
   }
-  return [];
 }
 
-export async function saveStoredWatches(watches: PriceWatch[]): Promise<{ persisted: boolean; path: string | null }> {
-  const payload = `${JSON.stringify({ watches, updatedAt: new Date().toISOString() }, null, 2)}\n`;
-  for (const file of storePaths()) {
-    try {
-      await mkdir(path.dirname(file), { recursive: true });
-      await writeFile(file, payload, "utf8");
-      return { persisted: true, path: file };
-    } catch {
-      // Try the next location (Vercel project dir is read-only).
-    }
+export async function saveStoredWatches(watches: PriceWatch[]): Promise<boolean> {
+  try {
+    const payload = JSON.stringify({ watches, updatedAt: new Date().toISOString() });
+    await put(BLOB_PATH, payload, {
+      access: "public",
+      contentType: "application/json",
+      addRandomSuffix: false,
+    });
+    return true;
+  } catch {
+    return false;
   }
-  return { persisted: false, path: null };
 }
 
 export async function upsertStoredWatch(watch: PriceWatch): Promise<PriceWatch[]> {

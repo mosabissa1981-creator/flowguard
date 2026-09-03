@@ -7,17 +7,24 @@ import type { PriceWatch } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
+export async function GET() {
+  return check(await loadStoredWatches());
+}
+
 export async function POST(request: NextRequest) {
   let body: { watches?: unknown };
   try {
     body = (await request.json()) as { watches?: unknown };
   } catch {
-    return Response.json({ error: "Send JSON { watches }." }, { status: 400 });
+    return Response.json({ error: "Send JSON { watches } or use GET to check server watches." }, { status: 400 });
   }
 
   const incoming = Array.isArray(body.watches) ? body.watches.filter(isPriceWatch) : [];
   const watches: PriceWatch[] = incoming.length > 0 ? incoming : await loadStoredWatches();
+  return check(watches);
+}
 
+async function check(watches: PriceWatch[]) {
   const quotes = hasUnusualWhalesKey()
     ? await fetchOptionQuotes(
         watches.map((watch) => ({

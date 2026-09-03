@@ -255,6 +255,37 @@ export function Screener({
 
   useEffect(() => {
     let stale = false;
+    void (async () => {
+      try {
+        const serverWatches = await fetchJson<{ watches: PriceWatch[] }>("/api/watches");
+        if (stale) return;
+        const server = serverWatches.watches ?? [];
+        const local = priceWatches;
+        const merged = [...server];
+        for (const localWatch of local) {
+          if (!merged.some((sw) => sw.id === localWatch.id)) {
+            merged.push(localWatch);
+          }
+        }
+        setPriceWatches(merged);
+        if (merged.length !== server.length) {
+          void fetch("/api/watches", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ watches: merged }),
+          }).catch(() => {});
+        }
+      } catch {
+        // Offline or no server watches — keep localStorage.
+      }
+    })();
+    return () => {
+      stale = true;
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    let stale = false;
 
     void (async () => {
       try {
@@ -371,23 +402,20 @@ export function Screener({
   }
 
   function savePriceWatch(watch: PriceWatch) {
-    setPriceWatches((prev) => upsertWatch(prev, watch));
+    const next = upsertWatch(priceWatches, watch);
+    setPriceWatches(next);
     void fetch("/api/watches", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ watch }),
-    }).catch(() => {
-      // localStorage is the source of truth on Vercel.
-    });
-    void checkWatches(upsertWatch(priceWatches, watch));
+    }).catch(() => {});
+    void checkWatches(next);
   }
 
   function removePriceWatch(id: string) {
     const next = priceWatches.filter((item) => item.id !== id);
     setPriceWatches(next);
-    void fetch(`/api/watches?id=${encodeURIComponent(id)}`, { method: "DELETE" }).catch(() => {
-      // localStorage is the source of truth on Vercel.
-    });
+    void fetch(`/api/watches?id=${encodeURIComponent(id)}`, { method: "DELETE" }).catch(() => {});
     void checkWatches(next);
   }
 
@@ -598,6 +626,8 @@ export function Screener({
           onSelect={setSelectedId}
           onPinTicker={toggleTicker}
           onDismiss={dismissRow}
+          priceWatches={priceWatches}
+          onSavePriceWatch={savePriceWatch}
         />
       )}
 

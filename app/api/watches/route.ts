@@ -7,19 +7,13 @@ import {
   saveStoredWatches,
   upsertStoredWatch,
 } from "@/lib/watch-store";
+import { fireWebhook } from "@/lib/watch-webhook";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   const watches = await loadStoredWatches();
-  return Response.json({
-    watches,
-    persisted: true,
-    note:
-      process.env.VERCEL === "1"
-        ? "Vercel disk is ephemeral. Prefer POST /api/watches/check with the browser watch list."
-        : "File store at data/watches.json for local monitor jobs.",
-  });
+  return Response.json({ watches, count: watches.length });
 }
 
 export async function POST(request: NextRequest) {
@@ -32,8 +26,8 @@ export async function POST(request: NextRequest) {
 
   if (Array.isArray(body.watches)) {
     const watches = body.watches.filter(isPriceWatch);
-    const saved = await saveStoredWatches(watches);
-    return Response.json({ watches, persisted: saved.persisted });
+    const persisted = await saveStoredWatches(watches);
+    return Response.json({ watches, persisted });
   }
 
   if (!isPriceWatch(body.watch)) {
@@ -41,7 +35,8 @@ export async function POST(request: NextRequest) {
   }
 
   const watches = await upsertStoredWatch(body.watch);
-  return Response.json({ watches, persisted: true });
+  const webhook = await fireWebhook(body.watch, "armed");
+  return Response.json({ watches, persisted: true, webhook });
 }
 
 export async function DELETE(request: NextRequest) {
@@ -49,6 +44,9 @@ export async function DELETE(request: NextRequest) {
   if (!id) {
     return Response.json({ error: "Pass ?id=." }, { status: 400 });
   }
+  const before = await loadStoredWatches();
+  const removed = before.find((w) => w.id === id);
   const watches = await removeStoredWatch(id);
+  if (removed) await fireWebhook(removed, "removed").catch(() => {});
   return Response.json({ watches });
 }

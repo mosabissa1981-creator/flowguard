@@ -44,8 +44,8 @@ Set `UNUSUAL_WHALES_API_KEY` in `.env.local`, or paste it in the **Unusual Whale
 | `GET /api/morning` | Frozen morning shortlist — top 5–8 from the 9:30–10:00 ET window, cached for the trading day |
 | `GET /api/tide` | `GET /api/market/market-tide` |
 | `GET /api/ticker/{ticker}/net-prem` | `GET /api/stock/{ticker}/net-prem-ticks` |
-| `POST /api/watches/check` | `GET /api/stock/{ticker}/option-contracts` (`option_symbol[]`) then `GET /api/option-contract/{id}/historic`; else last flow print |
-| `GET/POST/DELETE /api/watches` | Local `data/watches.json` for monitor jobs (ephemeral on Vercel — pass watches into `/check`) |
+| `GET/POST /api/watches/check` | `GET /api/stock/{ticker}/option-contracts` (`option_symbol[]`) then `GET /api/option-contract/{id}/historic`; else last flow print |
+| `GET/POST/DELETE /api/watches` | Vercel Blob (`flowguard/watches.json`) — durable across deploys; external checker reads `GET /api/watches` |
 
 Requests use `Authorization: Bearer …` and `UW-CLIENT-API-ID: 100001`. If a live request fails, the screener falls back to mock data and shows a warning.
 
@@ -68,9 +68,9 @@ The manager book sits on the same Unusual Whales tape. It does not pick stocks.
 - **Watchlist** — pin a ticker or a specific option contract. Stored in `localStorage` (`flowguard.watchlist`). Toggle *Watchlist only* to filter the tape.
 - **Manager notes** — optional note per alert id (`flowguard.notes`).
 - **Dismiss** — hide an alert from picks and the tape (`flowguard.dismissed`). Restore one name or restore all.
-- **Price watches** — options only. **Track entry** alerts if live premium moves against a fill (default 15% or a stop). **Watch for entry** alerts when live premium is within 5% of a target. Stored in `localStorage` (`flowguard.priceWatches`); `POST /api/watches/check` quotes Unusual Whales last/NBBO (else last flow print) and returns structured alerts. Never auto-trades.
+- **Price watches** — options only. **Bought** (one tap) arms an adverse-move watch at the last print (15% default). **Watch entry** (one tap) arms an entry-approach watch (5% band). Tap Adjust to change the numbers. Watches are stored in Vercel Blob (durable across deploys) and synced to `localStorage` on load. An external checker calls `GET /api/watches` to read all armed watches, and `GET /api/watches/check` to get live quotes and alerts. On each arm/remove the server also POSTs to `WATCH_WEBHOOK_URL` (with `WATCH_WEBHOOK_SECRET` header) if set. Never auto-trades.
 
-No brokerage routing. Notes, pins, and price watches never leave the browser except when you ask the server to check quotes.
+No brokerage routing. Notes and pins stay in the browser. Price watches are durable on the server.
 
 ## Conviction score
 

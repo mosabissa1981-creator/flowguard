@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Check, Eye } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { toNumber } from "@/lib/numbers";
@@ -33,33 +34,88 @@ export function PickWatchControls({
   watches: PriceWatch[];
   onSave: (watch: PriceWatch) => void;
 }) {
-  const [form, setForm] = useState<"adverse" | "entry" | null>(null);
+  const [expand, setExpand] = useState<"adverse" | "entry" | null>(null);
+  const [justBought, setJustBought] = useState(false);
+  const [justEntry, setJustEntry] = useState(false);
   const suggested = toNumber(seed.price);
   const hasAdverse = watches.some((watch) => watch.id === watchId("adverse", seed.option_chain));
   const hasEntry = watches.some((watch) => watch.id === watchId("entry_approach", seed.option_chain));
 
   if (!seed.option_chain) return null;
 
+  function oneTapBought() {
+    if (!suggested || suggested <= 0) {
+      setExpand("adverse");
+      return;
+    }
+    onSave(
+      makeAdverseWatch({
+        ticker: seed.ticker,
+        option_chain: seed.option_chain,
+        strike: seed.strike,
+        expiry: seed.expiry,
+        type: seed.type,
+        entryPremium: suggested,
+        lastFlowPrint: suggested,
+      }),
+    );
+    setJustBought(true);
+    setTimeout(() => setJustBought(false), 2000);
+  }
+
+  function oneTapEntry() {
+    if (!suggested || suggested <= 0) {
+      setExpand("entry");
+      return;
+    }
+    onSave(
+      makeEntryWatch({
+        ticker: seed.ticker,
+        option_chain: seed.option_chain,
+        strike: seed.strike,
+        expiry: seed.expiry,
+        type: seed.type,
+        targetPremium: suggested,
+        lastFlowPrint: suggested,
+      }),
+    );
+    setJustEntry(true);
+    setTimeout(() => setJustEntry(false), 2000);
+  }
+
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap gap-1.5">
         <Button
           size="sm"
-          variant={hasAdverse || form === "adverse" ? "secondary" : "outline"}
-          onClick={() => setForm((value) => (value === "adverse" ? null : "adverse"))}
+          variant={hasAdverse || justBought ? "secondary" : "outline"}
+          onClick={oneTapBought}
+          disabled={justBought}
         >
-          {hasAdverse ? "Edit track" : "Track entry"}
+          <Check className="size-3.5" />
+          {justBought ? "Armed ✓" : hasAdverse ? "Bought ✓" : "Bought"}
         </Button>
         <Button
           size="sm"
-          variant={hasEntry || form === "entry" ? "secondary" : "outline"}
-          onClick={() => setForm((value) => (value === "entry" ? null : "entry"))}
+          variant={hasEntry || justEntry ? "secondary" : "outline"}
+          onClick={oneTapEntry}
+          disabled={justEntry}
         >
-          {hasEntry ? "Edit entry watch" : "Watch for entry"}
+          <Eye className="size-3.5" />
+          {justEntry ? "Watching ✓" : hasEntry ? "Watching ✓" : "Watch entry"}
         </Button>
+        {(hasAdverse || hasEntry) && !expand ? (
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setExpand(hasAdverse ? "adverse" : "entry")}
+          >
+            Adjust
+          </Button>
+        ) : null}
       </div>
 
-      {form === "adverse" ? (
+      {expand === "adverse" ? (
         <form
           className="space-y-2 rounded-lg border border-border/70 bg-muted/20 p-3"
           onSubmit={(event) => {
@@ -81,12 +137,11 @@ export function PickWatchControls({
                 lastFlowPrint: suggested || entry,
               }),
             );
-            setForm(null);
+            setExpand(null);
           }}
         >
           <p className="text-xs text-muted-foreground">
-            You bought this option. Alert if live premium moves against you. Options only — never
-            auto-trades.
+            Adjust entry premium and stop. Default adverse threshold is 15%.
           </p>
           <label className="block text-xs">
             Entry premium
@@ -100,34 +155,26 @@ export function PickWatchControls({
           </label>
           <label className="block text-xs">
             Adverse % (default 15)
-            <input
-              name="adversePct"
-              type="text"
-              inputMode="decimal"
-              defaultValue="15"
+            <input name="adversePct" type="text" inputMode="decimal" defaultValue="15"
               className="mt-1 h-11 w-full rounded-lg border border-input bg-transparent px-2.5 font-mono text-base"
             />
           </label>
           <label className="block text-xs">
             Optional stop premium
-            <input
-              name="stop"
-              type="text"
-              inputMode="decimal"
-              placeholder="Leave blank to use % only"
+            <input name="stop" type="text" inputMode="decimal" placeholder="Blank = % only"
               className="mt-1 h-11 w-full rounded-lg border border-input bg-transparent px-2.5 font-mono text-base"
             />
           </label>
-          <button
-            type="submit"
-            className="inline-flex h-11 items-center rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground"
-          >
-            Save position watch
-          </button>
+          <div className="flex gap-2">
+            <button type="submit"
+              className="inline-flex h-11 items-center rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground"
+            >Save</button>
+            <Button type="button" size="sm" variant="ghost" onClick={() => setExpand(null)}>Cancel</Button>
+          </div>
         </form>
       ) : null}
 
-      {form === "entry" ? (
+      {expand === "entry" ? (
         <form
           className="space-y-2 rounded-lg border border-border/70 bg-muted/20 p-3"
           onSubmit={(event) => {
@@ -147,39 +194,31 @@ export function PickWatchControls({
                 lastFlowPrint: suggested || target,
               }),
             );
-            setForm(null);
+            setExpand(null);
           }}
         >
           <p className="text-xs text-muted-foreground">
-            Not in yet. Alert when live premium is within the band of this target. Default target is
-            the last print.
+            Adjust target entry premium. Default approach band is 5%.
           </p>
           <label className="block text-xs">
             Target entry premium
-            <input
-              name="target"
-              type="text"
-              inputMode="decimal"
+            <input name="target" type="text" inputMode="decimal"
               defaultValue={suggested ? String(suggested) : ""}
               className="mt-1 h-11 w-full rounded-lg border border-input bg-transparent px-2.5 font-mono text-base"
             />
           </label>
           <label className="block text-xs">
             Approach % (default 5)
-            <input
-              name="approachPct"
-              type="text"
-              inputMode="decimal"
-              defaultValue="5"
+            <input name="approachPct" type="text" inputMode="decimal" defaultValue="5"
               className="mt-1 h-11 w-full rounded-lg border border-input bg-transparent px-2.5 font-mono text-base"
             />
           </label>
-          <button
-            type="submit"
-            className="inline-flex h-11 items-center rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground"
-          >
-            Save entry watch
-          </button>
+          <div className="flex gap-2">
+            <button type="submit"
+              className="inline-flex h-11 items-center rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground"
+            >Save</button>
+            <Button type="button" size="sm" variant="ghost" onClick={() => setExpand(null)}>Cancel</Button>
+          </div>
         </form>
       ) : null}
     </div>
