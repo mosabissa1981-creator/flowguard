@@ -10,11 +10,22 @@ import { FlowList, FlowListSkeleton } from "@/components/flow-list";
 import { DetailDrawer } from "@/components/detail-drawer";
 import { TideBar } from "@/components/tide-bar";
 import { PicksPanel } from "@/components/picks-panel";
+import { PriceWatchesPanel } from "@/components/price-watches-panel";
 import { WatchlistBar } from "@/components/watchlist-bar";
 import { UwKeyForm } from "@/components/uw-key-form";
 import { DEFAULT_FILTERS } from "@/lib/filters";
-import type { DailyPick, FlowFilters, FlowResponse, PicksResponse, RankedFlow } from "@/lib/types";
+import type {
+  DailyPick,
+  EvaluatedWatch,
+  FlowFilters,
+  FlowResponse,
+  PicksResponse,
+  PriceWatch,
+  RankedFlow,
+  WatchCheckResponse,
+} from "@/lib/types";
 import { formatClock } from "@/lib/format";
+import { toNumber } from "@/lib/numbers";
 import { usePersistentState } from "@/hooks/use-persistent-state";
 import {
   DISMISSED_KEY,
@@ -34,6 +45,7 @@ import {
   type ManagerNoteMap,
   type WatchTarget,
 } from "@/lib/manager";
+import { EMPTY_PRICE_WATCHES, PRICE_WATCHES_KEY, upsertWatch } from "@/lib/price-watches";
 
 const REFRESH_MS = 45_000;
 const FETCH_MS = 20_000;
@@ -100,6 +112,12 @@ export function Screener({
     DISMISSED_KEY,
     EMPTY_DISMISSED,
   );
+  const [priceWatches, setPriceWatches] = usePersistentState<PriceWatch[]>(
+    PRICE_WATCHES_KEY,
+    EMPTY_PRICE_WATCHES,
+  );
+  const [watchCheck, setWatchCheck] = useState<WatchCheckResponse | null>(null);
+  const [watchesLoading, setWatchesLoading] = useState(false);
 
   useEffect(() => {
     const handle = window.setTimeout(() => setDebounced(filters), 280);
@@ -116,6 +134,56 @@ export function Screener({
   const loadPicks = useCallback(async () => {
     return fetchJson<PicksResponse>("/api/picks");
   }, []);
+
+  const freshenWatches = useCallback(
+    (list: PriceWatch[]): PriceWatch[] => {
+      const prints = new Map<string, number>();
+      for (const row of [...(data?.items ?? []), ...(picksData?.picks ?? [])]) {
+        const price = toNumber(row.alert.price);
+        if (row.alert.option_chain && price > 0) prints.set(row.alert.option_chain, price);
+      }
+      return list.map((watch) => ({
+        ...watch,
+        lastFlowPrint: prints.get(watch.option_chain) ?? watch.lastFlowPrint,
+      }));
+    },
+    [data?.items, picksData?.picks],
+  );
+
+  const checkWatches = useCallback(
+    async (list: PriceWatch[]) => {
+      if (list.length === 0) {
+        setWatchCheck({ checkedAt: new Date().toISOString(), evaluations: [], alerts: [] });
+        return;
+      }
+      setWatchesLoading(true);
+      try {
+        const payload = await fetch("/api/watches/check", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ watches: freshenWatches(list) }),
+          cache: "no-store",
+        });
+        if (!payload.ok) throw new Error(`Watch check failed (${payload.status})`);
+        setWatchCheck((await payload.json()) as WatchCheckResponse);
+      } catch {
+        setWatchCheck({
+          checkedAt: new Date().toISOString(),
+          evaluations: list.map((watch) => ({
+            watch,
+            quote: null,
+            status: "ok",
+            pctMove: null,
+            hint: null,
+          })),
+          alerts: [],
+        });
+      } finally {
+        setWatchesLoading(false);
+      }
+    },
+    [freshenWatches],
+  );
 
   const load = useCallback(async () => {
     const [flowResult, picksResult] = await Promise.allSettled([loadFlow(), loadPicks()]);
@@ -188,6 +256,10 @@ export function Screener({
       stale = true;
     };
   }, [query]);
+
+  useEffect(() => {
+    void checkWatches(priceWatches);
+  }, [checkWatches, priceWatches]);
 
   useEffect(() => {
     if (paused) return;
@@ -267,6 +339,27 @@ export function Screener({
     setDismissed((prev) => prev.filter((item) => item.id !== id));
   }
 
+  function savePriceWatch(watch: PriceWatch) {
+    setPriceWatches((prev) => upsertWatch(prev, watch));
+    void fetch("/api/watches", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ watch }),
+    }).catch(() => {
+      // localStorage is the source of truth on Vercel.
+    });
+    void checkWatches(upsertWatch(priceWatches, watch));
+  }
+
+  function removePriceWatch(id: string) {
+    const next = priceWatches.filter((item) => item.id !== id);
+    setPriceWatches(next);
+    void fetch(`/api/watches?id=${encodeURIComponent(id)}`, { method: "DELETE" }).catch(() => {
+      // localStorage is the source of truth on Vercel.
+    });
+    void checkWatches(next);
+  }
+
   function writeNote(id: string, note: string) {
     setNotes((prev) => {
       if (!note.trim()) {
@@ -297,8 +390,9 @@ export function Screener({
                 </Badge>
               </div>
               <p className="mt-1 max-w-xl text-sm text-muted-foreground">
-                Manager book on top of ranked unusual options flow. Pin contracts, annotate picks,
-                and dismiss noise — scoring still comes from Unusual Whales.
+                Manager book on top of ranked unusual options flow. Pin contracts, watch option
+                premiums, annotate picks, and dismiss noise — scoring still comes from Unusual
+                Whales. Never auto-trades.
               </p>
             </div>
           </div>
@@ -364,6 +458,30 @@ export function Screener({
         onPinTicker={toggleTicker}
         onPinContract={toggleContract}
         onDismiss={dismissRow}
+        priceWatches={priceWatches}
+        onSavePriceWatch={savePriceWatch}
+      />
+
+      <PriceWatchesPanel
+        evaluations={
+          (watchCheck?.evaluations.filter((row) =>
+            priceWatches.some((watch) => watch.id === row.watch.id),
+          ) ??
+            priceWatches.map(
+              (watch): EvaluatedWatch => ({
+                watch,
+                quote: null,
+                status: "ok",
+                pctMove: null,
+                hint: null,
+              }),
+            ))
+        }
+        alerts={(watchCheck?.alerts ?? []).filter((alert) =>
+          priceWatches.some((watch) => watch.id === alert.watchId),
+        )}
+        loading={watchesLoading && priceWatches.length > 0}
+        onRemove={removePriceWatch}
       />
 
       <WatchlistBar
@@ -460,6 +578,8 @@ export function Screener({
         onPinTicker={toggleTicker}
         onPinContract={toggleContract}
         onDismiss={dismissRow}
+        priceWatches={priceWatches}
+        onSavePriceWatch={savePriceWatch}
       />
     </div>
   );

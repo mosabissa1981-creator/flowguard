@@ -43,6 +43,8 @@ Set `UNUSUAL_WHALES_API_KEY` in `.env.local`, or paste it in the **Unusual Whale
 | `GET /api/picks` | Same flow alerts, scored and cut with strict anti-fade, top 10 by conviction |
 | `GET /api/tide` | `GET /api/market/market-tide` |
 | `GET /api/ticker/{ticker}/net-prem` | `GET /api/stock/{ticker}/net-prem-ticks` |
+| `POST /api/watches/check` | `GET /api/stock/{ticker}/option-contracts` (`option_symbol[]`) then `GET /api/option-contract/{id}/historic`; else last flow print |
+| `GET/POST/DELETE /api/watches` | Local `data/watches.json` for monitor jobs (ephemeral on Vercel — pass watches into `/check`) |
 
 Requests use `Authorization: Bearer …` and `UW-CLIENT-API-ID: 100001`. If a live request fails, the screener falls back to mock data and shows a warning.
 
@@ -64,8 +66,9 @@ The manager book sits on the same Unusual Whales tape. It does not pick stocks.
 - **Watchlist** — pin a ticker or a specific option contract. Stored in `localStorage` (`flowguard.watchlist`). Toggle *Watchlist only* to filter the tape.
 - **Manager notes** — optional note per alert id (`flowguard.notes`).
 - **Dismiss** — hide an alert from picks and the tape (`flowguard.dismissed`). Restore one name or restore all.
+- **Price watches** — options only. **Track entry** alerts if live premium moves against a fill (default 15% or a stop). **Watch for entry** alerts when live premium is within 5% of a target. Stored in `localStorage` (`flowguard.priceWatches`); `POST /api/watches/check` quotes Unusual Whales last/NBBO (else last flow print) and returns structured alerts. Never auto-trades.
 
-No brokerage routing. Notes and pins never leave the browser.
+No brokerage routing. Notes, pins, and price watches never leave the browser except when you ask the server to check quotes.
 
 ## Conviction score
 

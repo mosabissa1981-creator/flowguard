@@ -45,6 +45,14 @@ export function formatPct(value: number): string {
   return `${Math.round(value * 100)}%`;
 }
 
+export function formatSignedPct(value: number): string {
+  const pct = value * 100;
+  const digits = Math.abs(pct) >= 10 ? 0 : 1;
+  const formatted = pct.toFixed(digits);
+  if (pct > 0) return `+${formatted}%`;
+  return `${formatted}%`;
+}
+
 export function formatStrike(value: string | number): string {
   const n = toNumber(value);
   if (Number.isInteger(n)) return n.toFixed(0);

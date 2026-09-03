@@ -16,10 +16,11 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import { ConvictionMeter } from "@/components/conviction-meter";
 import { HoldWindowCopy } from "@/components/hold-window-copy";
+import { PickWatchControls } from "@/components/pick-watch-controls";
 import { ScoreChips } from "@/components/score-chips";
 import { TideBar } from "@/components/tide-bar";
 import { cn } from "@/lib/utils";
-import type { NetPremTick, RankedFlow, TideSnapshot } from "@/lib/types";
+import type { NetPremTick, PriceWatch, RankedFlow, TideSnapshot } from "@/lib/types";
 import {
   formatClock,
   formatCompact,
@@ -91,6 +92,8 @@ export function DetailDrawer({
   onPinTicker,
   onPinContract,
   onDismiss,
+  priceWatches = [],
+  onSavePriceWatch,
 }: {
   row: RankedFlow | null;
   marketTide: TideSnapshot | null;
@@ -103,6 +106,8 @@ export function DetailDrawer({
   onPinTicker?: (ticker: string) => void;
   onPinContract?: (row: RankedFlow) => void;
   onDismiss?: (row: RankedFlow) => void;
+  priceWatches?: PriceWatch[];
+  onSavePriceWatch?: (watch: PriceWatch) => void;
 }) {
   const [tickCache, setTickCache] = useState<{
     ticker: string;
@@ -258,6 +263,21 @@ export function DetailDrawer({
                     </Button>
                   ) : null}
                 </div>
+
+                {onSavePriceWatch && alert.option_chain ? (
+                  <PickWatchControls
+                    seed={{
+                      ticker: alert.ticker,
+                      option_chain: alert.option_chain,
+                      strike: alert.strike,
+                      expiry: alert.expiry,
+                      type: alert.type,
+                      price: alert.price,
+                    }}
+                    watches={priceWatches}
+                    onSave={onSavePriceWatch}
+                  />
+                ) : null}
 
                 {onNote ? (
                   <label className="block">

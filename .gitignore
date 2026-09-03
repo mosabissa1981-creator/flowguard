@@ -37,6 +37,9 @@ yarn-error.log*
 # vercel
 .vercel
 
+# local watch file store
+/data/watches.json
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

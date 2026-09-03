@@ -114,3 +114,67 @@ export type PicksResponse = {
   tide: TideSnapshot | null;
   warning?: string;
 };
+
+export type PriceWatchKind = "adverse" | "entry_approach";
+
+export type PriceWatchStatus = "ok" | "approaching" | "adverse";
+
+export type WatchDataQuality = "uw_last" | "uw_nbbo" | "flow_print";
+
+/** Options-only price watch. Premiums are per-share option prices, not flow notional. */
+export type PriceWatch = {
+  id: string;
+  kind: PriceWatchKind;
+  ticker: string;
+  option_chain: string;
+  strike: string;
+  expiry: string;
+  type: OptionType;
+  /** Fill (adverse) or suggested/target entry (entry_approach). */
+  referencePremium: number;
+  /** Adverse default 0.15. Ignored for entry watches. */
+  adversePct: number;
+  /** Entry default 0.05. Ignored for position watches. */
+  approachPct: number;
+  /** Optional hard stop on option premium (position watches). */
+  stopPremium?: number;
+  /** Last flow print at create/check time — quote fallback. */
+  lastFlowPrint?: number;
+  createdAt: string;
+};
+
+export type WatchQuote = {
+  last: number;
+  bid: number | null;
+  ask: number | null;
+  asOf: string | null;
+  quality: WatchDataQuality;
+};
+
+export type EvaluatedWatch = {
+  watch: PriceWatch;
+  quote: WatchQuote | null;
+  status: PriceWatchStatus;
+  pctMove: number | null;
+  hint: string | null;
+};
+
+export type WatchAlert = {
+  watchId: string;
+  ticker: string;
+  contract: string;
+  option_chain: string;
+  type: PriceWatchKind;
+  last: number;
+  reference: number;
+  pctMove: number;
+  status: Exclude<PriceWatchStatus, "ok">;
+  hint: "consider cutting" | "approaching entry";
+  dataQuality: WatchDataQuality;
+};
+
+export type WatchCheckResponse = {
+  checkedAt: string;
+  evaluations: EvaluatedWatch[];
+  alerts: WatchAlert[];
+};

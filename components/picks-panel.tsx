@@ -7,8 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ConvictionMeter } from "@/components/conviction-meter";
 import { HoldWindowCopy } from "@/components/hold-window-copy";
+import { PickWatchControls } from "@/components/pick-watch-controls";
 import { cn } from "@/lib/utils";
-import type { DailyPick } from "@/lib/types";
+import type { DailyPick, PriceWatch } from "@/lib/types";
 import { formatDte, formatExpiry, formatPremium, formatStrike } from "@/lib/format";
 import { contractWatched, tickerWatched, type ManagerNoteMap, type WatchTarget } from "@/lib/manager";
 
@@ -22,6 +23,8 @@ export function PicksPanel({
   onPinTicker,
   onPinContract,
   onDismiss,
+  priceWatches,
+  onSavePriceWatch,
 }: {
   picks: DailyPick[];
   loading: boolean;
@@ -32,6 +35,8 @@ export function PicksPanel({
   onPinTicker: (ticker: string) => void;
   onPinContract: (pick: DailyPick) => void;
   onDismiss: (pick: DailyPick) => void;
+  priceWatches: PriceWatch[];
+  onSavePriceWatch: (watch: PriceWatch) => void;
 }) {
   return (
     <section className="rounded-xl border border-amber-400/20 bg-card/80 p-4">
@@ -166,6 +171,21 @@ export function PicksPanel({
                     Dismiss
                   </Button>
                 </div>
+
+                {pick.alert.option_chain ? (
+                  <PickWatchControls
+                    seed={{
+                      ticker: pick.alert.ticker,
+                      option_chain: pick.alert.option_chain,
+                      strike: pick.alert.strike,
+                      expiry: pick.alert.expiry,
+                      type: pick.alert.type,
+                      price: pick.alert.price,
+                    }}
+                    watches={priceWatches}
+                    onSave={onSavePriceWatch}
+                  />
+                ) : null}
               </article>
             );
           })}

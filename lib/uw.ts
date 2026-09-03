@@ -1,6 +1,6 @@
 import "server-only";
 
-import type { FlowAlert, NetPremTick, TideSnapshot } from "@/lib/types";
+import type { FlowAlert, NetPremTick, TideSnapshot, WatchQuote } from "@/lib/types";
 import { tideFromPremiums, toBool, toNumber } from "@/lib/numbers";
 
 const UW_BASE = "https://api.unusualwhales.com";
@@ -188,3 +188,120 @@ export async function fetchTickerTides(
   );
   return Object.fromEntries(entries);
 }
+
+function firstPositive(...values: unknown[]): number | null {
+  for (const value of values) {
+    const n = toNumber(value, NaN);
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+  return null;
+}
+
+function quoteFromContract(raw: Record<string, unknown>, flowPrint?: number): WatchQuote | null {
+  const last = firstPositive(raw.last_price, raw.price, raw.close);
+  const bid = firstPositive(raw.nbbo_bid, raw.bid);
+  const ask = firstPositive(raw.nbbo_ask, raw.ask);
+  const mid = bid != null && ask != null ? (bid + ask) / 2 : null;
+  const asOf = asString(raw.last_tape_time || raw.date || raw.executed_at, "") || null;
+
+  if (last != null) {
+    return { last, bid, ask, asOf, quality: "uw_last" };
+  }
+  if (mid != null || ask != null || bid != null) {
+    return {
+      last: mid ?? ask ?? bid ?? 0,
+      bid,
+      ask,
+      asOf,
+      quality: "uw_nbbo",
+    };
+  }
+  if (flowPrint && flowPrint > 0) {
+    return { last: flowPrint, bid, ask, asOf, quality: "flow_print" };
+  }
+  return null;
+}
+
+export function quoteFromFlowPrint(price: number | undefined): WatchQuote | null {
+  if (!price || price <= 0) return null;
+  return { last: price, bid: null, ask: null, asOf: null, quality: "flow_print" };
+}
+
+export async function fetchOptionQuote(
+  ticker: string,
+  optionSymbol: string,
+  flowPrint?: number,
+): Promise<WatchQuote | null> {
+  const symbol = optionSymbol.trim();
+  const name = ticker.trim().toUpperCase();
+  if (!symbol || !name) return quoteFromFlowPrint(flowPrint);
+
+  try {
+    const url = buildUrl(`/api/stock/${encodeURIComponent(name)}/option-contracts`, { limit: 5 });
+    url.searchParams.append("option_symbol[]", symbol);
+    const key = getUnusualWhalesKey();
+    if (!key) return quoteFromFlowPrint(flowPrint);
+
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${key}`,
+        "UW-CLIENT-API-ID": CLIENT_ID,
+        Accept: "application/json",
+      },
+      cache: "no-store",
+    });
+    if (response.ok) {
+      const payload = (await response.json()) as { data?: Record<string, unknown>[] };
+      const row =
+        (payload.data ?? []).find((item) => asString(item.option_symbol) === symbol) ??
+        payload.data?.[0];
+      if (row) {
+        const quote = quoteFromContract(row, flowPrint);
+        if (quote) return quote;
+      }
+    }
+  } catch {
+    // Fall through to historic / flow print.
+  }
+
+  try {
+    const historic = await uwGet<{ chains?: Record<string, unknown>[] }>(
+      `/api/option-contract/${encodeURIComponent(symbol)}/historic`,
+      { limit: 1 },
+    );
+    const row = historic.chains?.[historic.chains.length - 1];
+    if (row) {
+      const quote = quoteFromContract(row, flowPrint);
+      if (quote) return quote;
+    }
+  } catch {
+    // Flow print is the last resort.
+  }
+
+  return quoteFromFlowPrint(flowPrint);
+}
+
+export async function fetchOptionQuotes(
+  requests: Array<{ ticker: string; option_chain: string; lastFlowPrint?: number }>,
+): Promise<Record<string, WatchQuote | null>> {
+  const unique = new Map<string, { ticker: string; option_chain: string; lastFlowPrint?: number }>();
+  for (const request of requests) {
+    if (!request.option_chain || unique.has(request.option_chain)) continue;
+    unique.set(request.option_chain, request);
+  }
+
+  const entries = await Promise.all(
+    [...unique.values()].map(async (request) => {
+      try {
+        const quote = await fetchOptionQuote(request.ticker, request.option_chain, request.lastFlowPrint);
+        return [request.option_chain, quote] as const;
+      } catch {
+        return [request.option_chain, quoteFromFlowPrint(request.lastFlowPrint)] as const;
+      }
+    }),
+  );
+
+  return Object.fromEntries(entries);
+}
+
