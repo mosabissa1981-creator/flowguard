@@ -29,7 +29,7 @@ export async function resolveArmingPremium(input: {
     asOf,
   });
 
-  if (hasUnusualWhalesKey() && input.option_chain && input.ticker) {
+  if ((await hasUnusualWhalesKey()) && input.option_chain && input.ticker) {
     try {
       const quote = await fetchOptionQuote(input.ticker, input.option_chain, alertPrice || undefined);
       if (quote && quote.last > 0 && (quote.quality === "uw_last" || quote.quality === "uw_nbbo")) {

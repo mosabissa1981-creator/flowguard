@@ -19,7 +19,7 @@ Open [http://localhost:43127](http://localhost:43127). Without a key, FlowGuard 
 
 Open **[https://flowguard-zeta.vercel.app](https://flowguard-zeta.vercel.app)** on your phone. Bookmark it. That copy stays up; it is not a tunnel.
 
-`UNUSUAL_WHALES_API_KEY` is a Production secret on the Vercel project. It is not in git. On the hosted URL you do not paste the key.
+`UNUSUAL_WHALES_API_KEY` is a Production secret on the Vercel project. It is not in git. To use a **new** Unusual Whales key on the phone, paste it in the Unusual Whales API box on the hosted URL and tap **Replace key**. The server checks it against Unusual Whales, then stores it in a private blob (ahead of the Vercel env). The key is never written back to the browser.
 
 To publish again from this repo:
 
@@ -35,7 +35,7 @@ npm start
 
 ## Live data
 
-Set `UNUSUAL_WHALES_API_KEY` in `.env.local`, or paste it in the **Unusual Whales API** box in the app. The key is POSTed to `POST /api/uw-key`, checked against Unusual Whales, stored only on the server (`.env.local`), and never written to the browser or returned by any API.
+Set `UNUSUAL_WHALES_API_KEY` in `.env.local`, or paste it in the **Unusual Whales API** box in the app. The key is POSTed to `POST /api/uw-key`, checked against Unusual Whales, stored only on the server (private blob + `.env.local` when writable), and never written to the browser or returned by any API.
 
 | FlowGuard route | Unusual Whales endpoint |
 | --- | --- |

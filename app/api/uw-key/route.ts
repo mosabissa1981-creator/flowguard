@@ -2,32 +2,19 @@ import { NextRequest } from "next/server";
 import { writeFile } from "node:fs/promises";
 import path from "node:path";
 
-import { getUnusualWhalesKey, setRuntimeUnusualWhalesKey } from "@/lib/uw";
+import { persistUnusualWhalesKey, resolveUnusualWhalesKey } from "@/lib/uw";
 
 export const dynamic = "force-dynamic";
 
-function keyLockedByHost(): boolean {
-  return process.env.VERCEL === "1" && Boolean(process.env.UNUSUAL_WHALES_API_KEY?.trim());
-}
-
 export async function GET() {
+  const key = await resolveUnusualWhalesKey();
   return Response.json({
-    configured: getUnusualWhalesKey().length > 0,
-    locked: keyLockedByHost(),
+    configured: key.length > 0,
+    locked: false,
   });
 }
 
 export async function POST(request: NextRequest) {
-  if (keyLockedByHost()) {
-    return Response.json(
-      {
-        error:
-          "This hosted copy already has a live Unusual Whales key on the server. You do not need to paste it again.",
-      },
-      { status: 409 },
-    );
-  }
-
   let body: { key?: string };
   try {
     body = (await request.json()) as { key?: string };
@@ -67,14 +54,14 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  setRuntimeUnusualWhalesKey(key);
+  await persistUnusualWhalesKey(key);
 
   try {
     const envPath = path.join(process.cwd(), ".env.local");
     await writeFile(envPath, `UNUSUAL_WHALES_API_KEY=${key}\n`, { encoding: "utf8" });
   } catch {
-    // Runtime key still works for this process even if the file write fails.
+    // Runtime + blob still work if the local env file is not writable (Vercel).
   }
 
-  return Response.json({ configured: true });
+  return Response.json({ configured: true, replaced: true });
 }

@@ -20,7 +20,7 @@ export default async function Home() {
         initialFlow={initialFlow}
         initialPicks={initialPicks}
         initialMorning={initialMorning}
-        initialUwConfigured={hasUnusualWhalesKey()}
+        initialUwConfigured={await hasUnusualWhalesKey()}
       />
       <footer className="border-t border-border/70 px-6 py-4 text-center text-xs text-muted-foreground">
         FlowGuard screens options flow only. It does not route orders, place trades, or give

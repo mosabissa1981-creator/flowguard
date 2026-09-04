@@ -16,7 +16,7 @@ export async function GET(
     return Response.json({ error: "Ticker required" }, { status: 400 });
   }
 
-  if (!hasUnusualWhalesKey()) {
+  if (!(await hasUnusualWhalesKey())) {
     const ticks = buildMockNetPremTicks(symbol);
     return Response.json({
       source: "mock",

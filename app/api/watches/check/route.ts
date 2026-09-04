@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
 }
 
 async function check(watches: PriceWatch[]) {
-  const quotes = hasUnusualWhalesKey()
+  const quotes = (await hasUnusualWhalesKey())
     ? await fetchOptionQuotes(
         watches.map((watch) => ({
           ticker: watch.ticker,

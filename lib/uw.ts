@@ -2,11 +2,13 @@ import "server-only";
 
 import type { FlowAlert, NetPremTick, TideSnapshot, WatchQuote } from "@/lib/types";
 import { tideFromPremiums, toBool, toNumber } from "@/lib/numbers";
+import { loadStoredUwKey, saveStoredUwKey } from "@/lib/uw-key-store";
 
 const UW_BASE = "https://api.unusualwhales.com";
 const CLIENT_ID = "100001";
 
 let runtimeKey = "";
+let blobChecked = false;
 
 export function setRuntimeUnusualWhalesKey(key: string) {
   runtimeKey = key.trim();
@@ -15,12 +17,36 @@ export function setRuntimeUnusualWhalesKey(key: string) {
   }
 }
 
+export async function persistUnusualWhalesKey(key: string): Promise<void> {
+  setRuntimeUnusualWhalesKey(key);
+  blobChecked = true;
+  await saveStoredUwKey(key);
+}
+
+/** Runtime override, then the last key saved from the phone, then the Vercel env. */
+export async function resolveUnusualWhalesKey(): Promise<string> {
+  if (runtimeKey) return runtimeKey;
+  if (!blobChecked) {
+    blobChecked = true;
+    try {
+      const stored = await loadStoredUwKey();
+      if (stored) {
+        runtimeKey = stored;
+        return runtimeKey;
+      }
+    } catch {
+      // Env fallback still works.
+    }
+  }
+  return process.env.UNUSUAL_WHALES_API_KEY?.trim() || "";
+}
+
 export function getUnusualWhalesKey(): string {
   return runtimeKey || process.env.UNUSUAL_WHALES_API_KEY?.trim() || "";
 }
 
-export function hasUnusualWhalesKey(): boolean {
-  return getUnusualWhalesKey().length > 0;
+export async function hasUnusualWhalesKey(): Promise<boolean> {
+  return (await resolveUnusualWhalesKey()).length > 0;
 }
 
 function buildUrl(path: string, params?: Record<string, string | number | boolean | undefined>) {
@@ -38,7 +64,7 @@ async function uwGet<T>(
   path: string,
   params?: Record<string, string | number | boolean | undefined>,
 ): Promise<T> {
-  const key = getUnusualWhalesKey();
+  const key = await resolveUnusualWhalesKey();
   if (!key) {
     throw new Error("UNUSUAL_WHALES_API_KEY is not set");
   }
@@ -268,7 +294,7 @@ export async function fetchChainTrades(optionChain: string, newerThanIso: string
       newer_than: Math.floor(created.getTime() / 1000),
     });
     url.searchParams.append("option_contracts[]", chain);
-    const key = getUnusualWhalesKey();
+    const key = await resolveUnusualWhalesKey();
     if (!key) return [];
     const response = await fetch(url, {
       method: "GET",
@@ -355,7 +381,7 @@ export async function fetchOptionQuote(
   try {
     const url = buildUrl(`/api/stock/${encodeURIComponent(name)}/option-contracts`, { limit: 5 });
     url.searchParams.append("option_symbol[]", symbol);
-    const key = getUnusualWhalesKey();
+    const key = await resolveUnusualWhalesKey();
     if (!key) return quoteFromFlowPrint(flowPrint);
 
     const response = await fetch(url, {

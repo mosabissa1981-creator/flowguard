@@ -39,7 +39,7 @@ function looksUnusual(alert: FlowAlert): boolean {
 
 async function enrichChainFades(alerts: FlowAlert[]): Promise<Record<string, ChainFadeSignal>> {
   const out: Record<string, ChainFadeSignal> = {};
-  if (!hasUnusualWhalesKey()) return out;
+  if (!(await hasUnusualWhalesKey())) return out;
 
   const candidates = alerts
     .filter((alert) => isFloorOnlyCandidate(alert) || toNumber(alert.total_premium) >= 250_000)
@@ -112,7 +112,7 @@ export async function loadRankedFlow(
   filters: FlowFilters,
   opts?: { olderThan?: string; maxPages?: number },
 ): Promise<FlowResponse> {
-  const live = hasUnusualWhalesKey();
+  const live = await hasUnusualWhalesKey();
 
   if (!live) {
     const alerts = buildMockAlerts();

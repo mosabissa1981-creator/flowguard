@@ -4,7 +4,7 @@ import { fetchMarketTide, hasUnusualWhalesKey } from "@/lib/uw";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  if (!hasUnusualWhalesKey()) {
+  if (!(await hasUnusualWhalesKey())) {
     return Response.json({ source: "mock", tide: buildMockTide() });
   }
 
