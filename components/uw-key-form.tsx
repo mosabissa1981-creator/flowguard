@@ -1,12 +1,43 @@
 "use client";
 
 import { useState } from "react";
+import { KeyRound, X } from "lucide-react";
+
+import { Button } from "@/components/ui/button";
+
+export function UwKeyIcon({
+  live,
+  open,
+  onClick,
+}: {
+  live: boolean;
+  open: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <Button
+      type="button"
+      variant="outline"
+      size="icon-sm"
+      aria-label={open ? "Hide API key" : "Unusual Whales API key"}
+      aria-expanded={open}
+      title="API key"
+      onClick={onClick}
+    >
+      <KeyRound className={live ? "text-emerald-300" : "text-amber-200"} />
+    </Button>
+  );
+}
 
 export function UwKeyForm({
   configured,
+  open,
+  onClose,
   onConfigured,
 }: {
   configured: boolean;
+  open: boolean;
+  onClose: () => void;
   locked?: boolean;
   onConfigured: () => void;
 }) {
@@ -15,6 +46,8 @@ export function UwKeyForm({
   const [saved, setSaved] = useState(false);
   const [failed, setFailed] = useState(false);
   const live = configured || saved;
+
+  if (live && !open) return null;
 
   async function save(key: string) {
     const trimmed = key.trim();
@@ -40,8 +73,9 @@ export function UwKeyForm({
         return;
       }
       setSaved(true);
-      setMessage("Live Unusual Whales connected. Refreshing tape.");
+      setMessage("Live Unusual Whales connected.");
       onConfigured();
+      onClose();
     } catch (error) {
       setFailed(true);
       setMessage(error instanceof Error ? error.message : "Could not save key.");
@@ -62,14 +96,23 @@ export function UwKeyForm({
         if (field instanceof HTMLInputElement) field.value = "";
       }}
     >
-      <div className="text-[10px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
-        Unusual Whales API
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <div className="text-[10px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
+            Unusual Whales API
+          </div>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {live
+              ? "Paste a new Bearer key to replace the one on the server. It is not stored on the phone."
+              : "Paste your Bearer key, then tap Connect live. It is sent only to this server and never stored on the phone."}
+          </p>
+        </div>
+        {live ? (
+          <Button type="button" variant="ghost" size="icon-xs" aria-label="Hide API key" onClick={onClose}>
+            <X />
+          </Button>
+        ) : null}
       </div>
-      <p className="mt-1 text-xs text-muted-foreground">
-        {live
-          ? "Live data is on. Paste a new Unusual Whales Bearer key and tap Replace key — it stays on the server, not on the phone."
-          : "Paste your Bearer key, then tap Connect live. It is sent only to this server and never stored on the phone."}
-      </p>
       <div className="mt-2 flex flex-col gap-2 sm:flex-row">
         <input
           name="key"
@@ -79,7 +122,7 @@ export function UwKeyForm({
           autoCorrect="off"
           autoCapitalize="none"
           spellCheck={false}
-          placeholder={live ? "Key on file — paste a new one to replace" : "Paste Unusual Whales API key"}
+          placeholder={live ? "Paste a new key to replace" : "Paste Unusual Whales API key"}
           className="h-11 w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 font-mono text-base outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
         />
         <button

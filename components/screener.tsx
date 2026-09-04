@@ -13,7 +13,7 @@ import { MorningPanel } from "@/components/morning-panel";
 import { PicksPanel } from "@/components/picks-panel";
 import { PriceWatchesPanel } from "@/components/price-watches-panel";
 import { WatchlistBar } from "@/components/watchlist-bar";
-import { UwKeyForm } from "@/components/uw-key-form";
+import { UwKeyForm, UwKeyIcon } from "@/components/uw-key-form";
 import { DEFAULT_FILTERS } from "@/lib/filters";
 import type {
   DailyPick,
@@ -111,6 +111,7 @@ export function Screener({
 
   const [uwConfigured, setUwConfigured] = useState(initialUwConfigured);
   const [uwLocked, setUwLocked] = useState(false);
+  const [uwKeyOpen, setUwKeyOpen] = useState(!initialUwConfigured);
 
   const [watchlist, setWatchlist] = usePersistentState<WatchTarget[]>(
     WATCHLIST_KEY,
@@ -221,6 +222,7 @@ export function Screener({
         if (!stale) {
           setUwConfigured(status.configured);
           setUwLocked(Boolean(status.locked));
+          if (status.configured) setUwKeyOpen(false);
         }
       } catch {
         // Status is optional; the connect form still works.
@@ -493,14 +495,22 @@ export function Screener({
             >
               <RefreshCw className={refreshing ? "animate-spin" : undefined} />
             </Button>
+            <UwKeyIcon
+              live={uwConfigured || data?.source === "live"}
+              open={uwKeyOpen}
+              onClick={() => setUwKeyOpen((value) => !value)}
+            />
           </div>
         </div>
         <TideBar tide={data?.tide ?? null} />
         <UwKeyForm
           configured={uwConfigured || data?.source === "live"}
+          open={uwKeyOpen}
+          onClose={() => setUwKeyOpen(false)}
           locked={uwLocked}
           onConfigured={() => {
             setUwConfigured(true);
+            setUwKeyOpen(false);
             setRefreshing(true);
             void load();
           }}
