@@ -15,8 +15,8 @@ export const PICKS_FILTERS: FlowFilters = {
 
 export const MAX_PICKS = 10;
 
-export async function loadDailyPicks(): Promise<PicksResponse> {
-  const ranked = await loadRankedFlow(PICKS_FILTERS);
+export async function loadDailyPicks(opts?: { forceFresh?: boolean }): Promise<PicksResponse> {
+  const ranked = await loadRankedFlow(PICKS_FILTERS, opts);
   const picks = ranked.items.slice(0, MAX_PICKS).map((row) => {
     const copy = buildPickCopy(row);
     return { ...row, ...copy };

@@ -4,13 +4,15 @@ import { list, put } from "@vercel/blob";
 
 import type { FlowAlert, TideSnapshot } from "@/lib/types";
 
+import { TAPE_CACHE_MS } from "@/lib/refresh";
+
 const CIRCUIT_PREFIX = "flowguard/uw-circuit-";
 const TAPE_PREFIX = "flowguard/uw-tape-";
 const MORNING_PREFIX = "flowguard/morning-";
 
-export const FLOW_TTL_MS = 45_000;
-export const TIDE_TTL_MS = 60_000;
-export const STOCK_STATE_TTL_MS = 5 * 60_000;
+export const FLOW_TTL_MS = TAPE_CACHE_MS;
+export const TIDE_TTL_MS = TAPE_CACHE_MS;
+export const STOCK_STATE_TTL_MS = TAPE_CACHE_MS;
 export const NET_PREM_TTL_MS = 5 * 60_000;
 export const QUOTE_TTL_MS = 15 * 60_000;
 export const CHAIN_TTL_MS = 10 * 60_000;
@@ -74,9 +76,16 @@ function blobToken(): string {
   return process.env.BLOB_READ_WRITE_TOKEN?.trim() ?? "";
 }
 
-export async function cachedCall<T>(key: string, ttlMs: number, fn: () => Promise<T>): Promise<T> {
-  const hit = mem.get(key);
-  if (hit && Date.now() - hit.at < hit.ttl) return hit.value as T;
+export async function cachedCall<T>(
+  key: string,
+  ttlMs: number,
+  fn: () => Promise<T>,
+  bust = false,
+): Promise<T> {
+  if (!bust) {
+    const hit = mem.get(key);
+    if (hit && Date.now() - hit.at < hit.ttl) return hit.value as T;
+  }
   const pending = inflight.get(key);
   if (pending) return pending as Promise<T>;
   const run = fn()

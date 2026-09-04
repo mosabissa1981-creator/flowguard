@@ -51,7 +51,7 @@ Set `UNUSUAL_WHALES_API_KEY` in `.env.local`, or paste it in the **Unusual Whale
 
 Requests use `Authorization: Bearer …` and `UW-CLIENT-API-ID: 100001`.
 
-**Quota:** Unusual Whales allows 40,000 requests/day. Flow, picks, premove, and morning share **one** session tape (cached 45s in memory + blob). Market tide 60s. Stock-state 5 min, max 6 tickers, sequential. Ticker tide is derived from the tape (no per-name net-prem on poll). Chain quotes are not fetched on poll. Bought/Watch quotes run **on tap only**. Price-alert checks run every 15 minutes and fail closed on 429. A 429 trips a circuit breaker until next UTC midnight — no further UW calls. Mock/demo names are never shown when a key is configured; 429 serves last-good live tape or an empty board with a hard banner.
+**Quota:** Unusual Whales allows 40,000 requests/day. The board auto-refreshes every **15 minutes** (`BOARD_REFRESH_MS` in `lib/refresh.ts`). Flow, picks, premove, and morning share **one** session tape (cached 12 min in memory + blob, slightly under the poll). Market tide and stock-state use the same 12 min TTL. Ticker tide is derived from the tape (no per-name net-prem on poll). Chain quotes are not fetched on poll. Bought/Watch quotes run **on tap only**. Price-alert checks run every 15 minutes and fail closed on 429. Manual refresh (`?fresh=1`) may bypass cache but still respects the circuit breaker. A 429 trips a circuit breaker until next UTC midnight — no further UW calls. Mock/demo names are never shown when a key is configured; 429 serves last-good live tape or an empty board with a hard banner.
 
 If a live request fails, the screener does **not** substitute the demo tape.
 
@@ -62,7 +62,7 @@ If a live request fails, the screener does **not** substitute the demo tape.
 - Unusual preset — applied **locally** on today's session tape (opening, vol&gt;OI, size&gt;OI, sweep/floor, or a named alert rule such as RepeatedHits). Does **not** send `unusual=true` to Unusual Whales.
 - Strict anti-fade — hides 0–2 DTE, tiny premium, bid-dominant, fighting-tide, post-print fade, and **stale** rows (also excluded from Picks)
 - **Session filter** — UW `GET /api/option-trades/flow-alerts` with documented `newer_than` (unix seconds of 9:30 ET). There is no `intraday_only` param; `hide_expired` is not on this endpoint (it exists on `/api/option-trades`). FlowGuard then keeps only `created_at` ≥ 9:30 ET today and unexpired contracts. Rank/conviction apply inside that window. Empty windows stay empty — they do not fill from multi-week `LowHistoricVolumeFloor` alerts. `unusual=true` is never sent (UW docs: that flag is a live-options-flow *criteria* preset, not a session cut).
-- Auto-refresh every 45s, with pause (server cache 45s, so a refresh is not a new UW pull)
+- Auto-refresh every **15 minutes**, with pause. Server tape cache is 12 minutes so a 15-minute poll usually does one UW pull; faster traffic hits cache. Tap refresh to force a fetch (still blocked after 429).
 
 Click a row for the detail drawer: score chips, ask/bid split, market tide, ticker net-premium ticks, pin, note, and dismiss.
 

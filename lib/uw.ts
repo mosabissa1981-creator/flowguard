@@ -74,7 +74,7 @@ function buildUrl(path: string, params?: Record<string, string | number | boolea
   return url;
 }
 
-async function uwRequest<T>(url: URL, ttlMs = 0): Promise<T> {
+async function uwRequest<T>(url: URL, ttlMs = 0, bust = false): Promise<T> {
   if (await isUwBlocked()) {
     throw new UwQuotaError(
       "Unusual Whales daily request cap is in effect. Not calling UW.",
@@ -82,44 +82,50 @@ async function uwRequest<T>(url: URL, ttlMs = 0): Promise<T> {
     );
   }
 
-  return cachedCall(url.toString(), ttlMs, async () => {
-    if (await isUwBlocked()) {
-      throw new UwQuotaError(
-        "Unusual Whales daily request cap is in effect. Not calling UW.",
-        quotaResetUtcMs(),
-      );
-    }
-    const key = await resolveUnusualWhalesKey();
-    if (!key) {
-      throw new Error("UNUSUAL_WHALES_API_KEY is not set");
-    }
-    const response = await fetch(url, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${key}`,
-        "UW-CLIENT-API-ID": CLIENT_ID,
-        Accept: "application/json",
-      },
-      cache: "no-store",
-    });
-    if (!response.ok) {
-      const body = await response.text();
-      if (isQuotaHttp(response.status, body)) {
-        const until = await tripUwQuota(body);
-        throw new UwQuotaError(`Unusual Whales ${url.pathname} 429: ${body.slice(0, 180)}`, until);
+  return cachedCall(
+    url.toString(),
+    ttlMs,
+    async () => {
+      if (await isUwBlocked()) {
+        throw new UwQuotaError(
+          "Unusual Whales daily request cap is in effect. Not calling UW.",
+          quotaResetUtcMs(),
+        );
       }
-      throw new Error(`Unusual Whales ${url.pathname} ${response.status}: ${body.slice(0, 240)}`);
-    }
-    return (await response.json()) as T;
-  });
+      const key = await resolveUnusualWhalesKey();
+      if (!key) {
+        throw new Error("UNUSUAL_WHALES_API_KEY is not set");
+      }
+      const response = await fetch(url, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${key}`,
+          "UW-CLIENT-API-ID": CLIENT_ID,
+          Accept: "application/json",
+        },
+        cache: "no-store",
+      });
+      if (!response.ok) {
+        const body = await response.text();
+        if (isQuotaHttp(response.status, body)) {
+          const until = await tripUwQuota(body);
+          throw new UwQuotaError(`Unusual Whales ${url.pathname} 429: ${body.slice(0, 180)}`, until);
+        }
+        throw new Error(`Unusual Whales ${url.pathname} ${response.status}: ${body.slice(0, 240)}`);
+      }
+      return (await response.json()) as T;
+    },
+    bust,
+  );
 }
 
 async function uwGet<T>(
   path: string,
   params?: Record<string, string | number | boolean | undefined>,
   ttlMs = 0,
+  bust = false,
 ): Promise<T> {
-  return uwRequest<T>(buildUrl(path, params), ttlMs);
+  return uwRequest<T>(buildUrl(path, params), ttlMs, bust);
 }
 
 function asString(value: unknown, fallback = ""): string {
@@ -168,6 +174,7 @@ export async function fetchFlowAlerts(params: {
   newerThan?: string;
   olderThan?: string;
   maxPages?: number;
+  skipCache?: boolean;
 }): Promise<FlowAlert[]> {
   // Official flow-alerts params (OpenAPI PublicApi.OptionTradeController.flow_alerts):
   // newer_than / older_than (unix seconds or ISO date YYYY-MM-DD). There is no
@@ -187,7 +194,10 @@ export async function fetchFlowAlerts(params: {
     maxPages,
   });
 
-  return cachedCall(cacheKey, FLOW_TTL_MS, async () => {
+  return cachedCall(
+    cacheKey,
+    FLOW_TTL_MS,
+    async () => {
   const collected: FlowAlert[] = [];
   const seen = new Set<string>();
   let olderThan = params.olderThan;
@@ -235,17 +245,17 @@ export async function fetchFlowAlerts(params: {
   }
 
   return collected;
-  });
+  }, Boolean(params.skipCache));
 }
 
-export async function fetchMarketTide(): Promise<TideSnapshot | null> {
+export async function fetchMarketTide(skipCache = false): Promise<TideSnapshot | null> {
   const payload = await uwGet<{
     data?: Array<{
       timestamp?: string;
       net_call_premium?: string | number;
       net_put_premium?: string | number;
     }>;
-  }>("/api/market/market-tide", { interval_5m: false }, TIDE_TTL_MS);
+  }>("/api/market/market-tide", { interval_5m: false }, TIDE_TTL_MS, skipCache);
 
   const rows = payload.data ?? [];
   const last = rows[rows.length - 1];

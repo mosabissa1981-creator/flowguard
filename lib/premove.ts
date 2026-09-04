@@ -22,8 +22,8 @@ export const PREMOVE_FILTERS: FlowFilters = {
 export const MAX_PREMOVE = 8;
 const MIN_PREMOVE_SCORE = 50;
 
-export async function loadPremoveShortlist(): Promise<PicksResponse> {
-  const ranked = await loadRankedFlow(PREMOVE_FILTERS);
+export async function loadPremoveShortlist(opts?: { forceFresh?: boolean }): Promise<PicksResponse> {
+  const ranked = await loadRankedFlow(PREMOVE_FILTERS, opts);
   const peers = ranked.items.map((row) => row.alert);
 
   let spots: Awaited<ReturnType<typeof fetchStockStates>> = {};

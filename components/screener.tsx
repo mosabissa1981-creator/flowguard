@@ -49,10 +49,9 @@ import {
   type WatchTarget,
 } from "@/lib/manager";
 import { EMPTY_PRICE_WATCHES, PRICE_WATCHES_KEY, upsertWatch } from "@/lib/price-watches";
+import { BOARD_REFRESH_MS, WATCH_CHECK_MS, formatRefreshCountdown } from "@/lib/refresh";
 
-const REFRESH_MS = 45_000;
 const FETCH_MS = 20_000;
-const WATCH_CHECK_MS = 15 * 60_000;
 
 async function fetchJson<T>(url: string): Promise<T> {
   const response = await fetch(url, {
@@ -105,7 +104,7 @@ export function Screener({
   const [picksData, setPicksData] = useState<PicksResponse | null>(initialPicks ?? null);
   const [picksLoading, setPicksLoading] = useState(!initialPicks);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [secondsLeft, setSecondsLeft] = useState(REFRESH_MS / 1000);
+  const [secondsLeft, setSecondsLeft] = useState(BOARD_REFRESH_MS / 1000);
   const [watchlistOnly, setWatchlistOnly] = useState(false);
 
   const [morningData, setMorningData] = useState<MorningShortlistResponse | null>(
@@ -143,16 +142,20 @@ export function Screener({
   const query = useMemo(() => toQuery(debounced), [debounced]);
   const dismissedIds = useMemo(() => new Set(dismissed.map((item) => item.id)), [dismissed]);
 
-  const loadFlow = useCallback(async () => {
-    return fetchJson<FlowResponse>(`/api/flow?${query}`);
-  }, [query]);
+  const loadFlow = useCallback(
+    async (forceFresh = false) => {
+      const q = forceFresh ? `${query}&fresh=1` : query;
+      return fetchJson<FlowResponse>(`/api/flow?${q}`);
+    },
+    [query],
+  );
 
-  const loadPicks = useCallback(async () => {
-    return fetchJson<PicksResponse>("/api/picks");
+  const loadPicks = useCallback(async (forceFresh = false) => {
+    return fetchJson<PicksResponse>(forceFresh ? "/api/picks?fresh=1" : "/api/picks");
   }, []);
 
-  const loadPremove = useCallback(async () => {
-    return fetchJson<PicksResponse>("/api/premove");
+  const loadPremove = useCallback(async (forceFresh = false) => {
+    return fetchJson<PicksResponse>(forceFresh ? "/api/premove?fresh=1" : "/api/premove");
   }, []);
 
   const watchPrints = useRef(new Map<string, number>());
@@ -201,12 +204,13 @@ export function Screener({
     }
   }, []);
 
-  const load = useCallback(async () => {
-    const [flowResult, picksResult, premoveResult] = await Promise.allSettled([
-      loadFlow(),
-      loadPicks(),
-      loadPremove(),
-    ]);
+  const load = useCallback(
+    async (forceFresh = false) => {
+      const [flowResult, picksResult, premoveResult] = await Promise.allSettled([
+        loadFlow(forceFresh),
+        loadPicks(forceFresh),
+        loadPremove(forceFresh),
+      ]);
     if (flowResult.status === "fulfilled") {
       setData(flowResult.value);
       setError(null);
@@ -225,7 +229,7 @@ export function Screener({
     setPicksLoading(false);
     setPremoveLoading(false);
     setRefreshing(false);
-    setSecondsLeft(REFRESH_MS / 1000);
+    setSecondsLeft(BOARD_REFRESH_MS / 1000);
   }, [loadFlow, loadPicks, loadPremove]);
 
   useEffect(() => {
@@ -310,7 +314,7 @@ export function Screener({
         setData(flow);
         setError(null);
         setLoading(false);
-        setSecondsLeft(REFRESH_MS / 1000);
+        setSecondsLeft(BOARD_REFRESH_MS / 1000);
       } catch (err) {
         if (stale) return;
         setError(err instanceof Error ? err.message : "Could not load flow.");
@@ -344,15 +348,15 @@ export function Screener({
   useEffect(() => {
     if (paused) return;
     const interval = window.setInterval(() => {
-      void load();
-    }, REFRESH_MS);
+      void load(false);
+    }, BOARD_REFRESH_MS);
     return () => window.clearInterval(interval);
   }, [load, paused]);
 
   useEffect(() => {
     if (paused) return;
     const tick = window.setInterval(() => {
-      setSecondsLeft((value) => (value <= 1 ? REFRESH_MS / 1000 : value - 1));
+      setSecondsLeft((value) => (value <= 1 ? BOARD_REFRESH_MS / 1000 : value - 1));
     }, 1000);
     return () => window.clearInterval(tick);
   }, [paused]);
@@ -514,19 +518,20 @@ export function Screener({
               variant="outline"
               size="sm"
               onClick={() => setPaused((value) => !value)}
+              title={paused ? "Resume auto-refresh" : `Next auto-refresh in ${formatRefreshCountdown(secondsLeft)}`}
             >
               {paused ? <Play /> : <Pause />}
-              {paused ? "Resume" : `Pause · ${secondsLeft}s`}
+              {paused ? "Resume" : `Pause · ${formatRefreshCountdown(secondsLeft)}`}
             </Button>
             <Button
               variant="outline"
               size="icon-sm"
               onClick={() => {
                 setRefreshing(true);
-                void load();
+                void load(true);
               }}
               disabled={refreshing}
-              aria-label="Refresh flow"
+              aria-label="Refresh flow now"
             >
               <RefreshCw className={refreshing ? "animate-spin" : undefined} />
             </Button>
@@ -547,7 +552,7 @@ export function Screener({
             setUwConfigured(true);
             setUwKeyOpen(false);
             setRefreshing(true);
-            void load();
+            void load(true);
           }}
         />
         {quotaDown ? (
@@ -693,7 +698,7 @@ export function Screener({
       {error ? (
         <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-4 text-sm text-rose-200">
           {error}
-          <Button className="ml-3" size="sm" variant="outline" onClick={() => void load()}>
+          <Button className="ml-3" size="sm" variant="outline" onClick={() => void load(true)}>
             Retry
           </Button>
         </div>

@@ -162,7 +162,10 @@ function emptyLive(filters: FlowFilters, warning: string): FlowResponse {
 }
 
 /** Shared session tape: one UW flow-alerts pull, scored locally for flow / picks / premove / morning. */
-export async function loadRankedFlow(filters: FlowFilters): Promise<FlowResponse> {
+export async function loadRankedFlow(
+  filters: FlowFilters,
+  opts?: { forceFresh?: boolean },
+): Promise<FlowResponse> {
   const live = await hasUnusualWhalesKey();
 
   if (!live) {
@@ -186,7 +189,8 @@ export async function loadRankedFlow(filters: FlowFilters): Promise<FlowResponse
     let fetchedAt = new Date().toISOString();
     let source: FlowResponse["source"] = "live";
 
-    const fresh = await getFreshTape();
+    const forceFresh = Boolean(opts?.forceFresh);
+    const fresh = forceFresh ? null : await getFreshTape();
     if (fresh) {
       alerts = fresh.alerts;
       tide = fresh.tide;
@@ -199,9 +203,10 @@ export async function loadRankedFlow(filters: FlowFilters): Promise<FlowResponse
         limit: 200,
         newerThan: newerThanParam(),
         maxPages: 2,
+        skipCache: forceFresh,
       });
       try {
-        tide = await fetchMarketTide();
+        tide = await fetchMarketTide(forceFresh);
       } catch (error) {
         if (isUwQuotaError(error)) {
           const sessionAlerts = alerts.filter(
