@@ -4,6 +4,7 @@ import type { ArmingPremium, ArmingSource } from "@/lib/types";
 import { toNumber } from "@/lib/numbers";
 import { fetchFlowAlerts, fetchOptionQuote, hasUnusualWhalesKey } from "@/lib/uw";
 import { newerThanParam } from "@/lib/session";
+import { isUwBlocked } from "@/lib/uw-quota";
 
 const SOURCE_LABEL: Record<ArmingSource, string> = {
   uw_last: "live UW last",
@@ -29,7 +30,7 @@ export async function resolveArmingPremium(input: {
     asOf,
   });
 
-  if ((await hasUnusualWhalesKey()) && input.option_chain && input.ticker) {
+  if ((await hasUnusualWhalesKey()) && input.option_chain && input.ticker && !(await isUwBlocked())) {
     try {
       const quote = await fetchOptionQuote(input.ticker, input.option_chain, alertPrice || undefined);
       if (quote && quote.last > 0 && (quote.quality === "uw_last" || quote.quality === "uw_nbbo")) {

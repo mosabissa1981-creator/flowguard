@@ -28,5 +28,6 @@ export async function loadDailyPicks(): Promise<PicksResponse> {
     picks,
     tide: ranked.tide,
     warning: ranked.warning,
+    quotaBlocked: ranked.quotaBlocked,
   };
 }

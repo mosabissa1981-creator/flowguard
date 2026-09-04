@@ -93,14 +93,17 @@ export type FlowFilters = {
   ticker: string;
 };
 
+export type TapeSource = "live" | "mock" | "cached";
+
 export type FlowResponse = {
-  source: "live" | "mock";
+  source: TapeSource;
   fetchedAt: string;
   unusual: boolean;
   tide: TideSnapshot | null;
   items: RankedFlow[];
   rawCount: number;
   warning?: string;
+  quotaBlocked?: boolean;
 };
 
 export type DailyPick = RankedFlow & {
@@ -109,11 +112,12 @@ export type DailyPick = RankedFlow & {
 };
 
 export type PicksResponse = {
-  source: "live" | "mock";
+  source: TapeSource;
   fetchedAt: string;
   picks: DailyPick[];
   tide: TideSnapshot | null;
   warning?: string;
+  quotaBlocked?: boolean;
 };
 
 export type MorningShortlistResponse = PicksResponse & {

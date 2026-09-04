@@ -3,6 +3,20 @@ import "server-only";
 import type { FlowAlert, NetPremTick, TideSnapshot, WatchQuote } from "@/lib/types";
 import { tideFromPremiums, toBool, toNumber } from "@/lib/numbers";
 import { loadStoredUwKey, saveStoredUwKey } from "@/lib/uw-key-store";
+import {
+  CHAIN_TTL_MS,
+  FLOW_TTL_MS,
+  NET_PREM_TTL_MS,
+  QUOTE_TTL_MS,
+  STOCK_STATE_TTL_MS,
+  TIDE_TTL_MS,
+  UwQuotaError,
+  cachedCall,
+  isQuotaHttp,
+  isUwBlocked,
+  quotaResetUtcMs,
+  tripUwQuota,
+} from "@/lib/uw-quota";
 
 const UW_BASE = "https://api.unusualwhales.com";
 const CLIENT_ID = "100001";
@@ -60,41 +74,58 @@ function buildUrl(path: string, params?: Record<string, string | number | boolea
   return url;
 }
 
+async function uwRequest<T>(url: URL, ttlMs = 0): Promise<T> {
+  if (await isUwBlocked()) {
+    throw new UwQuotaError(
+      "Unusual Whales daily request cap is in effect. Not calling UW.",
+      quotaResetUtcMs(),
+    );
+  }
+
+  return cachedCall(url.toString(), ttlMs, async () => {
+    if (await isUwBlocked()) {
+      throw new UwQuotaError(
+        "Unusual Whales daily request cap is in effect. Not calling UW.",
+        quotaResetUtcMs(),
+      );
+    }
+    const key = await resolveUnusualWhalesKey();
+    if (!key) {
+      throw new Error("UNUSUAL_WHALES_API_KEY is not set");
+    }
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${key}`,
+        "UW-CLIENT-API-ID": CLIENT_ID,
+        Accept: "application/json",
+      },
+      cache: "no-store",
+    });
+    if (!response.ok) {
+      const body = await response.text();
+      if (isQuotaHttp(response.status, body)) {
+        const until = await tripUwQuota(body);
+        throw new UwQuotaError(`Unusual Whales ${url.pathname} 429: ${body.slice(0, 180)}`, until);
+      }
+      throw new Error(`Unusual Whales ${url.pathname} ${response.status}: ${body.slice(0, 240)}`);
+    }
+    return (await response.json()) as T;
+  });
+}
+
 async function uwGet<T>(
   path: string,
   params?: Record<string, string | number | boolean | undefined>,
+  ttlMs = 0,
 ): Promise<T> {
-  const key = await resolveUnusualWhalesKey();
-  if (!key) {
-    throw new Error("UNUSUAL_WHALES_API_KEY is not set");
-  }
-
-  const url = buildUrl(path, params);
-  const response = await fetch(url, {
-    method: "GET",
-    headers: {
-      Authorization: `Bearer ${key}`,
-      "UW-CLIENT-API-ID": CLIENT_ID,
-      Accept: "application/json",
-    },
-    cache: "no-store",
-  });
-
-  if (!response.ok) {
-    const body = await response.text();
-    throw new Error(`Unusual Whales ${path} ${response.status}: ${body.slice(0, 240)}`);
-  }
-
-  return (await response.json()) as T;
+  return uwRequest<T>(buildUrl(path, params), ttlMs);
 }
 
 function asString(value: unknown, fallback = ""): string {
   if (value === null || value === undefined) return fallback;
   return String(value);
 }
-
-const FLOW_ALERT_TTL_MS = 15_000;
-const flowAlertCache = new Map<string, { at: number; alerts: FlowAlert[] }>();
 
 export function normalizeFlowAlert(raw: Record<string, unknown>): FlowAlert {
   const typeRaw = asString(raw.type, "call").toLowerCase();
@@ -145,7 +176,7 @@ export async function fetchFlowAlerts(params: {
   // (vol>OI, size>OI, all-opening, OTM, …) — not a session filter — and without
   // newer_than the feed is a rolling multi-week unusual-alert log (floor/historic).
   const pageSize = Math.min(params.limit ?? 200, 200);
-  const maxPages = Math.min(Math.max(params.maxPages ?? 2, 1), 8);
+  const maxPages = Math.min(Math.max(params.maxPages ?? 2, 1), 2);
   const cacheKey = JSON.stringify({
     minPremium: params.minPremium ?? 0,
     side: params.side ?? "all",
@@ -155,11 +186,8 @@ export async function fetchFlowAlerts(params: {
     pageSize,
     maxPages,
   });
-  const cached = flowAlertCache.get(cacheKey);
-  if (cached && Date.now() - cached.at < FLOW_ALERT_TTL_MS) {
-    return cached.alerts;
-  }
 
+  return cachedCall(cacheKey, FLOW_TTL_MS, async () => {
   const collected: FlowAlert[] = [];
   const seen = new Set<string>();
   let olderThan = params.olderThan;
@@ -176,32 +204,38 @@ export async function fetchFlowAlerts(params: {
     if (params.side === "call") query.is_call = true;
     if (params.side === "put") query.is_put = true;
 
-    const payload = await uwGet<{ data?: Record<string, unknown>[] }>(
-      "/api/option-trades/flow-alerts",
-      query,
-    );
-    const batch = (payload.data ?? []).map(normalizeFlowAlert);
-    if (batch.length === 0) break;
+    try {
+      const payload = await uwGet<{ data?: Record<string, unknown>[] }>(
+        "/api/option-trades/flow-alerts",
+        query,
+        0,
+      );
+      const batch = (payload.data ?? []).map(normalizeFlowAlert);
+      if (batch.length === 0) break;
 
-    let oldestMs = Number.POSITIVE_INFINITY;
-    let added = 0;
-    for (const alert of batch) {
-      const createdMs = new Date(alert.created_at).getTime();
-      if (Number.isFinite(createdMs) && createdMs < oldestMs) oldestMs = createdMs;
-      if (seen.has(alert.id)) continue;
-      seen.add(alert.id);
-      collected.push(alert);
-      added += 1;
+      let oldestMs = Number.POSITIVE_INFINITY;
+      let added = 0;
+      for (const alert of batch) {
+        const createdMs = new Date(alert.created_at).getTime();
+        if (Number.isFinite(createdMs) && createdMs < oldestMs) oldestMs = createdMs;
+        if (seen.has(alert.id)) continue;
+        seen.add(alert.id);
+        collected.push(alert);
+        added += 1;
+      }
+
+      if (batch.length < pageSize || added === 0 || !Number.isFinite(oldestMs)) break;
+      const nextOlder = String(Math.floor(oldestMs / 1000));
+      if (nextOlder === olderThan) break;
+      olderThan = nextOlder;
+    } catch (error) {
+      if (collected.length > 0) return collected;
+      throw error;
     }
-
-    if (batch.length < pageSize || added === 0 || !Number.isFinite(oldestMs)) break;
-    const nextOlder = String(Math.floor(oldestMs / 1000));
-    if (nextOlder === olderThan) break;
-    olderThan = nextOlder;
   }
 
-  flowAlertCache.set(cacheKey, { at: Date.now(), alerts: collected });
   return collected;
+  });
 }
 
 export async function fetchMarketTide(): Promise<TideSnapshot | null> {
@@ -211,7 +245,7 @@ export async function fetchMarketTide(): Promise<TideSnapshot | null> {
       net_call_premium?: string | number;
       net_put_premium?: string | number;
     }>;
-  }>("/api/market/market-tide", { interval_5m: false });
+  }>("/api/market/market-tide", { interval_5m: false }, TIDE_TTL_MS);
 
   const rows = payload.data ?? [];
   const last = rows[rows.length - 1];
@@ -226,6 +260,8 @@ export async function fetchMarketTide(): Promise<TideSnapshot | null> {
 export async function fetchNetPremTicks(ticker: string): Promise<NetPremTick[]> {
   const payload = await uwGet<{ data?: Array<Record<string, unknown>> }>(
     `/api/stock/${encodeURIComponent(ticker.toUpperCase())}/net-prem-ticks`,
+    undefined,
+    NET_PREM_TTL_MS,
   );
 
   return (payload.data ?? []).map((row) => ({
@@ -288,25 +324,14 @@ export async function fetchChainTrades(optionChain: string, newerThanIso: string
   const chain = optionChain.trim();
   const created = new Date(newerThanIso);
   if (!chain || !Number.isFinite(created.getTime())) return [];
+  if (await isUwBlocked()) return [];
   try {
     const url = buildUrl("/api/option-trades", {
       limit: 50,
       newer_than: Math.floor(created.getTime() / 1000),
     });
     url.searchParams.append("option_contracts[]", chain);
-    const key = await resolveUnusualWhalesKey();
-    if (!key) return [];
-    const response = await fetch(url, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${key}`,
-        "UW-CLIENT-API-ID": CLIENT_ID,
-        Accept: "application/json",
-      },
-      cache: "no-store",
-    });
-    if (!response.ok) return [];
-    const payload = (await response.json()) as { data?: Record<string, unknown>[] };
+    const payload = await uwRequest<{ data?: Record<string, unknown>[] }>(url, CHAIN_TTL_MS);
     return (payload.data ?? []).map((row) => tradeAsAlert(row, chain));
   } catch {
     return [];
@@ -315,20 +340,21 @@ export async function fetchChainTrades(optionChain: string, newerThanIso: string
 
 export async function fetchTickerTides(
   tickers: string[],
-  limit = 10,
+  limit = 3,
 ): Promise<Record<string, TideSnapshot | null>> {
+  if (await isUwBlocked()) return {};
   const unique = [...new Set(tickers.map((t) => t.toUpperCase()).filter(Boolean))].slice(0, limit);
-  const entries = await Promise.all(
-    unique.map(async (ticker) => {
-      try {
-        const ticks = await fetchNetPremTicks(ticker);
-        return [ticker, tideFromTicks(ticks)] as const;
-      } catch {
-        return [ticker, null] as const;
-      }
-    }),
-  );
-  return Object.fromEntries(entries);
+  const out: Record<string, TideSnapshot | null> = {};
+  for (const ticker of unique) {
+    if (await isUwBlocked()) break;
+    try {
+      const ticks = await fetchNetPremTicks(ticker);
+      out[ticker] = tideFromTicks(ticks);
+    } catch {
+      out[ticker] = null;
+    }
+  }
+  return out;
 }
 
 function firstPositive(...values: unknown[]): number | null {
@@ -377,40 +403,29 @@ export async function fetchOptionQuote(
   const symbol = optionSymbol.trim();
   const name = ticker.trim().toUpperCase();
   if (!symbol || !name) return quoteFromFlowPrint(flowPrint);
+  if (await isUwBlocked()) return quoteFromFlowPrint(flowPrint);
 
   try {
     const url = buildUrl(`/api/stock/${encodeURIComponent(name)}/option-contracts`, { limit: 5 });
     url.searchParams.append("option_symbol[]", symbol);
-    const key = await resolveUnusualWhalesKey();
-    if (!key) return quoteFromFlowPrint(flowPrint);
-
-    const response = await fetch(url, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${key}`,
-        "UW-CLIENT-API-ID": CLIENT_ID,
-        Accept: "application/json",
-      },
-      cache: "no-store",
-    });
-    if (response.ok) {
-      const payload = (await response.json()) as { data?: Record<string, unknown>[] };
-      const row =
-        (payload.data ?? []).find((item) => asString(item.option_symbol) === symbol) ??
-        payload.data?.[0];
-      if (row) {
-        const quote = quoteFromContract(row, flowPrint);
-        if (quote) return quote;
-      }
+    const payload = await uwRequest<{ data?: Record<string, unknown>[] }>(url, QUOTE_TTL_MS);
+    const row =
+      (payload.data ?? []).find((item) => asString(item.option_symbol) === symbol) ?? payload.data?.[0];
+    if (row) {
+      const quote = quoteFromContract(row, flowPrint);
+      if (quote) return quote;
     }
-  } catch {
-    // Fall through to historic / flow print.
+  } catch (error) {
+    if (error instanceof UwQuotaError) return quoteFromFlowPrint(flowPrint);
   }
+
+  if (await isUwBlocked()) return quoteFromFlowPrint(flowPrint);
 
   try {
     const historic = await uwGet<{ chains?: Record<string, unknown>[] }>(
       `/api/option-contract/${encodeURIComponent(symbol)}/historic`,
       { limit: 1 },
+      QUOTE_TTL_MS,
     );
     const row = historic.chains?.[historic.chains.length - 1];
     if (row) {
@@ -433,18 +448,32 @@ export async function fetchOptionQuotes(
     unique.set(request.option_chain, request);
   }
 
-  const entries = await Promise.all(
-    [...unique.values()].map(async (request) => {
-      try {
-        const quote = await fetchOptionQuote(request.ticker, request.option_chain, request.lastFlowPrint);
-        return [request.option_chain, quote] as const;
-      } catch {
-        return [request.option_chain, quoteFromFlowPrint(request.lastFlowPrint)] as const;
-      }
-    }),
-  );
+  if (await isUwBlocked()) {
+    return Object.fromEntries(
+      [...unique.values()].map((request) => [
+        request.option_chain,
+        quoteFromFlowPrint(request.lastFlowPrint),
+      ]),
+    );
+  }
 
-  return Object.fromEntries(entries);
+  const out: Record<string, WatchQuote | null> = {};
+  for (const request of unique.values()) {
+    if (await isUwBlocked()) {
+      out[request.option_chain] = quoteFromFlowPrint(request.lastFlowPrint);
+      continue;
+    }
+    try {
+      out[request.option_chain] = await fetchOptionQuote(
+        request.ticker,
+        request.option_chain,
+        request.lastFlowPrint,
+      );
+    } catch {
+      out[request.option_chain] = quoteFromFlowPrint(request.lastFlowPrint);
+    }
+  }
+  return out;
 }
 
 /** Intraday last vs prior close. OpenAPI: GET /api/stock/{ticker}/stock-state (`close`, `prev_close`). */
@@ -455,26 +484,37 @@ export type StockState = {
   pctFromClose: number | null;
 };
 
-export async function fetchStockStates(tickers: string[], limit = 16): Promise<Record<string, StockState>> {
+export async function fetchStockStates(tickers: string[], limit = 6): Promise<Record<string, StockState>> {
   const unique = [...new Set(tickers.map((t) => t.toUpperCase()).filter(Boolean))].slice(0, limit);
-  const entries = await Promise.all(
-    unique.map(async (ticker) => {
-      const empty: StockState = { ticker, last: null, prevClose: null, pctFromClose: null };
-      try {
-        const payload = await uwGet<{ data?: Record<string, unknown> }>(
-          `/api/stock/${encodeURIComponent(ticker)}/stock-state`,
-        );
-        const row = payload.data ?? {};
-        const last = firstPositive(row.close, row.last, row.price);
-        const prevClose = firstPositive(row.prev_close, row.prev_close_price);
-        const pctFromClose =
-          last != null && prevClose != null && prevClose > 0 ? (last - prevClose) / prevClose : null;
-        return [ticker, { ticker, last, prevClose, pctFromClose }] as const;
-      } catch {
-        return [ticker, empty] as const;
-      }
-    }),
-  );
-  return Object.fromEntries(entries);
+  const out: Record<string, StockState> = {};
+  if (await isUwBlocked()) {
+    for (const ticker of unique) {
+      out[ticker] = { ticker, last: null, prevClose: null, pctFromClose: null };
+    }
+    return out;
+  }
+
+  for (const ticker of unique) {
+    if (await isUwBlocked()) {
+      out[ticker] = { ticker, last: null, prevClose: null, pctFromClose: null };
+      continue;
+    }
+    try {
+      const payload = await uwGet<{ data?: Record<string, unknown> }>(
+        `/api/stock/${encodeURIComponent(ticker)}/stock-state`,
+        undefined,
+        STOCK_STATE_TTL_MS,
+      );
+      const row = payload.data ?? {};
+      const last = firstPositive(row.close, row.last, row.price);
+      const prevClose = firstPositive(row.prev_close, row.prev_close_price);
+      const pctFromClose =
+        last != null && prevClose != null && prevClose > 0 ? (last - prevClose) / prevClose : null;
+      out[ticker] = { ticker, last, prevClose, pctFromClose };
+    } catch {
+      out[ticker] = { ticker, last: null, prevClose: null, pctFromClose: null };
+    }
+  }
+  return out;
 }
 

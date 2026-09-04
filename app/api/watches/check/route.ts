@@ -3,6 +3,7 @@ import { NextRequest } from "next/server";
 import { buildCheckResponse, evaluateWatch, isPriceWatch } from "@/lib/price-watches";
 import { fetchOptionQuotes, hasUnusualWhalesKey, quoteFromFlowPrint } from "@/lib/uw";
 import { loadStoredWatches } from "@/lib/watch-store";
+import { isUwBlocked } from "@/lib/uw-quota";
 import type { PriceWatch } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -25,17 +26,19 @@ export async function POST(request: NextRequest) {
 }
 
 async function check(watches: PriceWatch[]) {
-  const quotes = (await hasUnusualWhalesKey())
-    ? await fetchOptionQuotes(
-        watches.map((watch) => ({
-          ticker: watch.ticker,
-          option_chain: watch.option_chain,
-          lastFlowPrint: watch.lastFlowPrint,
-        })),
-      )
-    : Object.fromEntries(
-        watches.map((watch) => [watch.option_chain, quoteFromFlowPrint(watch.lastFlowPrint)]),
-      );
+  const blocked = await isUwBlocked();
+  const quotes =
+    !blocked && (await hasUnusualWhalesKey())
+      ? await fetchOptionQuotes(
+          watches.map((watch) => ({
+            ticker: watch.ticker,
+            option_chain: watch.option_chain,
+            lastFlowPrint: watch.lastFlowPrint,
+          })),
+        )
+      : Object.fromEntries(
+          watches.map((watch) => [watch.option_chain, quoteFromFlowPrint(watch.lastFlowPrint)]),
+        );
 
   const evaluations = watches.map((watch) => {
     const quote = quotes[watch.option_chain] ?? quoteFromFlowPrint(watch.lastFlowPrint);

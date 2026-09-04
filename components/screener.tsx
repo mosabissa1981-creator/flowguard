@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Pause, Play, RefreshCw, ShieldAlert, RotateCcw } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -52,6 +52,7 @@ import { EMPTY_PRICE_WATCHES, PRICE_WATCHES_KEY, upsertWatch } from "@/lib/price
 
 const REFRESH_MS = 45_000;
 const FETCH_MS = 20_000;
+const WATCH_CHECK_MS = 15 * 60_000;
 
 async function fetchJson<T>(url: string): Promise<T> {
   const response = await fetch(url, {
@@ -154,55 +155,51 @@ export function Screener({
     return fetchJson<PicksResponse>("/api/premove");
   }, []);
 
-  const freshenWatches = useCallback(
-    (list: PriceWatch[]): PriceWatch[] => {
-      const prints = new Map<string, number>();
-      for (const row of [...(data?.items ?? []), ...(picksData?.picks ?? []), ...(premoveData?.picks ?? [])]) {
-        const price = toNumber(row.alert.price);
-        if (row.alert.option_chain && price > 0) prints.set(row.alert.option_chain, price);
-      }
-      return list.map((watch) => ({
-        ...watch,
-        lastFlowPrint: prints.get(watch.option_chain) ?? watch.lastFlowPrint,
-      }));
-    },
-    [data?.items, picksData?.picks, premoveData?.picks],
-  );
+  const watchPrints = useRef(new Map<string, number>());
+  watchPrints.current = (() => {
+    const prints = new Map<string, number>();
+    for (const row of [...(data?.items ?? []), ...(picksData?.picks ?? []), ...(premoveData?.picks ?? [])]) {
+      const price = toNumber(row.alert.price);
+      if (row.alert.option_chain && price > 0) prints.set(row.alert.option_chain, price);
+    }
+    return prints;
+  })();
 
-  const checkWatches = useCallback(
-    async (list: PriceWatch[]) => {
-      if (list.length === 0) {
-        setWatchCheck({ checkedAt: new Date().toISOString(), evaluations: [], alerts: [] });
-        return;
-      }
-      setWatchesLoading(true);
-      try {
-        const payload = await fetch("/api/watches/check", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ watches: freshenWatches(list) }),
-          cache: "no-store",
-        });
-        if (!payload.ok) throw new Error(`Watch check failed (${payload.status})`);
-        setWatchCheck((await payload.json()) as WatchCheckResponse);
-      } catch {
-        setWatchCheck({
-          checkedAt: new Date().toISOString(),
-          evaluations: list.map((watch) => ({
-            watch,
-            quote: null,
-            status: "ok",
-            pctMove: null,
-            hint: null,
-          })),
-          alerts: [],
-        });
-      } finally {
-        setWatchesLoading(false);
-      }
-    },
-    [freshenWatches],
-  );
+  const checkWatches = useCallback(async (list: PriceWatch[]) => {
+    if (list.length === 0) {
+      setWatchCheck({ checkedAt: new Date().toISOString(), evaluations: [], alerts: [] });
+      return;
+    }
+    const freshened = list.map((watch) => ({
+      ...watch,
+      lastFlowPrint: watchPrints.current.get(watch.option_chain) ?? watch.lastFlowPrint,
+    }));
+    setWatchesLoading(true);
+    try {
+      const payload = await fetch("/api/watches/check", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ watches: freshened }),
+        cache: "no-store",
+      });
+      if (!payload.ok) throw new Error(`Watch check failed (${payload.status})`);
+      setWatchCheck((await payload.json()) as WatchCheckResponse);
+    } catch {
+      setWatchCheck({
+        checkedAt: new Date().toISOString(),
+        evaluations: list.map((watch) => ({
+          watch,
+          quote: null,
+          status: "ok",
+          pctMove: null,
+          hint: null,
+        })),
+        alerts: [],
+      });
+    } finally {
+      setWatchesLoading(false);
+    }
+  }, []);
 
   const load = useCallback(async () => {
     const [flowResult, picksResult, premoveResult] = await Promise.allSettled([
@@ -340,6 +337,8 @@ export function Screener({
 
   useEffect(() => {
     void checkWatches(priceWatches);
+    const id = window.setInterval(() => void checkWatches(priceWatches), WATCH_CHECK_MS);
+    return () => window.clearInterval(id);
   }, [checkWatches, priceWatches]);
 
   useEffect(() => {
@@ -379,6 +378,27 @@ export function Screener({
     visiblePremove.find((row) => row.alert.id === selectedId) ??
     morningData?.picks.find((row) => row.alert.id === selectedId) ??
     null;
+
+  const rejectMock = uwConfigured && (data?.source === "mock" || picksData?.source === "mock" || premoveData?.source === "mock");
+  const quotaDown = Boolean(
+    rejectMock ||
+      data?.quotaBlocked ||
+      data?.source === "cached" ||
+      picksData?.quotaBlocked ||
+      picksData?.source === "cached" ||
+      premoveData?.quotaBlocked ||
+      premoveData?.source === "cached",
+  );
+  const tapeBadge = quotaDown
+    ? { label: "UW cap · not live", className: "rounded-md bg-rose-500/20 text-rose-200" }
+    : data?.source === "live"
+      ? { label: "Live UW", className: "rounded-md bg-emerald-500/15 text-emerald-300" }
+      : uwConfigured
+        ? { label: "Live UW", className: "rounded-md bg-emerald-500/15 text-emerald-300" }
+        : { label: "Demo tape", className: "rounded-md bg-amber-500/15 text-amber-200" };
+  const shownItems = quotaDown && rejectMock ? [] : visibleItems;
+  const shownPicks = quotaDown && rejectMock ? [] : visiblePicks;
+  const shownPremove = quotaDown && rejectMock ? [] : visiblePremove;
 
   function toggleTicker(ticker: string) {
     const id = watchTickerId(ticker);
@@ -489,15 +509,7 @@ export function Screener({
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Badge
-              className={
-                data?.source === "live"
-                  ? "rounded-md bg-emerald-500/15 text-emerald-300"
-                  : "rounded-md bg-amber-500/15 text-amber-200"
-              }
-            >
-              {data?.source === "live" ? "Live UW" : "Mock tape"}
-            </Badge>
+            <Badge className={tapeBadge.className}>{tapeBadge.label}</Badge>
             <Button
               variant="outline"
               size="sm"
@@ -519,15 +531,15 @@ export function Screener({
               <RefreshCw className={refreshing ? "animate-spin" : undefined} />
             </Button>
             <UwKeyIcon
-              live={uwConfigured || data?.source === "live"}
+              live={uwConfigured && !quotaDown}
               open={uwKeyOpen}
               onClick={() => setUwKeyOpen((value) => !value)}
             />
           </div>
         </div>
-        <TideBar tide={data?.tide ?? null} />
+        <TideBar tide={rejectMock ? null : (data?.tide ?? null)} />
         <UwKeyForm
-          configured={uwConfigured || data?.source === "live"}
+          configured={uwConfigured}
           open={uwKeyOpen}
           onClose={() => setUwKeyOpen(false)}
           locked={uwLocked}
@@ -538,18 +550,44 @@ export function Screener({
             void load();
           }}
         />
+        {quotaDown ? (
+          <div className="rounded-lg border border-rose-400/50 bg-rose-950/70 p-3 text-sm text-rose-50">
+            <div className="font-medium tracking-wide">Live data down — Unusual Whales daily cap.</div>
+            <p className="mt-1 text-xs leading-relaxed text-rose-100/90">
+              {data?.warning ??
+                "Do not trade this screen. FlowGuard is not substituting the demo tape (no CRWD/SNOW/AVGO mock names)."}
+            </p>
+          </div>
+        ) : null}
         <div className="flex flex-wrap items-center justify-between gap-2 font-mono text-[11px] text-muted-foreground">
           <span>
             {data
-              ? `${visibleItems.length} on tape · ${visiblePremove.length} premove · ${visiblePicks.length} picks · ${dismissed.length} dismissed · ${formatClock(data.fetchedAt)} ET`
+              ? `${shownItems.length} on tape · ${shownPremove.length} premove · ${shownPicks.length} picks · ${dismissed.length} dismissed · ${formatClock(data.fetchedAt)} ET`
               : "Waiting for tape…"}
           </span>
-          {data?.warning ? <span className="text-amber-300">{data.warning}</span> : null}
+          {!quotaDown && data?.warning ? <span className="text-amber-300">{data.warning}</span> : null}
         </div>
       </header>
 
       <MorningPanel
-        morning={morningData}
+        morning={
+          rejectMock && morningData?.source === "mock"
+            ? {
+                ...(morningData ?? {
+                  source: "cached",
+                  fetchedAt: "",
+                  picks: [],
+                  tide: null,
+                  tradingDate: "",
+                  snapshotLabel: "Morning shortlist",
+                  frozen: true as const,
+                }),
+                picks: [],
+                source: "cached",
+                warning: data?.warning,
+              }
+            : morningData
+        }
         loading={morningLoading}
         notes={notes}
         onSelect={setSelectedId}
@@ -561,7 +599,9 @@ export function Screener({
       <PremovePanel
         premove={{
           ...(premoveData ?? { source: "live", fetchedAt: "", picks: [], tide: null }),
-          picks: visiblePremove,
+          picks: shownPremove,
+          source: rejectMock ? "cached" : (premoveData?.source ?? "live"),
+          warning: quotaDown ? data?.warning ?? premoveData?.warning : premoveData?.warning,
         }}
         loading={premoveLoading}
         notes={notes}
@@ -572,7 +612,7 @@ export function Screener({
       />
 
       <PicksPanel
-        picks={visiblePicks}
+        picks={shownPicks}
         loading={picksLoading}
         notes={notes}
         watchlist={watchlist}
@@ -661,7 +701,7 @@ export function Screener({
 
       {loading && !data ? (
         <FlowListSkeleton />
-      ) : visibleItems.length === 0 ? (
+      ) : shownItems.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border bg-card/50 p-10 text-center">
           <h2 className="font-medium">No flow survived these filters</h2>
           <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
@@ -676,7 +716,7 @@ export function Screener({
         </div>
       ) : (
         <FlowList
-          items={visibleItems}
+          items={shownItems}
           selectedId={selectedId}
           watchlist={watchlist}
           onSelect={setSelectedId}
@@ -689,7 +729,7 @@ export function Screener({
 
       <DetailDrawer
         row={selected}
-        marketTide={data?.tide ?? null}
+        marketTide={rejectMock ? null : data?.tide ?? null}
         open={Boolean(selected)}
         onOpenChange={(open) => {
           if (!open) setSelectedId(null);

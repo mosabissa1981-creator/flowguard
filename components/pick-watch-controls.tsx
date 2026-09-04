@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Check, Eye } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -68,16 +68,6 @@ export function PickWatchControls({
   const hasAdverse = watches.some((watch) => watch.id === watchId("adverse", seed.option_chain));
   const hasEntry = watches.some((watch) => watch.id === watchId("entry_approach", seed.option_chain));
 
-  useEffect(() => {
-    let cancelled = false;
-    void fetchArming(seed).then((next) => {
-      if (!cancelled) setArming(next);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [seed.option_chain, seed.ticker, seed.price]);
-
   if (!seed.option_chain) return null;
 
   async function oneTapBought() {
@@ -137,7 +127,7 @@ export function PickWatchControls({
   return (
     <div className="space-y-2">
       <p className="text-[11px] text-muted-foreground">
-        Arm at {arming?.label ?? (alertPx > 0 ? `${formatPrice(alertPx)} (alert print…)` : "…")}
+        Arm at {arming?.label ?? (alertPx > 0 ? `${formatPrice(alertPx)} (alert print)` : "alert print")}
         {arming && arming.source !== "alert" && alertPx > 0 && Math.abs(arming.premium - alertPx) / alertPx >= 0.02
           ? ` · alert was ${formatPrice(alertPx)}`
           : ""}

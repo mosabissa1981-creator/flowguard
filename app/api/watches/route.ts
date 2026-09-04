@@ -9,6 +9,7 @@ import {
   upsertStoredWatch,
 } from "@/lib/watch-store";
 import { fireWebhook } from "@/lib/watch-webhook";
+import { isUwBlocked } from "@/lib/uw-quota";
 import type { PriceWatch } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -42,7 +43,7 @@ export async function POST(request: NextRequest) {
   }
 
   let watch: PriceWatch = body.watch;
-  if (body.resolvePremium !== false) {
+  if (body.resolvePremium !== false && !(await isUwBlocked())) {
     try {
       const arming = await resolveArmingPremium({
         ticker: watch.ticker,

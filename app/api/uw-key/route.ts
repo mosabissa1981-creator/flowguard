@@ -44,7 +44,14 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  if (!probe.ok && probe.status !== 429) {
+  if (probe.status === 429) {
+    const { tripUwQuota } = await import("@/lib/uw-quota");
+    await tripUwQuota("key-probe 429");
+    await persistUnusualWhalesKey(key);
+    return Response.json({ configured: true, replaced: true, quotaBlocked: true });
+  }
+
+  if (!probe.ok) {
     const detail = await probe.text();
     return Response.json(
       {

@@ -4,6 +4,7 @@ import { loadRankedFlow } from "@/lib/flow-service";
 import { buildPremoveCopy } from "@/lib/thesis";
 import { applyPremoveOverlay, hasPremoveAccumulation } from "@/lib/premove-score";
 import { fetchStockStates, hasUnusualWhalesKey } from "@/lib/uw";
+import { isUwBlocked } from "@/lib/uw-quota";
 import { toNumber } from "@/lib/numbers";
 import type { FlowFilters, PicksResponse, RankedFlow } from "@/lib/types";
 
@@ -22,16 +23,19 @@ export const MAX_PREMOVE = 8;
 const MIN_PREMOVE_SCORE = 50;
 
 export async function loadPremoveShortlist(): Promise<PicksResponse> {
-  const ranked = await loadRankedFlow(PREMOVE_FILTERS, { maxPages: 2 });
+  const ranked = await loadRankedFlow(PREMOVE_FILTERS);
   const peers = ranked.items.map((row) => row.alert);
 
   let spots: Awaited<ReturnType<typeof fetchStockStates>> = {};
-  if (ranked.source === "live" && (await hasUnusualWhalesKey())) {
+  const allowSpot =
+    ranked.source === "live" &&
+    !ranked.quotaBlocked &&
+    (await hasUnusualWhalesKey()) &&
+    !(await isUwBlocked());
+  if (allowSpot) {
+    const tickers = [...new Set(ranked.items.map((row) => row.alert.ticker))].slice(0, 8);
     try {
-      spots = await fetchStockStates(
-        ranked.items.map((row) => row.alert.ticker),
-        16,
-      );
+      spots = await fetchStockStates(tickers, 6);
     } catch {
       spots = {};
     }
@@ -113,5 +117,6 @@ export async function loadPremoveShortlist(): Promise<PicksResponse> {
     picks,
     tide: ranked.tide,
     warning,
+    quotaBlocked: ranked.quotaBlocked,
   };
 }

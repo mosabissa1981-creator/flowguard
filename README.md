@@ -49,7 +49,11 @@ Set `UNUSUAL_WHALES_API_KEY` in `.env.local`, or paste it in the **Unusual Whale
 | `GET/POST/DELETE /api/watches` | Vercel Blob (`flowguard/watches.json`) — durable across deploys; external checker reads `GET /api/watches` |
 | `GET /api/quote` | Live arming premium: UW last/mid, else last session flow print, else `alert.price` |
 
-Requests use `Authorization: Bearer …` and `UW-CLIENT-API-ID: 100001`. If a live request fails, the screener falls back to mock data and shows a warning.
+Requests use `Authorization: Bearer …` and `UW-CLIENT-API-ID: 100001`.
+
+**Quota:** Unusual Whales allows 40,000 requests/day. Flow, picks, premove, and morning share **one** session tape (cached 45s in memory + blob). Market tide 60s. Stock-state 5 min, max 6 tickers, sequential. Ticker tide is derived from the tape (no per-name net-prem on poll). Chain quotes are not fetched on poll. Bought/Watch quotes run **on tap only**. Price-alert checks run every 15 minutes and fail closed on 429. A 429 trips a circuit breaker until next UTC midnight — no further UW calls. Mock/demo names are never shown when a key is configured; 429 serves last-good live tape or an empty board with a hard banner.
+
+If a live request fails, the screener does **not** substitute the demo tape.
 
 ## Filters
 
@@ -58,7 +62,7 @@ Requests use `Authorization: Bearer …` and `UW-CLIENT-API-ID: 100001`. If a li
 - Unusual preset — applied **locally** on today's session tape (opening, vol&gt;OI, size&gt;OI, sweep/floor, or a named alert rule such as RepeatedHits). Does **not** send `unusual=true` to Unusual Whales.
 - Strict anti-fade — hides 0–2 DTE, tiny premium, bid-dominant, fighting-tide, post-print fade, and **stale** rows (also excluded from Picks)
 - **Session filter** — UW `GET /api/option-trades/flow-alerts` with documented `newer_than` (unix seconds of 9:30 ET). There is no `intraday_only` param; `hide_expired` is not on this endpoint (it exists on `/api/option-trades`). FlowGuard then keeps only `created_at` ≥ 9:30 ET today and unexpired contracts. Rank/conviction apply inside that window. Empty windows stay empty — they do not fill from multi-week `LowHistoricVolumeFloor` alerts. `unusual=true` is never sent (UW docs: that flag is a live-options-flow *criteria* preset, not a session cut).
-- Auto-refresh every 45s, with pause
+- Auto-refresh every 45s, with pause (server cache 45s, so a refresh is not a new UW pull)
 
 Click a row for the detail drawer: score chips, ask/bid split, market tide, ticker net-premium ticks, pin, note, and dismiss.
 
@@ -72,7 +76,7 @@ The manager book sits on the same Unusual Whales tape. It does not pick stocks.
 - **Watchlist** — pin a ticker or a specific option contract. Stored in `localStorage` (`flowguard.watchlist`). Toggle *Watchlist only* to filter the tape.
 - **Manager notes** — optional note per alert id (`flowguard.notes`).
 - **Dismiss** — hide an alert from picks and the tape (`flowguard.dismissed`). Restore one name or restore all.
-- **Price watches** — options only. **Bought** (one tap) arms an adverse-move watch at the **live UW quote** when it exists (15% default). **Watch entry** does the same for an approach band (5%). The UI labels live vs session print vs alert print. Tap Adjust to override. Watches are stored in Vercel Blob (durable across deploys) and synced to `localStorage` on load. An external checker calls `GET /api/watches` to read all armed watches, and `GET /api/watches/check` to get live quotes and alerts. On each arm/remove the server also POSTs to `WATCH_WEBHOOK_URL` (with `WATCH_WEBHOOK_SECRET` header) if set. Never auto-trades.
+- **Price watches** — options only. **Bought** / **Watch entry** resolve a live UW quote **on tap** (not on every row render). Default adverse 15% / approach 5%. If the daily UW cap is hit, arming uses the alert print and watch checks fail closed (last flow print, no UW retry). Watches are stored in Vercel Blob and synced to `localStorage` on load. An external checker calls `GET /api/watches` to read all armed watches, and `GET /api/watches/check` to get quotes. On each arm/remove the server also POSTs to `WATCH_WEBHOOK_URL` (with `WATCH_WEBHOOK_SECRET` header) if set. Never auto-trades.
 
 No brokerage routing. Notes and pins stay in the browser. Price watches are durable on the server.
 

@@ -1,23 +1,11 @@
 import "server-only";
 
 import type { FlowAlert, FlowFilters, FlowResponse, TideSnapshot } from "@/lib/types";
-import { toNumber } from "@/lib/numbers";
+import { tideFromPremiums, toNumber } from "@/lib/numbers";
 import { rankAlerts } from "@/lib/scoring";
 import { buildMockAlerts, buildMockTide, buildMockTickerTides } from "@/lib/mock";
-import {
-  fetchChainTrades,
-  fetchFlowAlerts,
-  fetchMarketTide,
-  fetchOptionQuote,
-  fetchTickerTides,
-  hasUnusualWhalesKey,
-} from "@/lib/uw";
-import {
-  fadeFromLaterPrints,
-  fadeFromQuote,
-  isFloorOnlyCandidate,
-  type ChainFadeSignal,
-} from "@/lib/chain-context";
+import { fetchFlowAlerts, fetchMarketTide, hasUnusualWhalesKey } from "@/lib/uw";
+import { fadeFromLaterPrints, type ChainFadeSignal } from "@/lib/chain-context";
 import {
   isExpiredContract,
   isInCurrentSession,
@@ -25,6 +13,15 @@ import {
   sessionHasOpened,
   tradingDateET,
 } from "@/lib/session";
+import {
+  getFreshTape,
+  isUwBlocked,
+  isUwQuotaError,
+  loadLastGoodTape,
+  quotaBanner,
+  quotaResetUtcMs,
+  rememberTape,
+} from "@/lib/uw-quota";
 
 function looksUnusual(alert: FlowAlert): boolean {
   if (alert.all_opening_trades) return true;
@@ -37,36 +34,27 @@ function looksUnusual(alert: FlowAlert): boolean {
   return rule.length > 0 && rule.toLowerCase() !== "none";
 }
 
-async function enrichChainFades(alerts: FlowAlert[]): Promise<Record<string, ChainFadeSignal>> {
+function tickerTidesFromAlerts(alerts: FlowAlert[]): Record<string, TideSnapshot | null> {
+  const byTicker = new Map<string, { ask: number; bid: number }>();
+  for (const alert of alerts) {
+    const cur = byTicker.get(alert.ticker) ?? { ask: 0, bid: 0 };
+    cur.ask += toNumber(alert.total_ask_side_prem);
+    cur.bid += toNumber(alert.total_bid_side_prem);
+    byTicker.set(alert.ticker, cur);
+  }
+  const out: Record<string, TideSnapshot | null> = {};
+  for (const [ticker, prem] of byTicker) {
+    out[ticker] = tideFromPremiums(prem.ask, prem.bid, null);
+  }
+  return out;
+}
+
+function peerFades(alerts: FlowAlert[]): Record<string, ChainFadeSignal> {
   const out: Record<string, ChainFadeSignal> = {};
-  if (!(await hasUnusualWhalesKey())) return out;
-
-  const candidates = alerts
-    .filter((alert) => isFloorOnlyCandidate(alert) || toNumber(alert.total_premium) >= 250_000)
-    .slice(0, 8);
-
-  await Promise.all(
-    candidates.map(async (alert) => {
-      if (!alert.option_chain) return;
-      try {
-        const quote = await fetchOptionQuote(
-          alert.ticker,
-          alert.option_chain,
-          toNumber(alert.price) || undefined,
-        );
-        const fromQuote = fadeFromQuote(alert, quote?.quality === "flow_print" ? null : quote?.last);
-        if (fromQuote.faded) {
-          out[alert.id] = fromQuote;
-          return;
-        }
-        const later = await fetchChainTrades(alert.option_chain, alert.created_at);
-        const fromTape = fadeFromLaterPrints(alert, later);
-        if (fromTape.faded) out[alert.id] = fromTape;
-      } catch {
-        // Best-effort; scoring still works without chain history.
-      }
-    }),
-  );
+  for (const alert of alerts) {
+    const fade = fadeFromLaterPrints(alert, alerts);
+    if (fade.faded) out[alert.id] = fade;
+  }
   return out;
 }
 
@@ -96,6 +84,71 @@ function applyFilters(
   });
 }
 
+function mockResponse(filters: FlowFilters): FlowResponse {
+  const alerts = buildMockAlerts();
+  const tide = buildMockTide();
+  const tickerTides = buildMockTickerTides();
+  const items = applyFilters(alerts, filters, { marketTide: tide, tickerTides });
+  return {
+    source: "mock",
+    fetchedAt: new Date().toISOString(),
+    unusual: filters.unusual,
+    tide,
+    items,
+    rawCount: alerts.length,
+  };
+}
+
+function pack(
+  filters: FlowFilters,
+  alerts: FlowAlert[],
+  tide: TideSnapshot | null,
+  extra: Pick<FlowResponse, "source" | "fetchedAt" | "warning" | "quotaBlocked">,
+): FlowResponse {
+  const tickerTides = tickerTidesFromAlerts(alerts);
+  const chainFades = peerFades(alerts);
+  const items = applyFilters(alerts, filters, { marketTide: tide, tickerTides, chainFades });
+  let warning = extra.warning;
+  if (items.length === 0 && !warning && extra.source === "live") {
+    warning = `No prints in the current US cash session since 9:30 ET ${tradingDateET()}. Not filling from older Unusual Whales floor alerts.`;
+  }
+  return {
+    source: extra.source,
+    fetchedAt: extra.fetchedAt,
+    unusual: filters.unusual,
+    tide,
+    items,
+    rawCount: alerts.length,
+    warning,
+    quotaBlocked: extra.quotaBlocked,
+  };
+}
+
+async function fromLastGoodOrEmpty(filters: FlowFilters, untilMs: number): Promise<FlowResponse> {
+  const last = await loadLastGoodTape();
+  if (last?.alerts?.length) {
+    const sessionAlerts = last.alerts.filter(
+      (alert) => isInCurrentSession(alert.created_at) && !isExpiredContract(alert.expiry),
+    );
+    return pack(filters, sessionAlerts, last.tide, {
+      source: "cached",
+      fetchedAt: last.savedAt,
+      warning: quotaBanner(untilMs, last.savedAt),
+      quotaBlocked: true,
+    });
+  }
+  return {
+    source: "cached",
+    fetchedAt: new Date().toISOString(),
+    unusual: filters.unusual,
+    tide: null,
+    items: [],
+    rawCount: 0,
+    warning: quotaBanner(untilMs, null),
+    quotaBlocked: true,
+  };
+}
+
 function emptyLive(filters: FlowFilters, warning: string): FlowResponse {
   return {
     source: "live",
@@ -108,25 +161,12 @@ function emptyLive(filters: FlowFilters, warning: string): FlowResponse {
   };
 }
 
-export async function loadRankedFlow(
-  filters: FlowFilters,
-  opts?: { olderThan?: string; maxPages?: number },
-): Promise<FlowResponse> {
+/** Shared session tape: one UW flow-alerts pull, scored locally for flow / picks / premove / morning. */
+export async function loadRankedFlow(filters: FlowFilters): Promise<FlowResponse> {
   const live = await hasUnusualWhalesKey();
 
   if (!live) {
-    const alerts = buildMockAlerts();
-    const tide = buildMockTide();
-    const tickerTides = buildMockTickerTides();
-    const items = applyFilters(alerts, filters, { marketTide: tide, tickerTides });
-    return {
-      source: "mock",
-      fetchedAt: new Date().toISOString(),
-      unusual: filters.unusual,
-      tide,
-      items,
-      rawCount: alerts.length,
-    };
+    return mockResponse(filters);
   }
 
   if (!sessionHasOpened()) {
@@ -136,73 +176,84 @@ export async function loadRankedFlow(
     );
   }
 
+  if (await isUwBlocked()) {
+    return fromLastGoodOrEmpty(filters, quotaResetUtcMs());
+  }
+
   try {
-    const alerts = await fetchFlowAlerts({
-      minPremium: filters.minPremium,
-      side: filters.side,
-      ticker: filters.ticker || undefined,
-      limit: 200,
-      newerThan: newerThanParam(),
-      olderThan: opts?.olderThan,
-      maxPages: opts?.maxPages ?? 2,
-    });
+    let alerts: FlowAlert[] = [];
+    let tide: TideSnapshot | null = null;
+    let fetchedAt = new Date().toISOString();
+    let source: FlowResponse["source"] = "live";
+
+    const fresh = await getFreshTape();
+    if (fresh) {
+      alerts = fresh.alerts;
+      tide = fresh.tide;
+      fetchedAt = fresh.savedAt;
+      source = "live";
+    } else {
+      alerts = await fetchFlowAlerts({
+        minPremium: 10_000,
+        side: "all",
+        limit: 200,
+        newerThan: newerThanParam(),
+        maxPages: 2,
+      });
+      try {
+        tide = await fetchMarketTide();
+      } catch (error) {
+        if (isUwQuotaError(error)) {
+          const sessionAlerts = alerts.filter(
+            (alert) => isInCurrentSession(alert.created_at) && !isExpiredContract(alert.expiry),
+          );
+          rememberTape(sessionAlerts, null);
+          return pack(filters, sessionAlerts, null, {
+            source: "cached",
+            fetchedAt,
+            warning: quotaBanner(error.untilMs, fetchedAt),
+            quotaBlocked: true,
+          });
+        }
+      }
+      const sessionAlerts = alerts.filter(
+        (alert) => isInCurrentSession(alert.created_at) && !isExpiredContract(alert.expiry),
+      );
+      rememberTape(sessionAlerts, tide);
+      alerts = sessionAlerts;
+    }
 
     const sessionAlerts = alerts.filter(
       (alert) => isInCurrentSession(alert.created_at) && !isExpiredContract(alert.expiry),
     );
 
-    let tide: TideSnapshot | null = null;
-    let tickerTides: Record<string, TideSnapshot | null> = {};
-    let warning: string | undefined;
-
-    try {
-      tide = await fetchMarketTide();
-    } catch (error) {
-      warning = error instanceof Error ? error.message : "Market tide unavailable.";
-    }
-
-    try {
-      tickerTides = await fetchTickerTides(sessionAlerts.map((a) => a.ticker), 8);
-    } catch {
-      // Ticker tide is optional; scoring still works without it.
-    }
-
-    let chainFades: Record<string, ChainFadeSignal> = {};
-    try {
-      chainFades = await enrichChainFades(sessionAlerts);
-    } catch {
-      chainFades = {};
-    }
-
-    const items = applyFilters(sessionAlerts, filters, { marketTide: tide, tickerTides, chainFades });
-    if (items.length === 0 && !warning) {
-      warning = `No prints in the current US cash session since 9:30 ET ${tradingDateET()}. Not filling from older Unusual Whales floor alerts.`;
-    }
-    return {
-      source: "live",
-      fetchedAt: new Date().toISOString(),
-      unusual: filters.unusual,
-      tide,
-      items,
-      rawCount: sessionAlerts.length,
-      warning,
-    };
+    return pack(filters, sessionAlerts, tide, {
+      source,
+      fetchedAt,
+    });
   } catch (error) {
-    const alerts = buildMockAlerts();
-    const tide = buildMockTide();
-    const tickerTides = buildMockTickerTides();
-    const items = applyFilters(alerts, filters, { marketTide: tide, tickerTides });
+    if (isUwQuotaError(error)) {
+      return fromLastGoodOrEmpty(filters, error.untilMs);
+    }
+    const last = await loadLastGoodTape();
+    if (last?.alerts?.length) {
+      const sessionAlerts = last.alerts.filter(
+        (alert) => isInCurrentSession(alert.created_at) && !isExpiredContract(alert.expiry),
+      );
+      return pack(filters, sessionAlerts, last.tide, {
+        source: "cached",
+        fetchedAt: last.savedAt,
+        warning: `Unusual Whales request failed (${error instanceof Error ? error.message : "error"}). Showing last live snapshot — not mock tape. Do not trade this screen as live.`,
+      });
+    }
     return {
-      source: "mock",
+      source: "cached",
       fetchedAt: new Date().toISOString(),
       unusual: filters.unusual,
-      tide,
-      items,
-      rawCount: alerts.length,
-      warning:
-        error instanceof Error
-          ? `Unusual Whales request failed (${error.message}). Showing mock tape.`
-          : "Unusual Whales request failed. Showing mock tape.",
+      tide: null,
+      items: [],
+      rawCount: 0,
+      warning: `Unusual Whales request failed (${error instanceof Error ? error.message : "error"}). Live board is empty — not substituting mock names. Do not trade this screen.`,
     };
   }
 }
