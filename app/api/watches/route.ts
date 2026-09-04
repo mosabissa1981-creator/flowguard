@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 
+import { resolveArmingPremium } from "@/lib/arming";
 import { isPriceWatch } from "@/lib/price-watches";
 import {
   loadStoredWatches,
@@ -8,6 +9,7 @@ import {
   upsertStoredWatch,
 } from "@/lib/watch-store";
 import { fireWebhook } from "@/lib/watch-webhook";
+import type { PriceWatch } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -22,9 +24,9 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  let body: { watch?: unknown; watches?: unknown };
+  let body: { watch?: unknown; watches?: unknown; resolvePremium?: boolean };
   try {
-    body = (await request.json()) as { watch?: unknown; watches?: unknown };
+    body = (await request.json()) as { watch?: unknown; watches?: unknown; resolvePremium?: boolean };
   } catch {
     return Response.json({ error: "Send JSON { watch } or { watches }." }, { status: 400 });
   }
@@ -39,9 +41,30 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: "Invalid options watch." }, { status: 400 });
   }
 
-  const watches = await upsertStoredWatch(body.watch);
-  const webhook = await fireWebhook(body.watch, "armed");
-  return Response.json({ watches, persisted: true, webhook });
+  let watch: PriceWatch = body.watch;
+  if (body.resolvePremium !== false) {
+    try {
+      const arming = await resolveArmingPremium({
+        ticker: watch.ticker,
+        option_chain: watch.option_chain,
+        alertPrice: watch.lastFlowPrint ?? watch.referencePremium,
+      });
+      if (arming.premium > 0) {
+        watch = {
+          ...watch,
+          referencePremium: arming.premium,
+          referenceSource: arming.source,
+          lastFlowPrint: watch.lastFlowPrint ?? watch.referencePremium,
+        };
+      }
+    } catch {
+      // Keep the client-supplied premium.
+    }
+  }
+
+  const watches = await upsertStoredWatch(watch);
+  const webhook = await fireWebhook(watch, "armed");
+  return Response.json({ watch, watches, persisted: true, webhook });
 }
 
 export async function DELETE(request: NextRequest) {

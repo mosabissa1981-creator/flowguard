@@ -1,8 +1,16 @@
 import type { FlowAlert, RankedFlow, ScoreChip, TideSnapshot } from "@/lib/types";
 import { buildHoldWindow } from "@/lib/hold-window";
 import { askShare, clamp, daysToExpiry, toNumber } from "@/lib/numbers";
+import {
+  fadeFromLaterPrints,
+  hasSessionAskConfirmation,
+  isFloorOnlyCandidate,
+  type ChainFadeSignal,
+} from "@/lib/chain-context";
+import { isAgingPrint, isStalePrint } from "@/lib/session";
 
 const BASE_SCORE = 32;
+const STALE_CAP = 40;
 
 function chip(
   id: string,
@@ -20,15 +28,19 @@ export function scoreAlert(
     marketTide?: TideSnapshot | null;
     tickerTide?: TideSnapshot | null;
     now?: Date;
+    peers?: FlowAlert[];
+    chainFade?: ChainFadeSignal | null;
   } = {},
 ): Omit<RankedFlow, "rank"> {
   const chips: ScoreChip[] = [];
   let score = BASE_SCORE;
+  const now = context.now ?? new Date();
+  const peers = context.peers ?? [];
 
   const premium = toNumber(alert.total_premium);
   const volOi = toNumber(alert.volume_oi_ratio);
   const share = askShare(alert);
-  const dte = daysToExpiry(alert.expiry, context.now);
+  const dte = daysToExpiry(alert.expiry, now);
   const isCall = alert.type === "call";
   const aggressive = share >= 0.55;
 
@@ -200,6 +212,19 @@ export function scoreAlert(
       chip("floor", "Floor", "boost", delta, "Floor print. Often institutional, less likely a retail lottery ticket."),
     );
   }
+  if (isFloorOnlyCandidate(alert) && !hasSessionAskConfirmation(alert, peers)) {
+    const delta = -8;
+    score += delta;
+    chips.push(
+      chip(
+        "floor-only",
+        "Floor-only / no sweep",
+        "penalty",
+        delta,
+        "Low-historic / floor print without a same-session sweep or second ask-side hit. Whale floor alone fades.",
+      ),
+    );
+  }
 
   if (alert.has_singleleg && !alert.has_multileg) {
     const delta = 4;
@@ -263,14 +288,62 @@ export function scoreAlert(
     }
   }
 
+  if (isAgingPrint(alert.created_at, now)) {
+    const delta = -12;
+    score += delta;
+    chips.push(
+      chip(
+        "aging",
+        "Aging print",
+        "penalty",
+        delta,
+        "Print is 4–24h old. Conviction should already be fading if the move did not follow through.",
+      ),
+    );
+  }
+
+  const peerFade = fadeFromLaterPrints(alert, peers);
+  const remoteFade = context.chainFade?.faded ? context.chainFade : null;
+  const fadeHit = peerFade.faded ? peerFade : remoteFade;
+  if (fadeHit?.faded) {
+    const delta = -15;
+    score += delta;
+    chips.push(
+      chip(
+        "post-fade",
+        "Post-print fade",
+        "penalty",
+        delta,
+        fadeHit.detail || "Later tape on this contract moved against the alert.",
+      ),
+    );
+  }
+
+  const stale = isStalePrint(alert.created_at, now);
+  if (stale) {
+    const capped = Math.min(score, STALE_CAP);
+    const delta = Math.round(capped - score);
+    chips.push(
+      chip(
+        "stale",
+        "Stale print",
+        "penalty",
+        delta,
+        "Created before the prior session’s 9:30 ET. Cap 40 — not today’s tape.",
+      ),
+    );
+    score = capped;
+  }
+
   const fadeProne = chips.some((c) =>
-    ["lottery", "tiny", "bid-dom", "fight-tide"].includes(c.id),
+    ["lottery", "tiny", "bid-dom", "fight-tide", "post-fade", "stale"].includes(c.id),
   );
 
   const scored = {
     score: Math.round(clamp(score, 0, 100)),
     chips,
     fadeProne,
+    stale,
     dte,
     askShare: share,
     marketTideBias: tapeBias,
@@ -290,6 +363,7 @@ export function rankAlerts(
     marketTide?: TideSnapshot | null;
     tickerTides?: Record<string, TideSnapshot | null>;
     now?: Date;
+    chainFades?: Record<string, ChainFadeSignal>;
   } = {},
 ): RankedFlow[] {
   const scored = alerts.map((alert) =>
@@ -297,6 +371,8 @@ export function rankAlerts(
       marketTide: context.marketTide,
       tickerTide: context.tickerTides?.[alert.ticker] ?? null,
       now: context.now,
+      peers: alerts,
+      chainFade: context.chainFades?.[alert.id] ?? null,
     }),
   );
 

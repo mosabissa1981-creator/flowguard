@@ -73,6 +73,7 @@ export type RankedFlow = {
   score: number;
   chips: ScoreChip[];
   fadeProne: boolean;
+  stale: boolean;
   dte: number;
   askShare: number;
   holdWindow: HoldWindow;
@@ -127,6 +128,15 @@ export type PriceWatchStatus = "ok" | "approaching" | "adverse";
 
 export type WatchDataQuality = "uw_last" | "uw_nbbo" | "flow_print";
 
+export type ArmingSource = "uw_last" | "uw_nbbo" | "session_print" | "alert";
+
+export type ArmingPremium = {
+  premium: number;
+  source: ArmingSource;
+  label: string;
+  asOf: string | null;
+};
+
 /** Options-only price watch. Premiums are per-share option prices, not flow notional. */
 export type PriceWatch = {
   id: string;
@@ -138,6 +148,8 @@ export type PriceWatch = {
   type: OptionType;
   /** Fill (adverse) or suggested/target entry (entry_approach). */
   referencePremium: number;
+  /** How the reference was chosen at arm time. */
+  referenceSource?: ArmingSource;
   /** Adverse default 0.15. Ignored for entry watches. */
   adversePct: number;
   /** Entry default 0.05. Ignored for position watches. */

@@ -36,7 +36,7 @@ export function PicksPanel({
   onPinContract: (pick: DailyPick) => void;
   onDismiss: (pick: DailyPick) => void;
   priceWatches: PriceWatch[];
-  onSavePriceWatch: (watch: PriceWatch) => void;
+  onSavePriceWatch: (watch: PriceWatch, resolvePremium?: boolean) => void;
 }) {
   return (
     <section className="rounded-xl border border-amber-400/20 bg-card/80 p-4">

@@ -28,7 +28,7 @@ export function MorningPanel({
   onSelect: (id: string) => void;
   onNote: (id: string, note: string) => void;
   priceWatches: PriceWatch[];
-  onSavePriceWatch: (watch: PriceWatch) => void;
+  onSavePriceWatch: (watch: PriceWatch, resolvePremium?: boolean) => void;
 }) {
   const picks = morning?.picks ?? [];
   const label = morning?.snapshotLabel ?? "Morning shortlist";

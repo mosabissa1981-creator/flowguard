@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { contractLabel } from "@/lib/price-watches";
 import { formatPrice, formatSignedPct } from "@/lib/format";
-import type { EvaluatedWatch, PriceWatchStatus, WatchAlert, WatchDataQuality } from "@/lib/types";
+import type { EvaluatedWatch, PriceWatch, PriceWatchStatus, WatchAlert, WatchDataQuality } from "@/lib/types";
 
 function statusTone(status: PriceWatchStatus) {
   if (status === "adverse") return "bg-rose-500/15 text-rose-300";
@@ -19,6 +19,14 @@ function qualityLabel(quality: WatchDataQuality) {
   if (quality === "uw_last") return "UW last";
   if (quality === "uw_nbbo") return "UW NBBO";
   return "Last flow print";
+}
+
+function armingSourceLabel(source: PriceWatch["referenceSource"]) {
+  if (source === "uw_last") return "armed at live UW last";
+  if (source === "uw_nbbo") return "armed at live UW mid";
+  if (source === "session_print") return "armed at last session print";
+  if (source === "alert") return "armed at alert print";
+  return null;
 }
 
 export function PriceWatchesPanel({
@@ -117,6 +125,7 @@ export function PriceWatchesPanel({
                   </div>
                   <p className="mt-1 text-xs text-muted-foreground">
                     {quote ? qualityLabel(quote.quality) : "No quote yet"}
+                    {armingSourceLabel(watch.referenceSource) ? ` · ${armingSourceLabel(watch.referenceSource)}` : ""}
                     {watch.kind === "adverse"
                       ? ` · cut if down ${Math.round(watch.adversePct * 100)}%${watch.stopPremium ? ` or ≤ ${formatPrice(watch.stopPremium)}` : ""}`
                       : ` · within ${Math.round(watch.approachPct * 100)}% of target`}

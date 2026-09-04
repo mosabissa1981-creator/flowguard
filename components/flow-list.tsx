@@ -65,7 +65,7 @@ export function FlowList({
   onPinTicker: (ticker: string) => void;
   onDismiss: (row: RankedFlow) => void;
   priceWatches?: PriceWatch[];
-  onSavePriceWatch?: (watch: PriceWatch) => void;
+  onSavePriceWatch?: (watch: PriceWatch, resolvePremium?: boolean) => void;
 }) {
   return (
     <>

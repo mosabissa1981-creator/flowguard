@@ -107,7 +107,7 @@ export function DetailDrawer({
   onPinContract?: (row: RankedFlow) => void;
   onDismiss?: (row: RankedFlow) => void;
   priceWatches?: PriceWatch[];
-  onSavePriceWatch?: (watch: PriceWatch) => void;
+  onSavePriceWatch?: (watch: PriceWatch, resolvePremium?: boolean) => void;
 }) {
   const [tickCache, setTickCache] = useState<{
     ticker: string;

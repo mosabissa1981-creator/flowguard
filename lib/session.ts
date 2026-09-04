@@ -47,6 +47,45 @@ export function sessionHasOpened(now = new Date()): boolean {
   return now.getTime() >= sessionOpenUtc(now).getTime();
 }
 
+function weekdayShort(instant: Date): string {
+  return new Intl.DateTimeFormat("en-US", { timeZone: ET, weekday: "short" }).format(instant);
+}
+
+/** 9:30 ET open of the previous weekday session (skips Sat/Sun). */
+export function previousSessionOpenUtc(now = new Date()): Date {
+  const currentOpen = sessionOpenUtc(now);
+  let cursor = new Date(currentOpen.getTime() - 36 * 3600_000);
+  for (let i = 0; i < 8; i += 1) {
+    const open = sessionOpenUtc(cursor);
+    const wd = weekdayShort(open);
+    if (wd !== "Sat" && wd !== "Sun" && open.getTime() < currentOpen.getTime()) {
+      return open;
+    }
+    cursor = new Date(cursor.getTime() - 24 * 3600_000);
+  }
+  return new Date(currentOpen.getTime() - 86_400_000);
+}
+
+export function hoursSinceCreated(createdAt: string, now = new Date()): number {
+  const created = new Date(createdAt);
+  if (!Number.isFinite(created.getTime())) return Number.POSITIVE_INFINITY;
+  return (now.getTime() - created.getTime()) / 3_600_000;
+}
+
+/** Older than one trading session: created_at before the prior weekday 9:30 ET. */
+export function isStalePrint(createdAt: string, now = new Date()): boolean {
+  const created = new Date(createdAt);
+  if (!Number.isFinite(created.getTime())) return true;
+  return created.getTime() < previousSessionOpenUtc(now).getTime();
+}
+
+/** 4–24h old and not yet stale (morning print scored later the same day / next hours). */
+export function isAgingPrint(createdAt: string, now = new Date()): boolean {
+  if (isStalePrint(createdAt, now)) return false;
+  const hours = hoursSinceCreated(createdAt, now);
+  return hours >= 4 && hours < 24;
+}
+
 export function morningWindowClosed(now = new Date()): boolean {
   return now.getTime() >= sessionMorningCutoffUtc(now).getTime();
 }

@@ -38,6 +38,7 @@ export function makeAdverseWatch(input: {
   adversePct?: number;
   stopPremium?: number;
   lastFlowPrint?: number;
+  referenceSource?: PriceWatch["referenceSource"];
 }): PriceWatch {
   return {
     id: watchId("adverse", input.option_chain),
@@ -48,6 +49,7 @@ export function makeAdverseWatch(input: {
     expiry: input.expiry,
     type: input.type,
     referencePremium: input.entryPremium,
+    referenceSource: input.referenceSource,
     adversePct: input.adversePct ?? DEFAULT_ADVERSE_PCT,
     approachPct: DEFAULT_APPROACH_PCT,
     stopPremium: input.stopPremium,
@@ -65,6 +67,7 @@ export function makeEntryWatch(input: {
   targetPremium: number;
   approachPct?: number;
   lastFlowPrint?: number;
+  referenceSource?: PriceWatch["referenceSource"];
 }): PriceWatch {
   return {
     id: watchId("entry_approach", input.option_chain),
@@ -75,6 +78,7 @@ export function makeEntryWatch(input: {
     expiry: input.expiry,
     type: input.type,
     referencePremium: input.targetPremium,
+    referenceSource: input.referenceSource,
     adversePct: DEFAULT_ADVERSE_PCT,
     approachPct: input.approachPct ?? DEFAULT_APPROACH_PCT,
     lastFlowPrint: input.lastFlowPrint,

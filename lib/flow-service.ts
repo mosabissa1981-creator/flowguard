@@ -5,11 +5,19 @@ import { toNumber } from "@/lib/numbers";
 import { rankAlerts } from "@/lib/scoring";
 import { buildMockAlerts, buildMockTide, buildMockTickerTides } from "@/lib/mock";
 import {
+  fetchChainTrades,
   fetchFlowAlerts,
   fetchMarketTide,
+  fetchOptionQuote,
   fetchTickerTides,
   hasUnusualWhalesKey,
 } from "@/lib/uw";
+import {
+  fadeFromLaterPrints,
+  fadeFromQuote,
+  isFloorOnlyCandidate,
+  type ChainFadeSignal,
+} from "@/lib/chain-context";
 import {
   isExpiredContract,
   isInCurrentSession,
@@ -29,18 +37,54 @@ function looksUnusual(alert: FlowAlert): boolean {
   return rule.length > 0 && rule.toLowerCase() !== "none";
 }
 
+async function enrichChainFades(alerts: FlowAlert[]): Promise<Record<string, ChainFadeSignal>> {
+  const out: Record<string, ChainFadeSignal> = {};
+  if (!hasUnusualWhalesKey()) return out;
+
+  const candidates = alerts
+    .filter((alert) => isFloorOnlyCandidate(alert) || toNumber(alert.total_premium) >= 250_000)
+    .slice(0, 8);
+
+  await Promise.all(
+    candidates.map(async (alert) => {
+      if (!alert.option_chain) return;
+      try {
+        const quote = await fetchOptionQuote(
+          alert.ticker,
+          alert.option_chain,
+          toNumber(alert.price) || undefined,
+        );
+        const fromQuote = fadeFromQuote(alert, quote?.quality === "flow_print" ? null : quote?.last);
+        if (fromQuote.faded) {
+          out[alert.id] = fromQuote;
+          return;
+        }
+        const later = await fetchChainTrades(alert.option_chain, alert.created_at);
+        const fromTape = fadeFromLaterPrints(alert, later);
+        if (fromTape.faded) out[alert.id] = fromTape;
+      } catch {
+        // Best-effort; scoring still works without chain history.
+      }
+    }),
+  );
+  return out;
+}
+
 function applyFilters(
   alerts: FlowAlert[],
   filters: FlowFilters,
   context: {
     marketTide?: TideSnapshot | null;
     tickerTides?: Record<string, TideSnapshot | null>;
+    chainFades?: Record<string, ChainFadeSignal>;
+    now?: Date;
   },
 ) {
   const ranked = rankAlerts(alerts, context);
   return ranked.filter((row) => {
-    if (!isInCurrentSession(row.alert.created_at)) return false;
-    if (isExpiredContract(row.alert.expiry)) return false;
+    if (!isInCurrentSession(row.alert.created_at, context.now)) return false;
+    if (isExpiredContract(row.alert.expiry, context.now)) return false;
+    if (row.stale && filters.strictAntiFade) return false;
     if (row.dte < filters.minDte || row.dte > filters.maxDte) return false;
     if (filters.side !== "all" && row.alert.type !== filters.side) return false;
     if (toNumber(row.alert.total_premium) < filters.minPremium) return false;
@@ -123,7 +167,14 @@ export async function loadRankedFlow(
       // Ticker tide is optional; scoring still works without it.
     }
 
-    const items = applyFilters(sessionAlerts, filters, { marketTide: tide, tickerTides });
+    let chainFades: Record<string, ChainFadeSignal> = {};
+    try {
+      chainFades = await enrichChainFades(sessionAlerts);
+    } catch {
+      chainFades = {};
+    }
+
+    const items = applyFilters(sessionAlerts, filters, { marketTide: tide, tickerTides, chainFades });
     if (items.length === 0 && !warning) {
       warning = `No prints in the current US cash session since 9:30 ET ${tradingDateET()}. Not filling from older Unusual Whales floor alerts.`;
     }

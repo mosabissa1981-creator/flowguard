@@ -46,6 +46,7 @@ Set `UNUSUAL_WHALES_API_KEY` in `.env.local`, or paste it in the **Unusual Whale
 | `GET /api/ticker/{ticker}/net-prem` | `GET /api/stock/{ticker}/net-prem-ticks` |
 | `GET/POST /api/watches/check` | `GET /api/stock/{ticker}/option-contracts` (`option_symbol[]`) then `GET /api/option-contract/{id}/historic`; else last flow print |
 | `GET/POST/DELETE /api/watches` | Vercel Blob (`flowguard/watches.json`) — durable across deploys; external checker reads `GET /api/watches` |
+| `GET /api/quote` | Live arming premium: UW last/mid, else last session flow print, else `alert.price` |
 
 Requests use `Authorization: Bearer …` and `UW-CLIENT-API-ID: 100001`. If a live request fails, the screener falls back to mock data and shows a warning.
 
@@ -54,7 +55,7 @@ Requests use `Authorization: Bearer …` and `UW-CLIENT-API-ID: 100001`. If a li
 - Min premium, DTE range, calls/puts, ticker
 - Min conviction
 - Unusual preset — applied **locally** on today's session tape (opening, vol&gt;OI, size&gt;OI, sweep/floor, or a named alert rule such as RepeatedHits). Does **not** send `unusual=true` to Unusual Whales.
-- Strict anti-fade — hides 0–2 DTE, tiny premium, bid-dominant, and fighting-tide rows
+- Strict anti-fade — hides 0–2 DTE, tiny premium, bid-dominant, fighting-tide, post-print fade, and **stale** rows (also excluded from Picks)
 - **Session filter** — UW `GET /api/option-trades/flow-alerts` with documented `newer_than` (unix seconds of 9:30 ET). There is no `intraday_only` param; `hide_expired` is not on this endpoint (it exists on `/api/option-trades`). FlowGuard then keeps only `created_at` ≥ 9:30 ET today and unexpired contracts. Rank/conviction apply inside that window. Empty windows stay empty — they do not fill from multi-week `LowHistoricVolumeFloor` alerts. `unusual=true` is never sent (UW docs: that flag is a live-options-flow *criteria* preset, not a session cut).
 - Auto-refresh every 45s, with pause
 
@@ -69,7 +70,7 @@ The manager book sits on the same Unusual Whales tape. It does not pick stocks.
 - **Watchlist** — pin a ticker or a specific option contract. Stored in `localStorage` (`flowguard.watchlist`). Toggle *Watchlist only* to filter the tape.
 - **Manager notes** — optional note per alert id (`flowguard.notes`).
 - **Dismiss** — hide an alert from picks and the tape (`flowguard.dismissed`). Restore one name or restore all.
-- **Price watches** — options only. **Bought** (one tap) arms an adverse-move watch at the last print (15% default). **Watch entry** (one tap) arms an entry-approach watch (5% band). Tap Adjust to change the numbers. Watches are stored in Vercel Blob (durable across deploys) and synced to `localStorage` on load. An external checker calls `GET /api/watches` to read all armed watches, and `GET /api/watches/check` to get live quotes and alerts. On each arm/remove the server also POSTs to `WATCH_WEBHOOK_URL` (with `WATCH_WEBHOOK_SECRET` header) if set. Never auto-trades.
+- **Price watches** — options only. **Bought** (one tap) arms an adverse-move watch at the **live UW quote** when it exists (15% default). **Watch entry** does the same for an approach band (5%). The UI labels live vs session print vs alert print. Tap Adjust to override. Watches are stored in Vercel Blob (durable across deploys) and synced to `localStorage` on load. An external checker calls `GET /api/watches` to read all armed watches, and `GET /api/watches/check` to get live quotes and alerts. On each arm/remove the server also POSTs to `WATCH_WEBHOOK_URL` (with `WATCH_WEBHOOK_SECRET` header) if set. Never auto-trades.
 
 No brokerage routing. Notes and pins stay in the browser. Price watches are durable on the server.
 
@@ -79,7 +80,9 @@ Base 32, clamped 0–100.
 
 **Boosts:** ask-side premium dominance, `all_opening_trades`, high `volume_oi_ratio`, meaningful `total_premium`, DTE 7–45, sweeps/floor, single-leg, aligned with market/ticker tide.
 
-**Penalties:** DTE 0–2, tiny premium, bid-dominant prints, multi-leg, fighting market or ticker tide (`/api/market/market-tide` and `/api/stock/{ticker}/net-prem-ticks`).
+**Penalties:** DTE 0–2, tiny premium, bid-dominant prints, multi-leg, fighting tide, **floor-only / no sweep (−8)** unless `has_sweep` or a second ask-side hit on the chain that session, **aging print (−12)** at 4–24h, **post-print fade (−15)** if later same-chain tape or live quote is ≥15% below the alert (or bid-side selling), **stale print (cap ≤ 40)** when `created_at` is before the prior weekday 9:30 ET. Stale rows are excluded from Picks / morning. Session `newer_than` still keeps the live board on today only.
+
+**Bought / Watch entry** arm at live UW last/mid when available, else last session print, else the alert print — and label which. Never silently reuse a week-old `alert.price`.
 
 Each chip shows the point delta and a short reason.
 

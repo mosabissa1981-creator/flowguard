@@ -224,6 +224,69 @@ export function tideFromTicks(ticks: NetPremTick[]): TideSnapshot | null {
   );
 }
 
+function tradeAsAlert(raw: Record<string, unknown>, chain: string): FlowAlert {
+  const typeRaw = asString(raw.type ?? raw.option_type, "call").toLowerCase();
+  return {
+    alert_rule: asString(raw.tags ?? raw.alert_rule),
+    all_opening_trades: toBool(raw.opening),
+    ask: asString(raw.ask),
+    bid: asString(raw.bid),
+    created_at: asString(raw.executed_at ?? raw.created_at ?? raw.tape_time),
+    expiry: asString(raw.expiry),
+    has_floor: toBool(raw.floor ?? raw.has_floor),
+    has_multileg: toBool(raw.multi_leg ?? raw.has_multileg),
+    has_singleleg: !toBool(raw.multi_leg ?? raw.has_multileg),
+    has_sweep: toBool(raw.sweep ?? raw.has_sweep),
+    id: asString(raw.id || `${chain}-${raw.executed_at}`),
+    issue_type: asString(raw.issue_type),
+    marketcap: null,
+    open_interest: Math.round(toNumber(raw.open_interest)),
+    option_chain: asString(raw.option_chain ?? chain),
+    price: asString(raw.price),
+    strike: asString(raw.strike),
+    ticker: asString(raw.underlying_symbol ?? raw.ticker).toUpperCase(),
+    total_ask_side_prem: asString(raw.ask_side_prem ?? raw.total_ask_side_prem, "0"),
+    total_bid_side_prem: asString(raw.bid_side_prem ?? raw.total_bid_side_prem, "0"),
+    total_premium: asString(raw.premium ?? raw.total_premium, "0"),
+    total_size: Math.round(toNumber(raw.size ?? raw.total_size)),
+    trade_count: 1,
+    type: typeRaw === "put" ? "put" : "call",
+    underlying_price: asString(raw.underlying_price),
+    volume: Math.round(toNumber(raw.volume)),
+    volume_oi_ratio: asString(raw.volume_oi_ratio, "0"),
+  };
+}
+
+/** Best-effort later prints on one chain. Failures return []. Option-trades lookback is short. */
+export async function fetchChainTrades(optionChain: string, newerThanIso: string): Promise<FlowAlert[]> {
+  const chain = optionChain.trim();
+  const created = new Date(newerThanIso);
+  if (!chain || !Number.isFinite(created.getTime())) return [];
+  try {
+    const url = buildUrl("/api/option-trades", {
+      limit: 50,
+      newer_than: Math.floor(created.getTime() / 1000),
+    });
+    url.searchParams.append("option_contracts[]", chain);
+    const key = getUnusualWhalesKey();
+    if (!key) return [];
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${key}`,
+        "UW-CLIENT-API-ID": CLIENT_ID,
+        Accept: "application/json",
+      },
+      cache: "no-store",
+    });
+    if (!response.ok) return [];
+    const payload = (await response.json()) as { data?: Record<string, unknown>[] };
+    return (payload.data ?? []).map((row) => tradeAsAlert(row, chain));
+  } catch {
+    return [];
+  }
+}
+
 export async function fetchTickerTides(
   tickers: string[],
   limit = 10,

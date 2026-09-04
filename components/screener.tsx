@@ -401,14 +401,22 @@ export function Screener({
     setDismissed((prev) => prev.filter((item) => item.id !== id));
   }
 
-  function savePriceWatch(watch: PriceWatch) {
+  function savePriceWatch(watch: PriceWatch, resolvePremium = true) {
     const next = upsertWatch(priceWatches, watch);
     setPriceWatches(next);
     void fetch("/api/watches", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ watch }),
-    }).catch(() => {});
+      body: JSON.stringify({ watch, resolvePremium }),
+    })
+      .then(async (response) => {
+        if (!response.ok) return;
+        const payload = (await response.json()) as { watch?: PriceWatch };
+        if (payload.watch) {
+          setPriceWatches((prev) => upsertWatch(prev, payload.watch as PriceWatch));
+        }
+      })
+      .catch(() => {});
     void checkWatches(next);
   }
 
