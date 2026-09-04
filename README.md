@@ -41,6 +41,7 @@ Set `UNUSUAL_WHALES_API_KEY` in `.env.local`, or paste it in the **Unusual Whale
 | --- | --- |
 | `GET /api/flow` | `GET /api/option-trades/flow-alerts` with `newer_than` = unix seconds of today's 9:30 ET open (paginated with `older_than`, `limit=200`). Never `unusual=true`. Expired contracts are dropped locally (`created_at` ≥ 9:30 ET and `expiry` ≥ today). |
 | `GET /api/picks` | Same **today-only** tape, scored and cut with strict anti-fade, top 10 by conviction. Empty session stays empty. |
+| `GET /api/premove` | Building ask-side flow on a still-quiet underlying (UW `stock-state` `close` vs `prev_close`). Mid-size stacked hits over late whale floors. |
 | `GET /api/morning` | Frozen morning shortlist — top 5–8 from **this session's** 9:30–10:00 ET window. No fallback to older whale floors. |
 | `GET /api/tide` | `GET /api/market/market-tide` |
 | `GET /api/ticker/{ticker}/net-prem` | `GET /api/stock/{ticker}/net-prem-ticks` |
@@ -66,6 +67,7 @@ Click a row for the detail drawer: score chips, ask/bid split, market tide, tick
 The manager book sits on the same Unusual Whales tape. It does not pick stocks.
 
 - **Morning shortlist** — `GET /api/morning` freezes the top 5–8 setups from the 9:30–10:00 ET window **of this session**. If that window is empty, the panel stays empty — it does not fall back to older whale floors. Cache freezes after 10:00 ET.
+- **Premove** — `GET /api/premove` ranks **building** ask-side interest (several $25k–$150k hits / repeated hits, DTE 7–45) while the stock is still close to the prior close. Honest early-flow lane, not a prediction. Picks of the Day stays the larger clean-print book.
 - **Picks of the Day** — `GET /api/picks` takes the unusual-flow tape, applies **strict anti-fade**, keeps conviction ≥ 55, and returns the top 5–10 setups by conviction with a plain-English thesis, fade risks, and an explicit options hold window (intraday–2 sessions, 2–7 sessions, or up to ~1–2 weeks — never hold to expiry, never a stock hold).
 - **Watchlist** — pin a ticker or a specific option contract. Stored in `localStorage` (`flowguard.watchlist`). Toggle *Watchlist only* to filter the tape.
 - **Manager notes** — optional note per alert id (`flowguard.notes`).

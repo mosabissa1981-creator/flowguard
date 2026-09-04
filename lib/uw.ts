@@ -447,3 +447,34 @@ export async function fetchOptionQuotes(
   return Object.fromEntries(entries);
 }
 
+/** Intraday last vs prior close. OpenAPI: GET /api/stock/{ticker}/stock-state (`close`, `prev_close`). */
+export type StockState = {
+  ticker: string;
+  last: number | null;
+  prevClose: number | null;
+  pctFromClose: number | null;
+};
+
+export async function fetchStockStates(tickers: string[], limit = 16): Promise<Record<string, StockState>> {
+  const unique = [...new Set(tickers.map((t) => t.toUpperCase()).filter(Boolean))].slice(0, limit);
+  const entries = await Promise.all(
+    unique.map(async (ticker) => {
+      const empty: StockState = { ticker, last: null, prevClose: null, pctFromClose: null };
+      try {
+        const payload = await uwGet<{ data?: Record<string, unknown> }>(
+          `/api/stock/${encodeURIComponent(ticker)}/stock-state`,
+        );
+        const row = payload.data ?? {};
+        const last = firstPositive(row.close, row.last, row.price);
+        const prevClose = firstPositive(row.prev_close, row.prev_close_price);
+        const pctFromClose =
+          last != null && prevClose != null && prevClose > 0 ? (last - prevClose) / prevClose : null;
+        return [ticker, { ticker, last, prevClose, pctFromClose }] as const;
+      } catch {
+        return [ticker, empty] as const;
+      }
+    }),
+  );
+  return Object.fromEntries(entries);
+}
+

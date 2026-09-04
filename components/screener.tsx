@@ -10,6 +10,7 @@ import { FlowList, FlowListSkeleton } from "@/components/flow-list";
 import { DetailDrawer } from "@/components/detail-drawer";
 import { TideBar } from "@/components/tide-bar";
 import { MorningPanel } from "@/components/morning-panel";
+import { PremovePanel } from "@/components/premove-panel";
 import { PicksPanel } from "@/components/picks-panel";
 import { PriceWatchesPanel } from "@/components/price-watches-panel";
 import { WatchlistBar } from "@/components/watchlist-bar";
@@ -84,11 +85,13 @@ export function Screener({
   initialFlow,
   initialPicks,
   initialMorning,
+  initialPremove,
   initialUwConfigured = false,
 }: {
   initialFlow?: FlowResponse | null;
   initialPicks?: PicksResponse | null;
   initialMorning?: MorningShortlistResponse | null;
+  initialPremove?: PicksResponse | null;
   initialUwConfigured?: boolean;
 }) {
   const [filters, setFilters] = useState<FlowFilters>(DEFAULT_FILTERS);
@@ -108,6 +111,8 @@ export function Screener({
     initialMorning ?? null,
   );
   const [morningLoading, setMorningLoading] = useState(!initialMorning);
+  const [premoveData, setPremoveData] = useState<PicksResponse | null>(initialPremove ?? null);
+  const [premoveLoading, setPremoveLoading] = useState(!initialPremove);
 
   const [uwConfigured, setUwConfigured] = useState(initialUwConfigured);
   const [uwLocked, setUwLocked] = useState(false);
@@ -145,10 +150,14 @@ export function Screener({
     return fetchJson<PicksResponse>("/api/picks");
   }, []);
 
+  const loadPremove = useCallback(async () => {
+    return fetchJson<PicksResponse>("/api/premove");
+  }, []);
+
   const freshenWatches = useCallback(
     (list: PriceWatch[]): PriceWatch[] => {
       const prints = new Map<string, number>();
-      for (const row of [...(data?.items ?? []), ...(picksData?.picks ?? [])]) {
+      for (const row of [...(data?.items ?? []), ...(picksData?.picks ?? []), ...(premoveData?.picks ?? [])]) {
         const price = toNumber(row.alert.price);
         if (row.alert.option_chain && price > 0) prints.set(row.alert.option_chain, price);
       }
@@ -157,7 +166,7 @@ export function Screener({
         lastFlowPrint: prints.get(watch.option_chain) ?? watch.lastFlowPrint,
       }));
     },
-    [data?.items, picksData?.picks],
+    [data?.items, picksData?.picks, premoveData?.picks],
   );
 
   const checkWatches = useCallback(
@@ -196,7 +205,11 @@ export function Screener({
   );
 
   const load = useCallback(async () => {
-    const [flowResult, picksResult] = await Promise.allSettled([loadFlow(), loadPicks()]);
+    const [flowResult, picksResult, premoveResult] = await Promise.allSettled([
+      loadFlow(),
+      loadPicks(),
+      loadPremove(),
+    ]);
     if (flowResult.status === "fulfilled") {
       setData(flowResult.value);
       setError(null);
@@ -208,11 +221,15 @@ export function Screener({
     if (picksResult.status === "fulfilled") {
       setPicksData(picksResult.value);
     }
+    if (premoveResult.status === "fulfilled") {
+      setPremoveData(premoveResult.value);
+    }
     setLoading(false);
     setPicksLoading(false);
+    setPremoveLoading(false);
     setRefreshing(false);
     setSecondsLeft(REFRESH_MS / 1000);
-  }, [loadFlow, loadPicks]);
+  }, [loadFlow, loadPicks, loadPremove]);
 
   useEffect(() => {
     let stale = false;
@@ -351,10 +368,16 @@ export function Screener({
     () => (picksData?.picks ?? []).filter((pick) => !dismissedIds.has(pick.alert.id)),
     [picksData?.picks, dismissedIds],
   );
+  const visiblePremove = useMemo(
+    () => (premoveData?.picks ?? []).filter((pick) => !dismissedIds.has(pick.alert.id)),
+    [premoveData?.picks, dismissedIds],
+  );
 
   const selected: RankedFlow | DailyPick | null =
     visibleItems.find((row) => row.alert.id === selectedId) ??
     visiblePicks.find((row) => row.alert.id === selectedId) ??
+    visiblePremove.find((row) => row.alert.id === selectedId) ??
+    morningData?.picks.find((row) => row.alert.id === selectedId) ??
     null;
 
   function toggleTicker(ticker: string) {
@@ -518,7 +541,7 @@ export function Screener({
         <div className="flex flex-wrap items-center justify-between gap-2 font-mono text-[11px] text-muted-foreground">
           <span>
             {data
-              ? `${visibleItems.length} on tape · ${visiblePicks.length} picks · ${dismissed.length} dismissed · ${formatClock(data.fetchedAt)} ET`
+              ? `${visibleItems.length} on tape · ${visiblePremove.length} premove · ${visiblePicks.length} picks · ${dismissed.length} dismissed · ${formatClock(data.fetchedAt)} ET`
               : "Waiting for tape…"}
           </span>
           {data?.warning ? <span className="text-amber-300">{data.warning}</span> : null}
@@ -528,6 +551,19 @@ export function Screener({
       <MorningPanel
         morning={morningData}
         loading={morningLoading}
+        notes={notes}
+        onSelect={setSelectedId}
+        onNote={writeNote}
+        priceWatches={priceWatches}
+        onSavePriceWatch={savePriceWatch}
+      />
+
+      <PremovePanel
+        premove={{
+          ...(premoveData ?? { source: "live", fetchedAt: "", picks: [], tide: null }),
+          picks: visiblePremove,
+        }}
+        loading={premoveLoading}
         notes={notes}
         onSelect={setSelectedId}
         onNote={writeNote}

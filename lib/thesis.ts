@@ -76,3 +76,41 @@ export function buildPickCopy(row: RankedFlow): PickCopy {
   const unique = [...new Set(fadeRisks)].slice(0, 4);
   return { thesis: reasons.join(" "), fadeRisks: unique };
 }
+
+export function buildPremoveCopy(row: RankedFlow): PickCopy {
+  const { alert, chips, askShare } = row;
+  const side = alert.type === "call" ? "calls" : "puts";
+  const lean = alert.type === "call" ? "bullish" : "bearish";
+  const reasons: string[] = [];
+
+  reasons.push(
+    `${contractLabel(row)} is early ${lean} options flow, not a prediction that the stock will run — unusual ask-side ${side} are stacking while we still treat the underlying as relatively quiet.`,
+  );
+
+  const mechanics: string[] = [];
+  if (hasChip(chips, "building") || hasChip(chips, "chain-repeat")) {
+    mechanics.push("multiple ask-side hits this session (building, not a single late floor)");
+  }
+  if (hasChip(chips, "mid-size")) {
+    mechanics.push("several $25k–$150k prints rather than one whale");
+  }
+  if (hasChip(chips, "quiet")) {
+    mechanics.push("spot is still close to the prior UW close");
+  }
+  if (hasChip(chips, "fresh")) mechanics.push("fresh this session");
+  if (hasChip(chips, "with-tide")) mechanics.push("tide is not fighting the print");
+  mechanics.push(`${Math.round(askShare * 100)}% ask-side premium`);
+
+  if (mechanics.length > 0) {
+    reasons.push(`Why it made Premove: ${mechanics.join("; ")}.`);
+  }
+
+  const fadeRisks: string[] = [];
+  for (const item of chips.filter((c) => c.kind === "penalty")) {
+    fadeRisks.push(item.detail);
+  }
+  fadeRisks.push(
+    "Building flow can still go nowhere. This is early detection for the next few sessions, not a crystal ball and not financial advice.",
+  );
+  return { thesis: reasons.join(" "), fadeRisks: [...new Set(fadeRisks)].slice(0, 4) };
+}
