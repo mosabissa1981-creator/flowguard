@@ -55,7 +55,12 @@ export async function loadPremoveShortlist(opts?: { forceFresh?: boolean }): Pro
   const overlaid: RankedFlow[] = ranked.items
     .filter((row) => row.askShare >= 0.55)
     .filter((row) => !row.stale)
-    .filter((row) => !row.chips.some((chip) => chip.id === "lottery" || chip.id === "post-fade"))
+    .filter(
+      (row) =>
+        !row.chips.some((chip) =>
+          ["lottery", "post-fade", "aged", "aged-call", "aged-floor"].includes(chip.id),
+        ),
+    )
     .filter((row) => hasPremoveAccumulation(row, peers))
     .map((row) =>
       applyPremoveOverlay(row, {

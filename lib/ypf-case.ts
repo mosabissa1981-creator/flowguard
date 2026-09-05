@@ -1,4 +1,6 @@
 import type { FlowAlert } from "@/lib/types";
+import { scoreAlert } from "@/lib/scoring";
+import { tideFromPremiums } from "@/lib/numbers";
 
 /** The Aug 17 YPF floor alert that was still a top Pick on Sep 3 before session + age fixes. */
 export function ypfAug17FloorAlert(): FlowAlert {
@@ -94,5 +96,25 @@ export function freshMorningSweep(now = new Date()): FlowAlert {
     trade_count: 28,
     volume: 61200,
     volume_oi_ratio: "3.32",
+  };
+}
+
+/** Local-only fixtures for Sep 4 study deltas. Does not call Unusual Whales. */
+export function scoreStudyFixtures(now = new Date()) {
+  const tide = tideFromPremiums(4_800_000, 1_200_000, now.toISOString());
+  const agedNow = new Date("2026-09-04T20:00:00-04:00");
+  const agedCall = {
+    ...ypfAug17FloorAlert(),
+    id: "study-mmm-class-floor",
+    ticker: "MMM",
+    strike: "190",
+    expiry: "2026-09-18",
+    created_at: "2026-09-04T10:00:00-04:00",
+    option_chain: "MMM260918C00190000",
+  };
+  return {
+    agedSameSession: scoreAlert(agedCall, { now: agedNow }),
+    staleYpf: scoreAlert(ypfAug17FloorAlert(), { now: agedNow }),
+    freshSweep: scoreAlert(freshMorningSweep(agedNow), { now: agedNow, marketTide: tide }),
   };
 }

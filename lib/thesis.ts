@@ -51,6 +51,9 @@ export function buildPickCopy(row: RankedFlow): PickCopy {
   if (mechanics.length > 0) {
     reasons.push(`Favored because ${mechanics.join("; ")}.`);
   }
+  if (hasChip(chips, "aged") || hasChip(chips, "stale") || hasChip(chips, "aged-call") || hasChip(chips, "aging")) {
+    reasons.push("Docked for print age — not a live setup.");
+  }
 
   const fadeRisks: string[] = [];
   for (const chip of chips.filter((item) => item.kind === "penalty")) {
@@ -98,11 +101,20 @@ export function buildPremoveCopy(row: RankedFlow): PickCopy {
     mechanics.push("spot is still close to the prior UW close");
   }
   if (hasChip(chips, "fresh")) mechanics.push("fresh this session");
+  if (hasChip(chips, "ask-sweep") || hasChip(chips, "sweep")) mechanics.push("ask-side sweep");
   if (hasChip(chips, "with-tide")) mechanics.push("tide is not fighting the print");
   mechanics.push(`${Math.round(askShare * 100)}% ask-side premium`);
 
   if (mechanics.length > 0) {
     reasons.push(`Why it made Premove: ${mechanics.join("; ")}.`);
+  }
+  if (
+    hasChip(chips, "aged") ||
+    hasChip(chips, "stale") ||
+    hasChip(chips, "aged-premove") ||
+    hasChip(chips, "aged-call")
+  ) {
+    reasons.push("Docked for print age — too old to treat as premove.");
   }
 
   const fadeRisks: string[] = [];

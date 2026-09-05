@@ -8,6 +8,7 @@ import type {
   WatchQuote,
 } from "@/lib/types";
 import { formatExpiry, formatStrike } from "@/lib/format";
+import { printAgeBand } from "@/lib/session";
 
 export const PRICE_WATCHES_KEY = "flowguard.priceWatches";
 export const EMPTY_PRICE_WATCHES: PriceWatch[] = [];
@@ -91,9 +92,19 @@ export function upsertWatch(list: PriceWatch[], watch: PriceWatch): PriceWatch[]
   return [...without, watch];
 }
 
+function agedWatchHint(watch: PriceWatch): string | null {
+  if (!watch.createdAt) return null;
+  const band = printAgeBand(watch.createdAt);
+  if (band !== "aged" && band !== "stale") return null;
+  return watch.type === "call"
+    ? "aged call watch — Sep 4 book faded these"
+    : "aged watch — conviction should already be fading";
+}
+
 export function evaluateWatch(watch: PriceWatch, quote: WatchQuote | null): EvaluatedWatch {
+  const ageHint = agedWatchHint(watch);
   if (!quote || !(quote.last > 0) || !(watch.referencePremium > 0)) {
-    return { watch, quote, status: "ok", pctMove: null, hint: null };
+    return { watch, quote, status: "ok", pctMove: null, hint: ageHint };
   }
 
   const last = quote.last;
@@ -114,14 +125,14 @@ export function evaluateWatch(watch: PriceWatch, quote: WatchQuote | null): Eval
     if (nearStop || nearPct) {
       return { watch, quote, status: "approaching", pctMove, hint: "consider cutting" };
     }
-    return { watch, quote, status: "ok", pctMove, hint: null };
+    return { watch, quote, status: "ok", pctMove, hint: ageHint };
   }
 
   const band = Math.max(0.005, Math.min(0.5, watch.approachPct));
   if (Math.abs(pctMove) <= band) {
     return { watch, quote, status: "approaching", pctMove, hint: "approaching entry" };
   }
-  return { watch, quote, status: "ok", pctMove, hint: null };
+  return { watch, quote, status: "ok", pctMove, hint: ageHint };
 }
 
 export function toWatchAlert(evaluation: EvaluatedWatch): WatchAlert | null {

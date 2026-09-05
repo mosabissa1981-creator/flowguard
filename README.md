@@ -84,9 +84,9 @@ No brokerage routing. Notes and pins stay in the browser. Price watches are dura
 
 Base 32, clamped 0–100.
 
-**Boosts:** ask-side premium dominance, `all_opening_trades`, high `volume_oi_ratio`, meaningful `total_premium`, DTE 7–45, sweeps/floor, single-leg, aligned with market/ticker tide.
+**Boosts:** ask-side premium dominance, `all_opening_trades`, high `volume_oi_ratio`, meaningful `total_premium`, DTE 7–45, **sweep (+8)** and **ask-sweep (+3)** when ask-side, single-leg, **tide aligned (+6)**, **fresh session (+3)** if printed in the last two hours.
 
-**Penalties:** DTE 0–2, tiny premium, bid-dominant prints, multi-leg, fighting tide, **floor-only / no sweep (−8)** unless `has_sweep` or a second ask-side hit on the chain that session, **aging print (−12)** at 4–24h, **post-print fade (−15)** if later same-chain tape or live quote is ≥15% below the alert (or bid-side selling), **stale print (cap ≤ 40)** when `created_at` is before the prior weekday 9:30 ET. Stale rows are excluded from Picks / morning. Session `newer_than` still keeps the live board on today only.
+**Penalties:** DTE 0–2, tiny premium, bid-dominant prints, multi-leg, fighting tide, **floor-only / no sweep (−12)** unless `has_sweep` or a second ask-side hit that session, **aging (−12)** at 4–8h, **aged print (−18)** at 8h+, **aged call watch (−6)** and **aged floor (−8)** on top of that, **post-print fade (−15)**, **stale print (cap ≤ 32)** when `created_at` is before the prior weekday 9:30 ET. Aged / stale / fade-prone rows are excluded from Picks / morning / Premove. Session `newer_than` still keeps the live board on today only. Sep 4 study: fresh ask-sweep + tide followed through; aged call watches (MMM/AVGO/TRMB/PGEN class) did not.
 
 **Bought / Watch entry** arm at live UW last/mid when available, else last session print, else the alert print — and label which. Never silently reuse a week-old `alert.price`.
 

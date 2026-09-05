@@ -119,11 +119,24 @@ export function applyPremoveOverlay(
     );
   }
 
-  if (hoursSinceCreated(row.alert.created_at, now) < 2) {
+  const hours = hoursSinceCreated(row.alert.created_at, now);
+  if (hours < 2 && !chips.some((c) => c.id === "fresh")) {
     const delta = 4;
     score += delta;
     chips.push(
       chip("fresh", "Fresh", "boost", delta, "Printed in the last two hours of this cash session."),
+    );
+  } else if (hours >= 8 || row.stale) {
+    const delta = -16;
+    score += delta;
+    chips.push(
+      chip(
+        "aged-premove",
+        "Too old for Premove",
+        "penalty",
+        delta,
+        "Days-old or late-session print. Premove is for building flow before the move, not an aged whale floor.",
+      ),
     );
   }
 

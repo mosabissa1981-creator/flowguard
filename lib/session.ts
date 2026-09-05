@@ -79,11 +79,29 @@ export function isStalePrint(createdAt: string, now = new Date()): boolean {
   return created.getTime() < previousSessionOpenUtc(now).getTime();
 }
 
-/** 4–24h old and not yet stale (morning print scored later the same day / next hours). */
-export function isAgingPrint(createdAt: string, now = new Date()): boolean {
-  if (isStalePrint(createdAt, now)) return false;
+export type PrintAgeBand = "fresh" | "session" | "aging" | "aged" | "stale";
+
+/**
+ * Sep 4 study: aged call watches faded; fresh ask-sweeps followed through.
+ * fresh <2h, session 2–4h, aging 4–8h, aged 8h+ same tape, stale = before prior session 9:30 ET.
+ */
+export function printAgeBand(createdAt: string, now = new Date()): PrintAgeBand {
+  if (isStalePrint(createdAt, now)) return "stale";
   const hours = hoursSinceCreated(createdAt, now);
-  return hours >= 4 && hours < 24;
+  if (hours < 2) return "fresh";
+  if (hours < 4) return "session";
+  if (hours < 8) return "aging";
+  return "aged";
+}
+
+/** 4–8h old and not yet stale (morning print scored later the same session). */
+export function isAgingPrint(createdAt: string, now = new Date()): boolean {
+  return printAgeBand(createdAt, now) === "aging";
+}
+
+/** 8h+ and not yet stale — too old to treat as a live setup. */
+export function isAgedPrint(createdAt: string, now = new Date()): boolean {
+  return printAgeBand(createdAt, now) === "aged";
 }
 
 export function morningWindowClosed(now = new Date()): boolean {

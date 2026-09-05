@@ -7,10 +7,10 @@ import {
   isFloorOnlyCandidate,
   type ChainFadeSignal,
 } from "@/lib/chain-context";
-import { isAgingPrint, isStalePrint } from "@/lib/session";
+import { hoursSinceCreated, printAgeBand } from "@/lib/session";
 
 const BASE_SCORE = 32;
-const STALE_CAP = 40;
+const STALE_CAP = 32;
 
 function chip(
   id: string,
@@ -199,10 +199,23 @@ export function scoreAlert(
   }
 
   if (alert.has_sweep) {
-    const delta = 6;
+    const delta = 8;
     score += delta;
     chips.push(
       chip("sweep", "Sweep", "boost", delta, "Intermarket sweep — urgency across exchanges, not a resting block."),
+    );
+  }
+  if (alert.has_sweep && aggressive) {
+    const delta = 3;
+    score += delta;
+    chips.push(
+      chip(
+        "ask-sweep",
+        "Ask sweep",
+        "boost",
+        delta,
+        "Ask-side sweep. Sep 4 book: fresh ask-sweeps (MU/TSLA/INTC) followed through; aged floors did not.",
+      ),
     );
   }
   if (alert.has_floor) {
@@ -213,7 +226,7 @@ export function scoreAlert(
     );
   }
   if (isFloorOnlyCandidate(alert) && !hasSessionAskConfirmation(alert, peers)) {
-    const delta = -8;
+    const delta = -12;
     score += delta;
     chips.push(
       chip(
@@ -262,7 +275,7 @@ export function scoreAlert(
     const aligned =
       (isCall && fightBias === "bullish") || (!isCall && fightBias === "bearish");
     if (aligned) {
-      const delta = 4;
+      const delta = 6;
       score += delta;
       chips.push(
         chip(
@@ -288,7 +301,15 @@ export function scoreAlert(
     }
   }
 
-  if (isAgingPrint(alert.created_at, now)) {
+  const ageBand = printAgeBand(alert.created_at, now);
+  const hours = hoursSinceCreated(alert.created_at, now);
+  if (ageBand === "fresh") {
+    const delta = 3;
+    score += delta;
+    chips.push(
+      chip("fresh", "Fresh session", "boost", delta, "Printed in the last two hours. Sep 4 winners were still fresh."),
+    );
+  } else if (ageBand === "aging") {
     const delta = -12;
     score += delta;
     chips.push(
@@ -297,7 +318,51 @@ export function scoreAlert(
         "Aging print",
         "penalty",
         delta,
-        "Print is 4–24h old. Conviction should already be fading if the move did not follow through.",
+        `Print is ${Math.round(hours)}h old. If it has not followed through, conviction should already be fading.`,
+      ),
+    );
+  } else if (ageBand === "aged") {
+    const delta = -18;
+    score += delta;
+    chips.push(
+      chip(
+        "aged",
+        "Aged print",
+        "penalty",
+        delta,
+        `Print is ${Math.round(hours)}h old. Sep 4 book: aged watches (MMM/AVGO/TRMB/PGEN class) got crushed.`,
+      ),
+    );
+  }
+
+  if ((ageBand === "aged" || ageBand === "stale") && isCall) {
+    const delta = -6;
+    score += delta;
+    chips.push(
+      chip(
+        "aged-call",
+        "Aged call watch",
+        "penalty",
+        delta,
+        "Aged call. Sep 4 study: multi-day call watches faded hardest; do not keep this high on the book.",
+      ),
+    );
+  }
+
+  if (
+    (ageBand === "aged" || ageBand === "stale") &&
+    isFloorOnlyCandidate(alert) &&
+    !hasSessionAskConfirmation(alert, peers)
+  ) {
+    const delta = -8;
+    score += delta;
+    chips.push(
+      chip(
+        "aged-floor",
+        "Aged floor",
+        "penalty",
+        delta,
+        "Days-old / late-session floor without a fresh ask-sweep. Cannot dominate Picks or Premove.",
       ),
     );
   }
@@ -319,7 +384,7 @@ export function scoreAlert(
     );
   }
 
-  const stale = isStalePrint(alert.created_at, now);
+  const stale = ageBand === "stale";
   if (stale) {
     const capped = Math.min(score, STALE_CAP);
     const delta = Math.round(capped - score);
@@ -329,14 +394,16 @@ export function scoreAlert(
         "Stale print",
         "penalty",
         delta,
-        "Created before the prior session’s 9:30 ET. Cap 40 — not today’s tape.",
+        "Created before the prior session’s 9:30 ET. Cap 32 — not today’s tape. Docked for age.",
       ),
     );
     score = capped;
   }
 
   const fadeProne = chips.some((c) =>
-    ["lottery", "tiny", "bid-dom", "fight-tide", "post-fade", "stale"].includes(c.id),
+    ["lottery", "tiny", "bid-dom", "fight-tide", "post-fade", "stale", "aged", "aged-call", "aged-floor"].includes(
+      c.id,
+    ),
   );
 
   const scored = {
