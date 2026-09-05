@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start --port 43127",
     "lint": "eslint",
-    "score-study": "npx tsx scripts/score-study.ts"
+    "score-study": "npx tsx scripts/score-study.ts",
+    "rescore-book": "npx tsx scripts/rescore-book.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
