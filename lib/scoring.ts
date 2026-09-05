@@ -8,6 +8,8 @@ import {
   type ChainFadeSignal,
 } from "@/lib/chain-context";
 import { hoursSinceCreated, printAgeBand } from "@/lib/session";
+import { followThroughFromPeers } from "@/lib/follow-through";
+import { alertOtmPct, moneynessBand } from "@/lib/moneyness";
 
 const BASE_SCORE = 32;
 const STALE_CAP = 32;
@@ -83,7 +85,7 @@ export function scoreAlert(
   }
 
   if (alert.all_opening_trades) {
-    const delta = 10;
+    const delta = 4;
     score += delta;
     chips.push(
       chip(
@@ -91,7 +93,7 @@ export function scoreAlert(
         "All opening",
         "boost",
         delta,
-        "Size beat open interest on every print — new risk, not a close.",
+        "Size beat open interest on every print. Mild plus only — Sep 4 winners MU/INTC were not all-opening.",
       ),
     );
   }
@@ -214,7 +216,60 @@ export function scoreAlert(
         "Ask sweep",
         "boost",
         delta,
-        "Ask-side sweep. Sep 4 book: fresh ask-sweeps (MU/TSLA/INTC) followed through; aged floors did not.",
+        "Ask-side sweep. Necessary, not sufficient — Sep 4 still lost several ask-sweep + tide prints that never confirmed.",
+      ),
+    );
+  }
+
+  const otm = alertOtmPct(alert);
+  const money = moneynessBand(otm);
+  if (money === "sweet" || money === "near-atm") {
+    const delta = 3;
+    score += delta;
+    const pctLabel = otm == null ? "" : `${otm >= 0 ? "+" : ""}${(otm * 100).toFixed(1)}%`;
+    chips.push(
+      chip(
+        "otm-sweet",
+        money === "sweet" ? "Modest OTM" : "Near ATM",
+        "boost",
+        delta,
+        `${pctLabel} vs spot. Sep 4: TSLA 350P (near the money) paid; 360P (further ITM) did not.`,
+      ),
+    );
+  } else if (money === "deep-itm") {
+    const delta = -8;
+    score += delta;
+    chips.push(
+      chip(
+        "deep-itm",
+        "Deep ITM",
+        "penalty",
+        delta,
+        `${otm == null ? "" : `${(otm * 100).toFixed(1)}% vs spot. `}Deep ITM is stock-like and expensive. Docked vs a nearer strike.`,
+      ),
+    );
+  } else if (money === "itm") {
+    const delta = -4;
+    score += delta;
+    chips.push(
+      chip(
+        "itm",
+        "ITM",
+        "penalty",
+        delta,
+        `${otm == null ? "" : `${(otm * 100).toFixed(1)}% vs spot. `}Further ITM than the near-ATM strike that paid on Sep 4 (350P vs 360P).`,
+      ),
+    );
+  } else if (money === "far-otm") {
+    const delta = -6;
+    score += delta;
+    chips.push(
+      chip(
+        "far-otm",
+        "Far OTM",
+        "penalty",
+        delta,
+        `${otm == null ? "" : `+${(otm * 100).toFixed(1)}% OTM. `}Lottery convexity — needs a hero move.`,
       ),
     );
   }
@@ -384,6 +439,33 @@ export function scoreAlert(
     );
   }
 
+  const follow = followThroughFromPeers(alert, peers, now);
+  if (follow.confirmed) {
+    const delta = 5;
+    score += delta;
+    chips.push(
+      chip(
+        "follow-thru",
+        "Follow-through",
+        "boost",
+        delta,
+        follow.detail,
+      ),
+    );
+  } else if (follow.fading) {
+    const delta = -14;
+    score += delta;
+    chips.push(
+      chip(
+        "no-follow",
+        "One-and-done",
+        "penalty",
+        delta,
+        follow.detail,
+      ),
+    );
+  }
+
   const stale = ageBand === "stale";
   if (stale) {
     const capped = Math.min(score, STALE_CAP);
@@ -401,9 +483,18 @@ export function scoreAlert(
   }
 
   const fadeProne = chips.some((c) =>
-    ["lottery", "tiny", "bid-dom", "fight-tide", "post-fade", "stale", "aged", "aged-call", "aged-floor"].includes(
-      c.id,
-    ),
+    [
+      "lottery",
+      "tiny",
+      "bid-dom",
+      "fight-tide",
+      "post-fade",
+      "stale",
+      "aged",
+      "aged-call",
+      "aged-floor",
+      "no-follow",
+    ].includes(c.id),
   );
 
   const scored = {

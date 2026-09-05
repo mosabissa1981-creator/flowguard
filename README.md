@@ -45,7 +45,7 @@ Set `UNUSUAL_WHALES_API_KEY` in `.env.local`, or paste it in the **Unusual Whale
 | `GET /api/morning` | Frozen morning shortlist — top 5–8 from **this session's** 9:30–10:00 ET window. No fallback to older whale floors. |
 | `GET /api/tide` | `GET /api/market/market-tide` |
 | `GET /api/ticker/{ticker}/net-prem` | `GET /api/stock/{ticker}/net-prem-ticks` |
-| `GET/POST /api/watches/check` | `GET /api/stock/{ticker}/option-contracts` (`option_symbol[]`) then `GET /api/option-contract/{id}/historic`; else last flow print |
+| `GET/POST /api/watches/check` | One `GET /api/option-contract/{id}/historic` (`limit=5`) per armed watch on the 15-min path. Quote + fade path (last vs open / prior, ask vs bid volume, IV) from that payload. Last flow print if historic is empty or the 429 breaker is open. Not on the board poll. |
 | `GET/POST/DELETE /api/watches` | Vercel Blob (`flowguard/watches.json`) — durable across deploys; external checker reads `GET /api/watches` |
 | `GET /api/quote` | Live arming premium: UW last/mid, else last session flow print, else `alert.price` |
 
@@ -76,7 +76,7 @@ The manager book sits on the same Unusual Whales tape. It does not pick stocks.
 - **Watchlist** — pin a ticker or a specific option contract. Stored in `localStorage` (`flowguard.watchlist`). Toggle *Watchlist only* to filter the tape.
 - **Manager notes** — optional note per alert id (`flowguard.notes`).
 - **Dismiss** — hide an alert from picks and the tape (`flowguard.dismissed`). Restore one name or restore all.
-- **Price watches** — options only. **Bought** / **Watch entry** resolve a live UW quote **on tap** (not on every row render). Default adverse 15% / approach 5%. If the daily UW cap is hit, arming uses the alert print and watch checks fail closed (last flow print, no UW retry). Watches are stored in Vercel Blob and synced to `localStorage` on load. An external checker calls `GET /api/watches` to read all armed watches, and `GET /api/watches/check` to get quotes. On each arm/remove the server also POSTs to `WATCH_WEBHOOK_URL` (with `WATCH_WEBHOOK_SECRET` header) if set. Never auto-trades.
+- **Price watches** — options only. **Bought** / **Watch entry** resolve a live UW quote **on tap** (not on every row render). Default adverse 15% / approach 5%. The 15-minute check uses **one contract historic** per watch (not the board poll) to see if premium followed through. Watches older than one session with no premium follow-through **expire**. Aged **call** watches without follow-through hard-expire (MMM class, 4 Sep book). GH-class (last still ≥+5% or historic confirmed) stays armed and is flagged only if the path fades. If the daily UW cap is hit, arming uses the alert print and watch checks fail closed (last flow print, no UW retry). Watches are stored in Vercel Blob and synced to `localStorage` on load. An external checker calls `GET /api/watches` to read all armed watches, and `GET /api/watches/check` to get quotes. On each arm/remove the server also POSTs to `WATCH_WEBHOOK_URL` (with `WATCH_WEBHOOK_SECRET` header) if set. Never auto-trades.
 
 No brokerage routing. Notes and pins stay in the browser. Price watches are durable on the server.
 
@@ -84,9 +84,11 @@ No brokerage routing. Notes and pins stay in the browser. Price watches are dura
 
 Base 32, clamped 0–100.
 
-**Boosts:** ask-side premium dominance, `all_opening_trades`, high `volume_oi_ratio`, meaningful `total_premium`, DTE 7–45, **sweep (+8)** and **ask-sweep (+3)** when ask-side, single-leg, **tide aligned (+6)**, **fresh session (+3)** if printed in the last two hours.
+**Boosts:** ask-side premium dominance, `all_opening_trades` **(+4, mild — Sep 4 winners MU/INTC were not all-opening)**, high `volume_oi_ratio`, meaningful `total_premium`, DTE 7–45, **sweep (+8)** and **ask-sweep (+3)** when ask-side, single-leg, **tide aligned (+6)**, **fresh session (+3)** if printed in the last two hours, **near-ATM / modest OTM (+3)**, **follow-through (+5)** when a later ask-side hit or rising print confirms.
 
-**Penalties:** DTE 0–2, tiny premium, bid-dominant prints, multi-leg, fighting tide, **floor-only / no sweep (−12)** unless `has_sweep` or a second ask-side hit that session, **aging (−12)** at 4–8h, **aged print (−18)** at 8h+, **aged call watch (−6)** and **aged floor (−8)** on top of that, **post-print fade (−15)**, **stale print (cap ≤ 32)** when `created_at` is before the prior weekday 9:30 ET. Aged / stale / fade-prone rows are excluded from Picks / morning / Premove. Session `newer_than` still keeps the live board on today only. Sep 4 study: fresh ask-sweep + tide followed through; aged call watches (MMM/AVGO/TRMB/PGEN class) did not.
+**Penalties:** DTE 0–2, tiny premium, bid-dominant prints, multi-leg, fighting tide, **floor-only / no sweep (−12)** unless `has_sweep` or a second ask-side hit that session, **aging (−12)** at 4–8h, **aged print (−18)** at 8h+, **aged call watch (−6)** and **aged floor (−8)** on top of that, **one-and-done (−14)** after 2h with no confirming ask-side flow or rising premium, **ITM (−4) / deep ITM (−8) / far OTM (−6)**, **post-print fade (−15)**, **stale print (cap ≤ 32)** when `created_at` is before the prior weekday 9:30 ET. Aged / stale / one-and-done / fade-prone rows are excluded from Picks / morning / Premove. Session `newer_than` still keeps the live board on today only.
+
+Ask-sweep + tide is **necessary but not sufficient**. See `study/lessons-2026-09-04.md`. Fresh MU-class sweeps stay high; MMM-class aged call watches expire; same-day tags without follow-through drop off Picks.
 
 **Bought / Watch entry** arm at live UW last/mid when available, else last session print, else the alert print — and label which. Never silently reuse a week-old `alert.price`.
 

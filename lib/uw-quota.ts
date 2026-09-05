@@ -15,6 +15,8 @@ export const TIDE_TTL_MS = TAPE_CACHE_MS;
 export const STOCK_STATE_TTL_MS = TAPE_CACHE_MS;
 export const NET_PREM_TTL_MS = 5 * 60_000;
 export const QUOTE_TTL_MS = 15 * 60_000;
+/** Same 15-min bucket as quotes — historic rides the watch-check path, not the board poll. */
+export const HISTORIC_TTL_MS = QUOTE_TTL_MS;
 export const CHAIN_TTL_MS = 10 * 60_000;
 
 export class UwQuotaError extends Error {

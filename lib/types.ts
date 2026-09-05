@@ -128,7 +128,7 @@ export type MorningShortlistResponse = PicksResponse & {
 
 export type PriceWatchKind = "adverse" | "entry_approach";
 
-export type PriceWatchStatus = "ok" | "approaching" | "adverse";
+export type PriceWatchStatus = "ok" | "approaching" | "adverse" | "fading" | "expired";
 
 export type WatchDataQuality = "uw_last" | "uw_nbbo" | "flow_print";
 
@@ -179,7 +179,15 @@ export type EvaluatedWatch = {
   status: PriceWatchStatus;
   pctMove: number | null;
   hint: string | null;
+  expired?: boolean;
+  fading?: boolean;
 };
+
+export type WatchAlertHint =
+  | "consider cutting"
+  | "approaching entry"
+  | "thesis fading"
+  | "watch expired";
 
 export type WatchAlert = {
   watchId: string;
@@ -191,7 +199,7 @@ export type WatchAlert = {
   reference: number;
   pctMove: number;
   status: Exclude<PriceWatchStatus, "ok">;
-  hint: "consider cutting" | "approaching entry";
+  hint: WatchAlertHint;
   dataQuality: WatchDataQuality;
 };
 

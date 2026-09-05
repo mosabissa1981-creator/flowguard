@@ -154,7 +154,7 @@ export function FilterBar({
           <span>
             Strict anti-fade
             <span className="ml-1 hidden text-xs text-muted-foreground sm:inline">
-              hide 0–2 DTE, tiny premium, bid-side, fighting tide
+              hide lotteries, bid-side, fighting tide, one-and-done, aged/stale
             </span>
           </span>
         </label>

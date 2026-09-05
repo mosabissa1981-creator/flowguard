@@ -48,7 +48,8 @@ export function PicksPanel({
           <h2 className="font-medium">Highest-conviction options setups after strict anti-fade</h2>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
             Same Unusual Whales tape and conviction score as the live feed. Lottery DTE, tiny
-            premium, bid-side dumps, and fighting-tide prints are already cut. Each pick has an
+            premium, bid-side dumps, fighting-tide, aged watches, and one-and-done prints
+            (ask-sweep + tide with no follow-through) are already cut. Each pick has an
             options hold window — never a stock hold, never hold to expiry.
           </p>
         </div>

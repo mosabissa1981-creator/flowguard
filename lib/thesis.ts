@@ -32,7 +32,13 @@ export function buildPickCopy(row: RankedFlow): PickCopy {
     );
   }
   if (hasChip(chips, "opening")) {
-    mechanics.push("size cleared open interest (all opening)");
+    mechanics.push("size cleared open interest (all opening — mild plus, not required)");
+  }
+  if (hasChip(chips, "follow-thru")) {
+    mechanics.push("post-print follow-through (later ask-side flow or rising premium)");
+  }
+  if (hasChip(chips, "otm-sweet")) {
+    mechanics.push("near-the-money / modest OTM strike");
   }
   if (hasChip(chips, "voi-high") || hasChip(chips, "voi")) {
     mechanics.push(`volume/OI ${Number(alert.volume_oi_ratio).toFixed(2)}x`);
@@ -54,6 +60,9 @@ export function buildPickCopy(row: RankedFlow): PickCopy {
   if (hasChip(chips, "aged") || hasChip(chips, "stale") || hasChip(chips, "aged-call") || hasChip(chips, "aging")) {
     reasons.push("Docked for print age — not a live setup.");
   }
+  if (hasChip(chips, "no-follow")) {
+    reasons.push("One-and-done — ask-sweep + tide never confirmed. Off Picks / Premove.");
+  }
 
   const fadeRisks: string[] = [];
   for (const chip of chips.filter((item) => item.kind === "penalty")) {
@@ -65,8 +74,8 @@ export function buildPickCopy(row: RankedFlow): PickCopy {
       `${row.dte} DTE still bleeds if the move does not follow through within a session or two.`,
     );
   }
-  if (!hasChip(chips, "opening")) {
-    fadeRisks.push("Not tagged all-opening — some of this size could be closing or rolling.");
+  if (hasChip(chips, "no-follow")) {
+    fadeRisks.push("No confirming ask-side hit or rising premium after 2h. Sep 4: tags alone were not edge.");
   }
   if (alert.has_multileg) {
     fadeRisks.push("Multi-leg flow can be a hedge; the listed call/put may not be the residual risk.");
@@ -103,6 +112,7 @@ export function buildPremoveCopy(row: RankedFlow): PickCopy {
   if (hasChip(chips, "fresh")) mechanics.push("fresh this session");
   if (hasChip(chips, "ask-sweep") || hasChip(chips, "sweep")) mechanics.push("ask-side sweep");
   if (hasChip(chips, "with-tide")) mechanics.push("tide is not fighting the print");
+  if (hasChip(chips, "follow-thru")) mechanics.push("later ask-side confirmation");
   mechanics.push(`${Math.round(askShare * 100)}% ask-side premium`);
 
   if (mechanics.length > 0) {
@@ -112,9 +122,14 @@ export function buildPremoveCopy(row: RankedFlow): PickCopy {
     hasChip(chips, "aged") ||
     hasChip(chips, "stale") ||
     hasChip(chips, "aged-premove") ||
-    hasChip(chips, "aged-call")
+    hasChip(chips, "aged-call") ||
+    hasChip(chips, "no-follow")
   ) {
-    reasons.push("Docked for print age — too old to treat as premove.");
+    reasons.push(
+      hasChip(chips, "no-follow")
+        ? "One-and-done — no follow-through, not premove."
+        : "Docked for print age — too old to treat as premove.",
+    );
   }
 
   const fadeRisks: string[] = [];

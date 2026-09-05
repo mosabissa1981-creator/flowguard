@@ -10,7 +10,8 @@ import { formatPrice, formatSignedPct } from "@/lib/format";
 import type { EvaluatedWatch, PriceWatch, PriceWatchStatus, WatchAlert, WatchDataQuality } from "@/lib/types";
 
 function statusTone(status: PriceWatchStatus) {
-  if (status === "adverse") return "bg-rose-500/15 text-rose-300";
+  if (status === "adverse" || status === "expired") return "bg-rose-500/15 text-rose-300";
+  if (status === "fading") return "bg-amber-500/20 text-amber-100";
   if (status === "approaching") return "bg-amber-500/15 text-amber-200";
   return "bg-emerald-500/15 text-emerald-300";
 }
@@ -50,7 +51,9 @@ export function PriceWatchesPanel({
           <h2 className="font-medium">Options price alerts — no auto-trading</h2>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
             Track a fill for adverse moves, or watch a pick until premium approaches entry. Quotes
-            prefer Unusual Whales last/NBBO; otherwise the last flow print.
+            prefer the contract historic path (last vs open / prior). Watches older than one
+            session with no premium follow-through expire. Aged call watches without
+            follow-through hard-expire (MMM class). Not a trade ticket.
           </p>
         </div>
         <Badge className="rounded-md bg-sky-500/15 text-sky-200">
@@ -65,9 +68,11 @@ export function PriceWatchesPanel({
               key={alert.watchId}
               className={cn(
                 "rounded-lg border px-3 py-2 text-sm",
-                alert.type === "adverse"
+                alert.status === "expired" || alert.status === "adverse"
                   ? "border-rose-500/30 bg-rose-500/10"
-                  : "border-amber-400/30 bg-amber-400/10",
+                  : alert.status === "fading"
+                    ? "border-amber-400/40 bg-amber-400/10"
+                    : "border-amber-400/30 bg-amber-400/10",
               )}
             >
               <div className="flex items-start gap-2">

@@ -1,11 +1,13 @@
 import "server-only";
 
 import type { FlowAlert, NetPremTick, TideSnapshot, WatchQuote } from "@/lib/types";
+import type { HistoricBar } from "@/lib/follow-through";
 import { tideFromPremiums, toBool, toNumber } from "@/lib/numbers";
 import { loadStoredUwKey, saveStoredUwKey } from "@/lib/uw-key-store";
 import {
   CHAIN_TTL_MS,
   FLOW_TTL_MS,
+  HISTORIC_TTL_MS,
   NET_PREM_TTL_MS,
   QUOTE_TTL_MS,
   STOCK_STATE_TTL_MS,
@@ -432,14 +434,10 @@ export async function fetchOptionQuote(
   if (await isUwBlocked()) return quoteFromFlowPrint(flowPrint);
 
   try {
-    const historic = await uwGet<{ chains?: Record<string, unknown>[] }>(
-      `/api/option-contract/${encodeURIComponent(symbol)}/historic`,
-      { limit: 1 },
-      QUOTE_TTL_MS,
-    );
-    const row = historic.chains?.[historic.chains.length - 1];
-    if (row) {
-      const quote = quoteFromContract(row, flowPrint);
+    const bars = await fetchContractHistoric(symbol);
+    const latest = bars[bars.length - 1];
+    if (latest) {
+      const quote = quoteFromHistoricBar(latest, flowPrint);
       if (quote) return quote;
     }
   } catch {
@@ -447,6 +445,124 @@ export async function fetchOptionQuote(
   }
 
   return quoteFromFlowPrint(flowPrint);
+}
+
+function parseHistoricBar(raw: Record<string, unknown>): HistoricBar {
+  return {
+    date: asString(raw.date),
+    last: firstPositive(raw.last_price, raw.close, raw.price),
+    open: firstPositive(raw.open_price, raw.open),
+    high: firstPositive(raw.high_price, raw.high),
+    low: firstPositive(raw.low_price, raw.low),
+    askVolume: Math.round(toNumber(raw.ask_volume)),
+    bidVolume: Math.round(toNumber(raw.bid_volume)),
+    sweepVolume: Math.round(toNumber(raw.sweep_volume)),
+    impliedVolatility: firstPositive(raw.implied_volatility),
+    ivHigh: firstPositive(raw.iv_high),
+    ivLow: firstPositive(raw.iv_low),
+    openInterest: Math.round(toNumber(raw.open_interest)) || null,
+    totalPremium: firstPositive(raw.total_premium),
+    volume: Math.round(toNumber(raw.volume)) || null,
+    lastTapeTime: asString(raw.last_tape_time) || null,
+    nbboBid: firstPositive(raw.nbbo_bid, raw.bid),
+    nbboAsk: firstPositive(raw.nbbo_ask, raw.ask),
+  };
+}
+
+function quoteFromHistoricBar(bar: HistoricBar, flowPrint?: number): WatchQuote | null {
+  if (bar.last != null && bar.last > 0) {
+    return {
+      last: bar.last,
+      bid: bar.nbboBid,
+      ask: bar.nbboAsk,
+      asOf: bar.lastTapeTime || bar.date || null,
+      quality: "uw_last",
+    };
+  }
+  const mid =
+    bar.nbboBid != null && bar.nbboAsk != null ? (bar.nbboBid + bar.nbboAsk) / 2 : null;
+  if (mid != null || bar.nbboAsk != null || bar.nbboBid != null) {
+    return {
+      last: mid ?? bar.nbboAsk ?? bar.nbboBid ?? 0,
+      bid: bar.nbboBid,
+      ask: bar.nbboAsk,
+      asOf: bar.lastTapeTime || bar.date || null,
+      quality: "uw_nbbo",
+    };
+  }
+  return quoteFromFlowPrint(flowPrint);
+}
+
+/** One historic pull per contract. Cached 15 min. Used on the watch-check path, not the board poll. */
+export async function fetchContractHistoric(optionSymbol: string, limit = 5): Promise<HistoricBar[]> {
+  const symbol = optionSymbol.trim();
+  if (!symbol) return [];
+  if (await isUwBlocked()) return [];
+  try {
+    const payload = await uwGet<{ chains?: Record<string, unknown>[] }>(
+      `/api/option-contract/${encodeURIComponent(symbol)}/historic`,
+      { limit },
+      HISTORIC_TTL_MS,
+    );
+    const bars = (payload.chains ?? []).map(parseHistoricBar);
+    return bars.sort((a, b) => a.date.localeCompare(b.date));
+  } catch {
+    return [];
+  }
+}
+
+export type WatchSnapshot = {
+  quote: WatchQuote | null;
+  historic: HistoricBar[];
+};
+
+/**
+ * 15-minute watch path: one historic (limit 5) per unique chain.
+ * Quote comes from the latest bar. No option-contracts fan-out.
+ */
+export async function fetchWatchSnapshots(
+  requests: Array<{ ticker: string; option_chain: string; lastFlowPrint?: number }>,
+): Promise<Record<string, WatchSnapshot>> {
+  const unique = new Map<string, { ticker: string; option_chain: string; lastFlowPrint?: number }>();
+  for (const request of requests) {
+    if (!request.option_chain || unique.has(request.option_chain)) continue;
+    unique.set(request.option_chain, request);
+  }
+
+  const out: Record<string, WatchSnapshot> = {};
+  if (await isUwBlocked()) {
+    for (const request of unique.values()) {
+      out[request.option_chain] = {
+        quote: quoteFromFlowPrint(request.lastFlowPrint),
+        historic: [],
+      };
+    }
+    return out;
+  }
+
+  for (const request of unique.values()) {
+    if (await isUwBlocked()) {
+      out[request.option_chain] = {
+        quote: quoteFromFlowPrint(request.lastFlowPrint),
+        historic: [],
+      };
+      continue;
+    }
+    try {
+      const historic = await fetchContractHistoric(request.option_chain, 5);
+      const latest = historic[historic.length - 1];
+      const quote =
+        (latest ? quoteFromHistoricBar(latest, request.lastFlowPrint) : null) ??
+        quoteFromFlowPrint(request.lastFlowPrint);
+      out[request.option_chain] = { quote, historic };
+    } catch {
+      out[request.option_chain] = {
+        quote: quoteFromFlowPrint(request.lastFlowPrint),
+        historic: [],
+      };
+    }
+  }
+  return out;
 }
 
 export async function fetchOptionQuotes(

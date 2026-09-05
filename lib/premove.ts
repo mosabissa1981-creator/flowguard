@@ -58,7 +58,7 @@ export async function loadPremoveShortlist(opts?: { forceFresh?: boolean }): Pro
     .filter(
       (row) =>
         !row.chips.some((chip) =>
-          ["lottery", "post-fade", "aged", "aged-call", "aged-floor"].includes(chip.id),
+          ["lottery", "post-fade", "aged", "aged-call", "aged-floor", "no-follow"].includes(chip.id),
         ),
     )
     .filter((row) => hasPremoveAccumulation(row, peers))
