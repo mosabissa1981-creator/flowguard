@@ -568,7 +568,7 @@ export function Screener({
             <div className="font-medium tracking-wide">Live data down — Unusual Whales rejected the API key.</div>
             <p className="mt-1 text-xs leading-relaxed text-rose-100/90">
               {data?.warning ??
-                "Tap the key icon, paste a fresh token from unusualwhales.com, and tap Save key. Not a daily cap."}
+                "Tap the key icon, copy a fresh token from unusualwhales.com, and tap Paste and save. Not a daily cap."}
             </p>
           </div>
         ) : null}

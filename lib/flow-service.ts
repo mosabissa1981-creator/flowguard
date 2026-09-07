@@ -250,7 +250,7 @@ export async function loadRankedFlow(
     const authFailed = isAuthFailure(error);
     const detail = error instanceof Error ? error.message : "error";
     const warning = authFailed
-      ? `Unusual Whales rejected the API key (${detail}). Tap the key icon, paste a fresh token, and tap Save key. Not a daily cap.`
+      ? `Unusual Whales rejected the API key (${detail}). Tap the key icon, copy a fresh token, and tap Paste and save. Not a daily cap.`
       : `Unusual Whales request failed (${detail}). Live board is empty — not substituting mock names. Do not trade this screen.`;
     if (last?.alerts?.length && !authFailed) {
       const sessionAlerts = last.alerts.filter(

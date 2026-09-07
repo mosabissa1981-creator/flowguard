@@ -10,7 +10,7 @@ export function normalizeUwKey(raw: unknown): string {
 }
 
 export function looksLikeUwKey(key: string): boolean {
-  if (key.length < 8 || key.length > 4096) return false;
-  if (key.includes(" ") || key.includes("\n")) return false;
-  return /^[A-Za-z0-9._~+/=-]+$/.test(key);
+  // UUID, JWT, and hex tokens are all valid UW shapes. Do not regex-reject
+  // hyphens — iPhone Safari was blocking those with a native pattern check.
+  return key.length >= 8 && key.length <= 4096;
 }

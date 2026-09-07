@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { KeyRound, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -42,7 +42,7 @@ export function UwKeyForm({
   locked?: boolean;
   onConfigured: () => void;
 }) {
-  const fieldRef = useRef<HTMLInputElement>(null);
+  const [draft, setDraft] = useState("");
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -55,9 +55,7 @@ export function UwKeyForm({
     const trimmed = normalizeUwKey(raw);
     if (!looksLikeUwKey(trimmed)) {
       setFailed(true);
-      setMessage(
-        "Paste the Unusual Whales token only (you can include “Bearer ” — we strip it). No email, no quotes.",
-      );
+      setMessage("Paste the Unusual Whales token (Bearer prefix is fine). Then tap Paste and save.");
       return;
     }
 
@@ -81,8 +79,8 @@ export function UwKeyForm({
         return;
       }
       setSaved(true);
+      setDraft("");
       setMessage(payload.warning ?? "Key saved on the server. Pulling live tape…");
-      if (fieldRef.current) fieldRef.current.value = "";
       onConfigured();
       onClose();
     } catch (error) {
@@ -93,8 +91,19 @@ export function UwKeyForm({
     }
   }
 
-  function readField(): string {
-    return fieldRef.current?.value ?? "";
+  async function pasteAndSave() {
+    try {
+      const text = await navigator.clipboard.readText();
+      setDraft(text);
+      await saveFromValue(text);
+    } catch {
+      if (draft.trim()) {
+        await saveFromValue(draft);
+        return;
+      }
+      setFailed(true);
+      setMessage("iPhone blocked clipboard. Paste into the box, then tap Save key.");
+    }
   }
 
   return (
@@ -105,9 +114,8 @@ export function UwKeyForm({
             Unusual Whales API
           </div>
           <p className="mt-1 text-xs text-muted-foreground">
-            {live
-              ? "Paste a new key and tap Save key. Bearer prefix is fine. Nothing stays on the phone."
-              : "Paste your Unusual Whales API key, then tap Save key. It is sent only to this server."}
+            Copy the token in unusualwhales.com, then tap Paste and save. UUID and Bearer
+            tokens both work. Nothing stays on the phone.
           </p>
         </div>
         {live ? (
@@ -116,34 +124,40 @@ export function UwKeyForm({
           </Button>
         ) : null}
       </div>
-      <div className="mt-2 flex flex-col gap-2 sm:flex-row">
-        <input
-          ref={fieldRef}
-          name="uw-key"
-          type="text"
-          inputMode="text"
+      <div className="mt-2 flex flex-col gap-2">
+        <textarea
+          value={draft}
+          rows={3}
           autoComplete="off"
           autoCorrect="off"
           autoCapitalize="none"
           spellCheck={false}
-          enterKeyHint="send"
-          placeholder={live ? "Paste key, then Save key" : "Paste Unusual Whales API key"}
-          className="h-11 w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 font-mono text-base outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
-          onKeyDown={(event) => {
-            if (event.key === "Enter") {
-              event.preventDefault();
-              void saveFromValue(readField());
-            }
-          }}
+          data-lpignore="true"
+          data-1p-ignore="true"
+          data-form-type="other"
+          placeholder="Optional: paste here if clipboard is blocked"
+          className="min-h-20 w-full min-w-0 resize-y rounded-lg border border-input bg-transparent px-2.5 py-2 font-mono text-base outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
+          onChange={(event) => setDraft(event.target.value)}
+          onInvalid={(event) => event.preventDefault()}
         />
-        <button
-          type="button"
-          disabled={saving}
-          onClick={() => void saveFromValue(readField())}
-          className="inline-flex h-11 shrink-0 items-center justify-center rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-50"
-        >
-          {saving ? "Saving…" : "Save key"}
-        </button>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <button
+            type="button"
+            disabled={saving}
+            onClick={() => void pasteAndSave()}
+            className="inline-flex h-11 flex-1 items-center justify-center rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-50"
+          >
+            {saving ? "Saving…" : "Paste and save"}
+          </button>
+          <button
+            type="button"
+            disabled={saving}
+            onClick={() => void saveFromValue(draft)}
+            className="inline-flex h-11 items-center justify-center rounded-lg border border-border bg-background px-4 text-sm font-medium disabled:opacity-50"
+          >
+            Save key
+          </button>
+        </div>
       </div>
       {message ? (
         <p className={`mt-2 text-xs ${failed ? "text-rose-300" : "text-emerald-300"}`}>{message}</p>
