@@ -30,6 +30,14 @@ export function UwKeyIcon({
   );
 }
 
+function friendlyError(error: unknown): string {
+  const raw = error instanceof Error ? error.message : "";
+  if (/expected pattern|requested format|pattern mismatch|validat/i.test(raw)) {
+    return "iPhone blocked the old paste box. Copy the token, tap Paste and save, then tap Allow.";
+  }
+  return raw || "Could not save key.";
+}
+
 export function UwKeyForm({
   configured,
   open,
@@ -42,11 +50,11 @@ export function UwKeyForm({
   locked?: boolean;
   onConfigured: () => void;
 }) {
-  const [draft, setDraft] = useState("");
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [failed, setFailed] = useState(false);
+  const [preview, setPreview] = useState("");
   const live = configured || saved;
 
   if (live && !open) return null;
@@ -55,10 +63,11 @@ export function UwKeyForm({
     const trimmed = normalizeUwKey(raw);
     if (!looksLikeUwKey(trimmed)) {
       setFailed(true);
-      setMessage("Paste the Unusual Whales token (Bearer prefix is fine). Then tap Paste and save.");
+      setMessage("Copy the token first, then tap Paste and save.");
       return;
     }
 
+    setPreview(`${trimmed.slice(0, 8)}…${trimmed.slice(-4)}`);
     setSaving(true);
     setMessage(null);
     setFailed(false);
@@ -79,13 +88,12 @@ export function UwKeyForm({
         return;
       }
       setSaved(true);
-      setDraft("");
       setMessage(payload.warning ?? "Key saved on the server. Pulling live tape…");
       onConfigured();
       onClose();
     } catch (error) {
       setFailed(true);
-      setMessage(error instanceof Error ? error.message : "Could not save key.");
+      setMessage(friendlyError(error));
     } finally {
       setSaving(false);
     }
@@ -94,15 +102,10 @@ export function UwKeyForm({
   async function pasteAndSave() {
     try {
       const text = await navigator.clipboard.readText();
-      setDraft(text);
       await saveFromValue(text);
     } catch {
-      if (draft.trim()) {
-        await saveFromValue(draft);
-        return;
-      }
       setFailed(true);
-      setMessage("iPhone blocked clipboard. Paste into the box, then tap Save key.");
+      setMessage("Allow Paste when iPhone asks, or long-press the box below and tap Paste.");
     }
   }
 
@@ -114,8 +117,8 @@ export function UwKeyForm({
             Unusual Whales API
           </div>
           <p className="mt-1 text-xs text-muted-foreground">
-            Copy the token in unusualwhales.com, then tap Paste and save. UUID and Bearer
-            tokens both work. Nothing stays on the phone.
+            Copy the token in unusualwhales.com, tap Paste and save, then tap Allow. There is no
+            type-in box — iPhone was blocking UUID tokens there.
           </p>
         </div>
         {live ? (
@@ -125,39 +128,35 @@ export function UwKeyForm({
         ) : null}
       </div>
       <div className="mt-2 flex flex-col gap-2">
-        <textarea
-          value={draft}
-          rows={3}
-          autoComplete="off"
+        <button
+          type="button"
+          disabled={saving}
+          onClick={() => void pasteAndSave()}
+          className="inline-flex h-12 w-full items-center justify-center rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-50"
+        >
+          {saving ? "Saving…" : "Paste and save"}
+        </button>
+        <div
+          role="textbox"
+          tabIndex={0}
+          contentEditable
+          suppressContentEditableWarning
           autoCorrect="off"
-          autoCapitalize="none"
+          autoCapitalize="off"
           spellCheck={false}
-          data-lpignore="true"
-          data-1p-ignore="true"
-          data-form-type="other"
-          placeholder="Optional: paste here if clipboard is blocked"
-          className="min-h-20 w-full min-w-0 resize-y rounded-lg border border-input bg-transparent px-2.5 py-2 font-mono text-base outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
-          onChange={(event) => setDraft(event.target.value)}
-          onInvalid={(event) => event.preventDefault()}
-        />
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <button
-            type="button"
-            disabled={saving}
-            onClick={() => void pasteAndSave()}
-            className="inline-flex h-11 flex-1 items-center justify-center rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-50"
-          >
-            {saving ? "Saving…" : "Paste and save"}
-          </button>
-          <button
-            type="button"
-            disabled={saving}
-            onClick={() => void saveFromValue(draft)}
-            className="inline-flex h-11 items-center justify-center rounded-lg border border-border bg-background px-4 text-sm font-medium disabled:opacity-50"
-          >
-            Save key
-          </button>
+          className="min-h-16 rounded-lg border border-dashed border-border px-2.5 py-3 text-sm text-muted-foreground outline-none focus-visible:border-ring"
+          onPaste={(event) => {
+            event.preventDefault();
+            const text = event.clipboardData.getData("text/plain");
+            event.currentTarget.textContent = "";
+            void saveFromValue(text);
+          }}
+        >
+          If Allow Paste is missing: long-press here and tap Paste
         </div>
+        {preview ? (
+          <p className="font-mono text-[11px] text-muted-foreground">Read token {preview}</p>
+        ) : null}
       </div>
       {message ? (
         <p className={`mt-2 text-xs ${failed ? "text-rose-300" : "text-emerald-300"}`}>{message}</p>

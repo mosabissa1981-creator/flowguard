@@ -19,7 +19,7 @@ Open [http://localhost:43127](http://localhost:43127). Without a key, FlowGuard 
 
 Open **[https://flowguard-zeta.vercel.app](https://flowguard-zeta.vercel.app)** on your phone. Bookmark it. That copy stays up; it is not a tunnel.
 
-`UNUSUAL_WHALES_API_KEY` is a Production secret on the Vercel project. It is not in git. To use a **new** Unusual Whales key on the phone, tap the small key icon in the header, copy the token from unusualwhales.com (Bearer or UUID is fine), and tap **Paste and save**. The box hides again after a successful save. The server checks it against Unusual Whales, then stores it in a private blob (ahead of the Vercel env). The key is never written back to the browser.
+`UNUSUAL_WHALES_API_KEY` is a Production secret on the Vercel project. It is not in git. To use a **new** Unusual Whales key on the phone, tap the small key icon in the header, copy the token from unusualwhales.com, tap **Paste and save**, and tap **Allow** if iPhone asks. There is no type-in box (Safari was blocking UUID tokens). The server checks the token against Unusual Whales, then stores it in a private blob. The key is never written back to the browser.
 
 To publish again from this repo:
 
