@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { KeyRound, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { looksLikeUwKey, normalizeUwKey } from "@/lib/uw-key";
 
 export function UwKeyIcon({
   live,
@@ -41,6 +42,7 @@ export function UwKeyForm({
   locked?: boolean;
   onConfigured: () => void;
 }) {
+  const fieldRef = useRef<HTMLInputElement>(null);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -49,11 +51,13 @@ export function UwKeyForm({
 
   if (live && !open) return null;
 
-  async function save(key: string) {
-    const trimmed = key.trim();
-    if (trimmed.length < 8) {
+  async function saveFromValue(raw: string) {
+    const trimmed = normalizeUwKey(raw);
+    if (!looksLikeUwKey(trimmed)) {
       setFailed(true);
-      setMessage("Paste the full Unusual Whales key, then tap Connect live.");
+      setMessage(
+        "Paste the Unusual Whales token only (you can include “Bearer ” — we strip it). No email, no quotes.",
+      );
       return;
     }
 
@@ -66,14 +70,19 @@ export function UwKeyForm({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ key: trimmed }),
       });
-      const payload = (await response.json()) as { configured?: boolean; error?: string };
+      const payload = (await response.json()) as {
+        configured?: boolean;
+        error?: string;
+        warning?: string;
+      };
       if (!response.ok) {
         setFailed(true);
         setMessage(payload.error ?? "Could not save key.");
         return;
       }
       setSaved(true);
-      setMessage("Live Unusual Whales connected.");
+      setMessage(payload.warning ?? "Key saved on the server. Pulling live tape…");
+      if (fieldRef.current) fieldRef.current.value = "";
       onConfigured();
       onClose();
     } catch (error) {
@@ -84,18 +93,12 @@ export function UwKeyForm({
     }
   }
 
+  function readField(): string {
+    return fieldRef.current?.value ?? "";
+  }
+
   return (
-    <form
-      className="rounded-lg border border-border/70 bg-muted/20 p-3"
-      onSubmit={(event) => {
-        event.preventDefault();
-        const form = event.currentTarget;
-        const value = String(new FormData(form).get("key") ?? "");
-        void save(value);
-        const field = form.elements.namedItem("key");
-        if (field instanceof HTMLInputElement) field.value = "";
-      }}
-    >
+    <div className="rounded-lg border border-border/70 bg-muted/20 p-3">
       <div className="flex items-start justify-between gap-2">
         <div>
           <div className="text-[10px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
@@ -103,8 +106,8 @@ export function UwKeyForm({
           </div>
           <p className="mt-1 text-xs text-muted-foreground">
             {live
-              ? "Paste a new Bearer key to replace the one on the server. It is not stored on the phone."
-              : "Paste your Bearer key, then tap Connect live. It is sent only to this server and never stored on the phone."}
+              ? "Paste a new key and tap Save key. Bearer prefix is fine. Nothing stays on the phone."
+              : "Paste your Unusual Whales API key, then tap Save key. It is sent only to this server."}
           </p>
         </div>
         {live ? (
@@ -115,27 +118,36 @@ export function UwKeyForm({
       </div>
       <div className="mt-2 flex flex-col gap-2 sm:flex-row">
         <input
-          name="key"
-          type="password"
+          ref={fieldRef}
+          name="uw-key"
+          type="text"
           inputMode="text"
           autoComplete="off"
           autoCorrect="off"
           autoCapitalize="none"
           spellCheck={false}
-          placeholder={live ? "Paste a new key to replace" : "Paste Unusual Whales API key"}
+          enterKeyHint="send"
+          placeholder={live ? "Paste key, then Save key" : "Paste Unusual Whales API key"}
           className="h-11 w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 font-mono text-base outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              void saveFromValue(readField());
+            }
+          }}
         />
         <button
-          type="submit"
+          type="button"
           disabled={saving}
+          onClick={() => void saveFromValue(readField())}
           className="inline-flex h-11 shrink-0 items-center justify-center rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-50"
         >
-          {saving ? "Checking…" : live ? "Replace key" : "Connect live"}
+          {saving ? "Saving…" : "Save key"}
         </button>
       </div>
       {message ? (
         <p className={`mt-2 text-xs ${failed ? "text-rose-300" : "text-emerald-300"}`}>{message}</p>
       ) : null}
-    </form>
+    </div>
   );
 }

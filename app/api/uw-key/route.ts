@@ -3,6 +3,7 @@ import { writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import { persistUnusualWhalesKey, resolveUnusualWhalesKey } from "@/lib/uw";
+import { looksLikeUwKey, normalizeUwKey } from "@/lib/uw-key";
 
 export const dynamic = "force-dynamic";
 
@@ -22,9 +23,12 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: "Send JSON { key }." }, { status: 400 });
   }
 
-  const key = body.key?.trim() ?? "";
-  if (key.length < 8) {
-    return Response.json({ error: "That does not look like an API key." }, { status: 400 });
+  const key = normalizeUwKey(body.key);
+  if (!looksLikeUwKey(key)) {
+    return Response.json(
+      { error: "That does not look like an Unusual Whales API token. Paste the token only." },
+      { status: 400 },
+    );
   }
 
   const probe = await fetch("https://api.unusualwhales.com/api/market/market-tide?interval_5m=false", {
@@ -39,7 +43,10 @@ export async function POST(request: NextRequest) {
 
   if (probe.status === 401 || probe.status === 403) {
     return Response.json(
-      { error: "Unusual Whales rejected this key (unauthorized)." },
+      {
+        error:
+          "Unusual Whales rejected this token (unauthorized). It may be revoked, regenerated, or from another account. Copy a fresh key from unusualwhales.com → API.",
+      },
       { status: 401 },
     );
   }
@@ -48,7 +55,12 @@ export async function POST(request: NextRequest) {
     const { tripUwQuota } = await import("@/lib/uw-quota");
     await tripUwQuota("key-probe 429");
     await persistUnusualWhalesKey(key);
-    return Response.json({ configured: true, replaced: true, quotaBlocked: true });
+    return Response.json({
+      configured: true,
+      replaced: true,
+      quotaBlocked: true,
+      warning: "Key saved. Unusual Whales is at the daily cap — live tape waits until UTC midnight.",
+    });
   }
 
   if (!probe.ok) {

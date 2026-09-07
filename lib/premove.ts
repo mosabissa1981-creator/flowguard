@@ -123,5 +123,6 @@ export async function loadPremoveShortlist(opts?: { forceFresh?: boolean }): Pro
     tide: ranked.tide,
     warning,
     quotaBlocked: ranked.quotaBlocked,
+    authFailed: ranked.authFailed,
   };
 }

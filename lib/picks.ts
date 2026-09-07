@@ -29,5 +29,6 @@ export async function loadDailyPicks(opts?: { forceFresh?: boolean }): Promise<P
     tide: ranked.tide,
     warning: ranked.warning,
     quotaBlocked: ranked.quotaBlocked,
+    authFailed: ranked.authFailed,
   };
 }

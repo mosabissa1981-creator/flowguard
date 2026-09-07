@@ -58,9 +58,12 @@ export async function loadMorningShortlist(): Promise<MorningShortlistResponse> 
     picks,
     tide: ranked.tide,
     quotaBlocked: ranked.quotaBlocked,
+    authFailed: ranked.authFailed,
     warning:
       ranked.quotaBlocked
         ? ranked.warning
+        : ranked.authFailed
+          ? ranked.warning
         : morningAlerts.length === 0
           ? `No setups in the 9:30–10:00 ET window on ${today}. Not substituting older whale floors.`
           : ranked.warning,

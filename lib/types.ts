@@ -104,6 +104,7 @@ export type FlowResponse = {
   rawCount: number;
   warning?: string;
   quotaBlocked?: boolean;
+  authFailed?: boolean;
 };
 
 export type DailyPick = RankedFlow & {
@@ -118,6 +119,7 @@ export type PicksResponse = {
   tide: TideSnapshot | null;
   warning?: string;
   quotaBlocked?: boolean;
+  authFailed?: boolean;
 };
 
 export type MorningShortlistResponse = PicksResponse & {

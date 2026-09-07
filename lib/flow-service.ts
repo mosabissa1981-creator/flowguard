@@ -99,11 +99,16 @@ function mockResponse(filters: FlowFilters): FlowResponse {
   };
 }
 
+function isAuthFailure(error: unknown): boolean {
+  const text = error instanceof Error ? error.message : String(error);
+  return /401|403|authentication_required|unauthorized|not recognized/i.test(text);
+}
+
 function pack(
   filters: FlowFilters,
   alerts: FlowAlert[],
   tide: TideSnapshot | null,
-  extra: Pick<FlowResponse, "source" | "fetchedAt" | "warning" | "quotaBlocked">,
+  extra: Pick<FlowResponse, "source" | "fetchedAt" | "warning" | "quotaBlocked" | "authFailed">,
 ): FlowResponse {
   const tickerTides = tickerTidesFromAlerts(alerts);
   const chainFades = peerFades(alerts);
@@ -121,6 +126,7 @@ function pack(
     rawCount: alerts.length,
     warning,
     quotaBlocked: extra.quotaBlocked,
+    authFailed: extra.authFailed,
   };
 }
 
@@ -241,14 +247,19 @@ export async function loadRankedFlow(
       return fromLastGoodOrEmpty(filters, error.untilMs);
     }
     const last = await loadLastGoodTape();
-    if (last?.alerts?.length) {
+    const authFailed = isAuthFailure(error);
+    const detail = error instanceof Error ? error.message : "error";
+    const warning = authFailed
+      ? `Unusual Whales rejected the API key (${detail}). Tap the key icon, paste a fresh token, and tap Save key. Not a daily cap.`
+      : `Unusual Whales request failed (${detail}). Live board is empty — not substituting mock names. Do not trade this screen.`;
+    if (last?.alerts?.length && !authFailed) {
       const sessionAlerts = last.alerts.filter(
         (alert) => isInCurrentSession(alert.created_at) && !isExpiredContract(alert.expiry),
       );
       return pack(filters, sessionAlerts, last.tide, {
         source: "cached",
         fetchedAt: last.savedAt,
-        warning: `Unusual Whales request failed (${error instanceof Error ? error.message : "error"}). Showing last live snapshot — not mock tape. Do not trade this screen as live.`,
+        warning: `Unusual Whales request failed (${detail}). Showing last live snapshot — not mock tape. Do not trade this screen as live.`,
       });
     }
     return {
@@ -258,7 +269,8 @@ export async function loadRankedFlow(
       tide: null,
       items: [],
       rawCount: 0,
-      warning: `Unusual Whales request failed (${error instanceof Error ? error.message : "error"}). Live board is empty — not substituting mock names. Do not trade this screen.`,
+      warning,
+      authFailed,
     };
   }
 }

@@ -384,25 +384,33 @@ export function Screener({
     null;
 
   const rejectMock = uwConfigured && (data?.source === "mock" || picksData?.source === "mock" || premoveData?.source === "mock");
+  const authDown = Boolean(data?.authFailed || picksData?.authFailed || premoveData?.authFailed);
   const quotaDown = Boolean(
-    rejectMock ||
-      data?.quotaBlocked ||
-      data?.source === "cached" ||
-      picksData?.quotaBlocked ||
-      picksData?.source === "cached" ||
-      premoveData?.quotaBlocked ||
-      premoveData?.source === "cached",
+    !authDown &&
+      (rejectMock ||
+        data?.quotaBlocked ||
+        data?.source === "cached" ||
+        picksData?.quotaBlocked ||
+        picksData?.source === "cached" ||
+        premoveData?.quotaBlocked ||
+        premoveData?.source === "cached"),
   );
-  const tapeBadge = quotaDown
-    ? { label: "UW cap · not live", className: "rounded-md bg-rose-500/20 text-rose-200" }
-    : data?.source === "live"
-      ? { label: "Live UW", className: "rounded-md bg-emerald-500/15 text-emerald-300" }
-      : uwConfigured
+  const tapeBadge = authDown
+    ? { label: "UW key rejected", className: "rounded-md bg-rose-500/20 text-rose-200" }
+    : quotaDown
+      ? { label: "UW cap · not live", className: "rounded-md bg-rose-500/20 text-rose-200" }
+      : data?.source === "live"
         ? { label: "Live UW", className: "rounded-md bg-emerald-500/15 text-emerald-300" }
-        : { label: "Demo tape", className: "rounded-md bg-amber-500/15 text-amber-200" };
+        : uwConfigured
+          ? { label: "Live UW", className: "rounded-md bg-emerald-500/15 text-emerald-300" }
+          : { label: "Demo tape", className: "rounded-md bg-amber-500/15 text-amber-200" };
   const shownItems = quotaDown && rejectMock ? [] : visibleItems;
   const shownPicks = quotaDown && rejectMock ? [] : visiblePicks;
   const shownPremove = quotaDown && rejectMock ? [] : visiblePremove;
+
+  useEffect(() => {
+    if (authDown) setUwKeyOpen(true);
+  }, [authDown]);
 
   function toggleTicker(ticker: string) {
     const id = watchTickerId(ticker);
@@ -536,7 +544,7 @@ export function Screener({
               <RefreshCw className={refreshing ? "animate-spin" : undefined} />
             </Button>
             <UwKeyIcon
-              live={uwConfigured && !quotaDown}
+              live={uwConfigured && !quotaDown && !authDown}
               open={uwKeyOpen}
               onClick={() => setUwKeyOpen((value) => !value)}
             />
@@ -555,6 +563,15 @@ export function Screener({
             void load(true);
           }}
         />
+        {authDown ? (
+          <div className="rounded-lg border border-rose-400/50 bg-rose-950/70 p-3 text-sm text-rose-50">
+            <div className="font-medium tracking-wide">Live data down — Unusual Whales rejected the API key.</div>
+            <p className="mt-1 text-xs leading-relaxed text-rose-100/90">
+              {data?.warning ??
+                "Tap the key icon, paste a fresh token from unusualwhales.com, and tap Save key. Not a daily cap."}
+            </p>
+          </div>
+        ) : null}
         {quotaDown ? (
           <div className="rounded-lg border border-rose-400/50 bg-rose-950/70 p-3 text-sm text-rose-50">
             <div className="font-medium tracking-wide">Live data down — Unusual Whales daily cap.</div>
