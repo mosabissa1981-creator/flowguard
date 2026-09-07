@@ -409,8 +409,12 @@ export function Screener({
   const shownPremove = quotaDown && rejectMock ? [] : visiblePremove;
 
   useEffect(() => {
-    if (authDown) setUwKeyOpen(true);
-  }, [authDown]);
+    if (authDown) {
+      setUwKeyOpen(true);
+      return;
+    }
+    if (uwConfigured && data?.source === "live") setUwKeyOpen(false);
+  }, [authDown, uwConfigured, data?.source]);
 
   function toggleTicker(ticker: string) {
     const id = watchTickerId(ticker);
