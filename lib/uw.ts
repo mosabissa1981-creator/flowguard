@@ -36,7 +36,11 @@ export function setRuntimeUnusualWhalesKey(key: string) {
 export async function persistUnusualWhalesKey(key: string): Promise<void> {
   setRuntimeUnusualWhalesKey(key);
   blobChecked = true;
-  await saveStoredUwKey(key);
+  try {
+    await saveStoredUwKey(key);
+  } catch {
+    // Vercel Blob can be suspended. The process env / runtime key still applies.
+  }
 }
 
 /** Runtime override, then the last key saved from the phone, then the Vercel env. */

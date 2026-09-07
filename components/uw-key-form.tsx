@@ -30,14 +30,6 @@ export function UwKeyIcon({
   );
 }
 
-function friendlyError(error: unknown): string {
-  const raw = error instanceof Error ? error.message : "";
-  if (/expected pattern|requested format|pattern mismatch|validat/i.test(raw)) {
-    return "iPhone blocked the old paste box. Copy the token, tap Paste and save, then tap Allow.";
-  }
-  return raw || "Could not save key.";
-}
-
 export function UwKeyForm({
   configured,
   open,
@@ -77,23 +69,29 @@ export function UwKeyForm({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ key: trimmed }),
       });
-      const payload = (await response.json()) as {
-        configured?: boolean;
-        error?: string;
-        warning?: string;
-      };
+      let payload: { configured?: boolean; error?: string; warning?: string } = {};
+      try {
+        payload = (await response.json()) as typeof payload;
+      } catch {
+        payload = {};
+      }
       if (!response.ok) {
         setFailed(true);
-        setMessage(payload.error ?? "Could not save key.");
+        setMessage(
+          payload.error ??
+            (response.status >= 500
+              ? "Server could not store the key. Try Paste and save once more."
+              : "Could not save key."),
+        );
         return;
       }
       setSaved(true);
       setMessage(payload.warning ?? "Key saved on the server. Pulling live tape…");
       onConfigured();
       onClose();
-    } catch (error) {
+    } catch {
       setFailed(true);
-      setMessage(friendlyError(error));
+      setMessage("Could not reach the server. Check the connection and tap Paste and save again.");
     } finally {
       setSaving(false);
     }
@@ -105,7 +103,7 @@ export function UwKeyForm({
       await saveFromValue(text);
     } catch {
       setFailed(true);
-      setMessage("Allow Paste when iPhone asks, or long-press the box below and tap Paste.");
+      setMessage("Allow Paste when iPhone asks, then tap Paste and save again.");
     }
   }
 
@@ -117,8 +115,7 @@ export function UwKeyForm({
             Unusual Whales API
           </div>
           <p className="mt-1 text-xs text-muted-foreground">
-            Copy the token in unusualwhales.com, tap Paste and save, then tap Allow. There is no
-            type-in box — iPhone was blocking UUID tokens there.
+            Copy the token from unusualwhales.com → Settings → API. Tap Paste and save, then Allow.
           </p>
         </div>
         {live ? (
@@ -127,37 +124,15 @@ export function UwKeyForm({
           </Button>
         ) : null}
       </div>
-      <div className="mt-2 flex flex-col gap-2">
-        <button
-          type="button"
-          disabled={saving}
-          onClick={() => void pasteAndSave()}
-          className="inline-flex h-12 w-full items-center justify-center rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-50"
-        >
-          {saving ? "Saving…" : "Paste and save"}
-        </button>
-        <div
-          role="textbox"
-          tabIndex={0}
-          contentEditable
-          suppressContentEditableWarning
-          autoCorrect="off"
-          autoCapitalize="off"
-          spellCheck={false}
-          className="min-h-16 rounded-lg border border-dashed border-border px-2.5 py-3 text-sm text-muted-foreground outline-none focus-visible:border-ring"
-          onPaste={(event) => {
-            event.preventDefault();
-            const text = event.clipboardData.getData("text/plain");
-            event.currentTarget.textContent = "";
-            void saveFromValue(text);
-          }}
-        >
-          If Allow Paste is missing: long-press here and tap Paste
-        </div>
-        {preview ? (
-          <p className="font-mono text-[11px] text-muted-foreground">Read token {preview}</p>
-        ) : null}
-      </div>
+      <button
+        type="button"
+        disabled={saving}
+        onClick={() => void pasteAndSave()}
+        className="mt-2 inline-flex h-12 w-full items-center justify-center rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-50"
+      >
+        {saving ? "Saving…" : "Paste and save"}
+      </button>
+      {preview ? <p className="mt-2 font-mono text-[11px] text-muted-foreground">Read token {preview}</p> : null}
       {message ? (
         <p className={`mt-2 text-xs ${failed ? "text-rose-300" : "text-emerald-300"}`}>{message}</p>
       ) : null}

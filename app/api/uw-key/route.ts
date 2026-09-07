@@ -73,13 +73,17 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  await persistUnusualWhalesKey(key);
+  try {
+    await persistUnusualWhalesKey(key);
+  } catch {
+    // Probe already succeeded. Do not 500 — iPhone then shows a bogus pattern error.
+  }
 
   try {
     const envPath = path.join(process.cwd(), ".env.local");
     await writeFile(envPath, `UNUSUAL_WHALES_API_KEY=${key}\n`, { encoding: "utf8" });
   } catch {
-    // Runtime + blob still work if the local env file is not writable (Vercel).
+    // Runtime still works if the local env file is not writable (Vercel).
   }
 
   return Response.json({ configured: true, replaced: true });

@@ -36,13 +36,18 @@ export async function saveStoredUwKey(key: string): Promise<boolean> {
   if (!token || trimmed.length < 8) return false;
 
   const path = `${BLOB_PREFIX}${Date.now()}.json`;
-  await put(path, JSON.stringify({ updatedAt: new Date().toISOString(), key: trimmed }), {
-    access: "private",
-    contentType: "application/json",
-    addRandomSuffix: false,
-    allowOverwrite: true,
-    cacheControlMaxAge: 0,
-  });
+  try {
+    await put(path, JSON.stringify({ updatedAt: new Date().toISOString(), key: trimmed }), {
+      access: "private",
+      contentType: "application/json",
+      addRandomSuffix: false,
+      allowOverwrite: true,
+      cacheControlMaxAge: 0,
+    });
+  } catch {
+    // Store can be suspended or over quota. Caller still has the runtime/env key.
+    return false;
+  }
 
   try {
     const { blobs } = await list({ prefix: BLOB_PREFIX, limit: 20 });
