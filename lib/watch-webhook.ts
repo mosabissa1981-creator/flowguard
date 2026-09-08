@@ -5,7 +5,7 @@ import { contractLabel } from "@/lib/price-watches";
 
 export async function fireWebhook(
   watch: PriceWatch,
-  action: "armed" | "removed",
+  action: "armed" | "removed" | "expired",
 ): Promise<{ sent: boolean; error?: string }> {
   const url = process.env.WATCH_WEBHOOK_URL?.trim();
   const secret = process.env.WATCH_WEBHOOK_SECRET?.trim();

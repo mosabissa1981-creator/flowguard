@@ -1,4 +1,5 @@
 import { scoreStudyFixtures } from "@/lib/ypf-case";
+import { shouldDropArmedWatch } from "@/lib/price-watches";
 
 const {
   agedSameSession,
@@ -34,8 +35,8 @@ line("TSLA 360P Sep11 (spot 348)", tsla360);
 line("TSLA 360P Sep9 (spot 348)", tsla360sep9);
 
 console.log(
-  `MMM watch: status=${mmmWatch.status} hint=${mmmWatch.hint} expired=${mmmWatch.expired} pct=${mmmWatch.pctMove}`,
+  `MMM watch: status=${mmmWatch.status} hint=${mmmWatch.hint} expired=${mmmWatch.expired} pct=${mmmWatch.pctMove} drop=${shouldDropArmedWatch(mmmWatch)}`,
 );
 console.log(
-  `GH watch: status=${ghWatch.status} hint=${ghWatch.hint} expired=${ghWatch.expired} pct=${ghWatch.pctMove}`,
+  `GH watch: status=${ghWatch.status} hint=${ghWatch.hint} expired=${ghWatch.expired} pct=${ghWatch.pctMove} drop=${shouldDropArmedWatch(ghWatch)}`,
 );

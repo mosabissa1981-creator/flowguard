@@ -1,15 +1,25 @@
 import { NextRequest } from "next/server";
 
-import { buildCheckResponse, evaluateWatch, isPriceWatch } from "@/lib/price-watches";
+import {
+  buildCheckResponse,
+  evaluateWatch,
+  isPriceWatch,
+  shouldDropArmedWatch,
+} from "@/lib/price-watches";
 import { fetchWatchSnapshots, hasUnusualWhalesKey, quoteFromFlowPrint } from "@/lib/uw";
-import { loadStoredWatches } from "@/lib/watch-store";
+import {
+  archiveExpiredWatches,
+  loadStoredWatches,
+  removeStoredWatches,
+} from "@/lib/watch-store";
+import { fireWebhook } from "@/lib/watch-webhook";
 import { isUwBlocked } from "@/lib/uw-quota";
 import type { PriceWatch } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  return check(await loadStoredWatches());
+  return check(await loadStoredWatches(), true);
 }
 
 export async function POST(request: NextRequest) {
@@ -22,10 +32,10 @@ export async function POST(request: NextRequest) {
 
   const incoming = Array.isArray(body.watches) ? body.watches.filter(isPriceWatch) : [];
   const watches: PriceWatch[] = incoming.length > 0 ? incoming : await loadStoredWatches();
-  return check(watches);
+  return check(watches, true);
 }
 
-async function check(watches: PriceWatch[]) {
+async function check(watches: PriceWatch[], persistExpire: boolean) {
   const blocked = await isUwBlocked();
   const snapshots =
     !blocked && (await hasUnusualWhalesKey())
@@ -49,5 +59,25 @@ async function check(watches: PriceWatch[]) {
     return evaluateWatch(watch, quote, { historic: snap?.historic ?? [] });
   });
 
-  return Response.json(buildCheckResponse(evaluations));
+  const dropping = evaluations.filter((row) => shouldDropArmedWatch(row));
+  const removedIds = dropping.map((row) => row.watch.id);
+  if (persistExpire && removedIds.length > 0) {
+    await archiveExpiredWatches(
+      dropping.map((row) => ({
+        watch: row.watch,
+        reason: row.hint ?? row.status,
+        pctMove: row.pctMove,
+      })),
+    );
+    await removeStoredWatches(removedIds);
+    await Promise.all(dropping.map((row) => fireWebhook(row.watch, "expired").catch(() => {})));
+  }
+
+  const remaining = evaluations.filter((row) => !removedIds.includes(row.watch.id));
+  const payload = buildCheckResponse(evaluations);
+  return Response.json({
+    ...payload,
+    evaluations: remaining,
+    removedIds,
+  });
 }

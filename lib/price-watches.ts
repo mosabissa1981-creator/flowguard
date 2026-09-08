@@ -9,10 +9,17 @@ import type {
   WatchQuote,
 } from "@/lib/types";
 import { formatExpiry, formatStrike } from "@/lib/format";
-import { printAgeBand } from "@/lib/session";
-import { watchLifecycle, type HistoricBar } from "@/lib/follow-through";
+import { isStalePrint, printAgeBand } from "@/lib/session";
+import {
+  HARD_EXPIRE_DOWN_PCT,
+  watchLifecycle,
+  type HistoricBar,
+} from "@/lib/follow-through";
+
+export { HARD_EXPIRE_DOWN_PCT };
 
 export const PRICE_WATCHES_KEY = "flowguard.priceWatches";
+export const EXPIRED_WATCH_IDS_KEY = "flowguard.expiredWatchIds";
 export const EMPTY_PRICE_WATCHES: PriceWatch[] = [];
 
 export const DEFAULT_ADVERSE_PCT = 0.15;
@@ -135,6 +142,19 @@ export function evaluateWatch(
   const last = quote.last;
   const reference = watch.referencePremium;
   const pctMove = (last - reference) / reference;
+  const crushed = pctMove <= -HARD_EXPIRE_DOWN_PCT;
+
+  if (life.expired || crushed) {
+    return {
+      watch,
+      quote,
+      status: "expired",
+      pctMove,
+      hint: life.hint ?? `watch expired — premium ${Math.round(pctMove * 100)}% vs arm (≤−40%)`,
+      expired: true,
+      fading: true,
+    };
+  }
 
   if (watch.kind === "adverse") {
     const band = Math.max(0.01, Math.min(0.9, watch.adversePct));
@@ -200,6 +220,42 @@ function alertHint(evaluation: EvaluatedWatch): WatchAlertHint {
   if (evaluation.status === "fading") return "thesis fading";
   if (evaluation.watch.kind === "entry_approach") return "approaching entry";
   return "consider cutting";
+}
+
+/** Drop from the armed book the checker / study / alerts read. */
+export function shouldDropArmedWatch(evaluation: EvaluatedWatch, now = new Date()): boolean {
+  if (evaluation.status === "expired" || evaluation.expired) return true;
+  if (evaluation.pctMove != null && evaluation.pctMove <= -HARD_EXPIRE_DOWN_PCT) return true;
+  if (
+    evaluation.fading &&
+    evaluation.watch.createdAt &&
+    isStalePrint(evaluation.watch.createdAt, now)
+  ) {
+    return true;
+  }
+  return false;
+}
+
+export function readExpiredWatchIds(): string[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(EXPIRED_WATCH_IDS_KEY);
+    const parsed = raw ? (JSON.parse(raw) as unknown) : [];
+    return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+export function rememberExpiredWatchIds(ids: string[]): string[] {
+  if (typeof window === "undefined" || ids.length === 0) return readExpiredWatchIds();
+  const next = [...new Set([...readExpiredWatchIds(), ...ids])].slice(-200);
+  try {
+    window.localStorage.setItem(EXPIRED_WATCH_IDS_KEY, JSON.stringify(next));
+  } catch {
+    // Private mode — in-memory list still returned.
+  }
+  return next;
 }
 
 export function toWatchAlert(evaluation: EvaluatedWatch): WatchAlert | null {

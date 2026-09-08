@@ -51,9 +51,11 @@ export function PriceWatchesPanel({
           <h2 className="font-medium">Options price alerts — no auto-trading</h2>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
             Track a fill for adverse moves, or watch a pick until premium approaches entry. Quotes
-            prefer the contract historic path (last vs open / prior). Watches older than one
-            session with no premium follow-through expire. Aged call watches without
-            follow-through hard-expire (MMM class). Not a trade ticket.
+            prefer the contract historic path (last vs open / prior). Expired watches are
+            deleted from the server book the checker and study routines read — not a UI
+            badge. Aged call watches without follow-through, live premium ≤−40% vs arm,
+            or fading after one session are removed on the 15-minute check. Not a trade
+            ticket.
           </p>
         </div>
         <Badge className="rounded-md bg-sky-500/15 text-sky-200">

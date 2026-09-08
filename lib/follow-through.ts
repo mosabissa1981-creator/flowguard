@@ -8,6 +8,9 @@ export const FOLLOW_THROUGH_GRACE_HOURS = 2;
 /** Premium must be at least this far above the print / arm to count as confirmation. */
 export const FOLLOW_THROUGH_UP_PCT = 0.05;
 
+/** Live last this far below arm → hard-expire and delete (Sep 8 book, MMM class). */
+export const HARD_EXPIRE_DOWN_PCT = 0.4;
+
 export type FollowThroughStatus = "confirmed" | "fading" | "pending" | "unknown";
 
 export type FollowThroughSignal = {
@@ -226,6 +229,21 @@ export function watchLifecycle(
   const histFt = followThroughFromHistoric(historic, watch.referencePremium);
   const merged = mergeFollowThrough([quoteFt, histFt]);
   const followed = merged.confirmed;
+  const histLast = historic?.length ? historic[historic.length - 1]?.last : null;
+  const last = quoteLast != null && quoteLast > 0 ? quoteLast : histLast;
+  if (
+    last != null &&
+    last > 0 &&
+    watch.referencePremium > 0 &&
+    last <= watch.referencePremium * (1 - HARD_EXPIRE_DOWN_PCT)
+  ) {
+    const drop = Math.round((1 - last / watch.referencePremium) * 100);
+    return {
+      expired: true,
+      fading: true,
+      hint: `watch expired — premium −${drop}% vs arm (≤−40%)`,
+    };
+  }
 
   if ((band === "stale" || band === "aged") && watch.type === "call" && !followed) {
     return {
@@ -240,6 +258,14 @@ export function watchLifecycle(
       expired: true,
       fading: true,
       hint: "watch expired — no premium follow-through after 1 session",
+    };
+  }
+
+  if (merged.fading && !followed && band === "stale") {
+    return {
+      expired: true,
+      fading: true,
+      hint: "watch expired — thesis fading after 1 session",
     };
   }
 

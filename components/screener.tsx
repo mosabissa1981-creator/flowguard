@@ -48,7 +48,13 @@ import {
   type ManagerNoteMap,
   type WatchTarget,
 } from "@/lib/manager";
-import { EMPTY_PRICE_WATCHES, PRICE_WATCHES_KEY, upsertWatch } from "@/lib/price-watches";
+import {
+  EMPTY_PRICE_WATCHES,
+  PRICE_WATCHES_KEY,
+  readExpiredWatchIds,
+  rememberExpiredWatchIds,
+  upsertWatch,
+} from "@/lib/price-watches";
 import { BOARD_REFRESH_MS, WATCH_CHECK_MS, formatRefreshCountdown } from "@/lib/refresh";
 
 const FETCH_MS = 20_000;
@@ -186,7 +192,13 @@ export function Screener({
         cache: "no-store",
       });
       if (!payload.ok) throw new Error(`Watch check failed (${payload.status})`);
-      setWatchCheck((await payload.json()) as WatchCheckResponse);
+      const checked = (await payload.json()) as WatchCheckResponse;
+      const removedIds = checked.removedIds ?? [];
+      if (removedIds.length > 0) {
+        rememberExpiredWatchIds(removedIds);
+        setPriceWatches((prev) => prev.filter((watch) => !removedIds.includes(watch.id)));
+      }
+      setWatchCheck(checked);
     } catch {
       setWatchCheck({
         checkedAt: new Date().toISOString(),
@@ -279,20 +291,23 @@ export function Screener({
       try {
         const serverWatches = await fetchJson<{ watches: PriceWatch[] }>("/api/watches");
         if (stale) return;
-        const server = serverWatches.watches ?? [];
-        const local = priceWatches;
+        const expired = new Set(readExpiredWatchIds());
+        const server = (serverWatches.watches ?? []).filter((watch) => !expired.has(watch.id));
+        const local = priceWatches.filter((watch) => !expired.has(watch.id));
         const merged = [...server];
+        const extras: PriceWatch[] = [];
         for (const localWatch of local) {
           if (!merged.some((sw) => sw.id === localWatch.id)) {
             merged.push(localWatch);
+            extras.push(localWatch);
           }
         }
         setPriceWatches(merged);
-        if (merged.length !== server.length) {
+        for (const watch of extras) {
           void fetch("/api/watches", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ watches: merged }),
+            body: JSON.stringify({ watch, resolvePremium: false }),
           }).catch(() => {});
         }
       } catch {

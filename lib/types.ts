@@ -209,4 +209,6 @@ export type WatchCheckResponse = {
   checkedAt: string;
   evaluations: EvaluatedWatch[];
   alerts: WatchAlert[];
+  /** Armed ids deleted from the server store this check. */
+  removedIds?: string[];
 };
