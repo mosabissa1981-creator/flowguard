@@ -10,5 +10,5 @@ export async function GET(request: NextRequest) {
   const filters = parseFlowFilters(request.nextUrl.searchParams);
   const forceFresh = wantFresh(request.nextUrl.searchParams);
   const payload = await loadRankedFlow(filters, { forceFresh });
-  return Response.json(payload, { headers: tapeCacheControl(forceFresh) });
+  return Response.json(payload, { headers: tapeCacheControl(forceFresh, payload.quotaBlocked) });
 }

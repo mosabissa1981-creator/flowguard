@@ -114,7 +114,12 @@ async function uwRequest<T>(url: URL, ttlMs = 0, bust = false): Promise<T> {
       if (!response.ok) {
         const body = await response.text();
         if (isQuotaHttp(response.status, body)) {
-          const until = await tripUwQuota(body);
+          const daily = /daily_request_limit_hit|daily request limit/i.test(body);
+          const retryAfter = Number(response.headers.get("retry-after"));
+          const until = daily
+            ? quotaResetUtcMs()
+            : Date.now() + (Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : 90_000);
+          await tripUwQuota(body, until);
           throw new UwQuotaError(`Unusual Whales ${url.pathname} 429: ${body.slice(0, 180)}`, until);
         }
         throw new Error(`Unusual Whales ${url.pathname} ${response.status}: ${body.slice(0, 240)}`);

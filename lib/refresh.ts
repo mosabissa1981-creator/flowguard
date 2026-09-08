@@ -20,8 +20,8 @@ export function wantFresh(searchParams: URLSearchParams): boolean {
   return value === "1" || value === "true";
 }
 
-export function tapeCacheControl(forceFresh: boolean): HeadersInit {
-  if (forceFresh) return { "Cache-Control": "no-store" };
+export function tapeCacheControl(forceFresh: boolean, quotaBlocked = false): HeadersInit {
+  if (forceFresh || quotaBlocked) return { "Cache-Control": "no-store" };
   return {
     "Cache-Control": `s-maxage=${TAPE_CACHE_SEC}, stale-while-revalidate=60`,
   };

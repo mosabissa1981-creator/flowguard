@@ -5,5 +5,5 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   const payload = await loadMorningShortlist();
-  return Response.json(payload, { headers: tapeCacheControl(false) });
+  return Response.json(payload, { headers: tapeCacheControl(false, payload.quotaBlocked) });
 }

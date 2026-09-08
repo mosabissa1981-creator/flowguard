@@ -388,12 +388,8 @@ export function Screener({
   const quotaDown = Boolean(
     !authDown &&
       (rejectMock ||
-        data?.quotaBlocked ||
-        data?.source === "cached" ||
-        picksData?.quotaBlocked ||
-        picksData?.source === "cached" ||
-        premoveData?.quotaBlocked ||
-        premoveData?.source === "cached"),
+        Boolean(data?.quotaBlocked && data.source !== "live") ||
+        (data?.source === "cached" && data.quotaBlocked)),
   );
   const tapeBadge = authDown
     ? { label: "UW key rejected", className: "rounded-md bg-rose-500/20 text-rose-200" }

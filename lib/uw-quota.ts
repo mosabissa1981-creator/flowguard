@@ -161,8 +161,7 @@ export async function isUwBlocked(): Promise<boolean> {
   return (await getCircuit()) != null;
 }
 
-export async function tripUwQuota(detail: string): Promise<number> {
-  const untilMs = quotaResetUtcMs();
+export async function tripUwQuota(detail: string, untilMs = quotaResetUtcMs()): Promise<number> {
   memCircuit = {
     open: true,
     untilMs,
