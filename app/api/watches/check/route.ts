@@ -12,6 +12,7 @@ import {
   loadStoredWatches,
   removeStoredWatches,
 } from "@/lib/watch-store";
+import { notifyWatchAlerts } from "@/lib/watch-notify";
 import { fireWebhook } from "@/lib/watch-webhook";
 import { isUwBlocked } from "@/lib/uw-quota";
 import type { PriceWatch } from "@/lib/types";
@@ -75,6 +76,11 @@ async function check(watches: PriceWatch[], persistExpire: boolean) {
 
   const remaining = evaluations.filter((row) => !removedIds.includes(row.watch.id));
   const payload = buildCheckResponse(evaluations);
+  try {
+    await notifyWatchAlerts(payload.alerts);
+  } catch {
+    // Lock-screen notify must not fail the check. Chat webhook stays as backup.
+  }
   return Response.json({
     ...payload,
     evaluations: remaining,

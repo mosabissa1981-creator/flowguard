@@ -48,6 +48,8 @@ Set `UNUSUAL_WHALES_API_KEY` in `.env.local`, or paste it in the **Unusual Whale
 | `GET/POST /api/watches/check` | One `GET /api/option-contract/{id}/historic` (`limit=5`) per armed watch on the 15-min path. Quote + fade path (last vs open / prior, ask vs bid volume, IV) from that payload. Last flow print if historic is empty or the 429 breaker is open. Not on the board poll. |
 | `GET/POST/DELETE /api/watches` | Vercel Blob (`flowguard/watches.json`) — durable across deploys; external checker reads `GET /api/watches` |
 | `GET /api/quote` | Live arming premium: UW last/mid, else last session flow print, else `alert.price` |
+| `GET/POST /api/notify` | Lock-screen ping (Pushover + Telegram). POST `{ title, body }`. |
+| `POST /api/notify/test` | Sends “FlowGuard test” to configured channels. |
 
 Requests use `Authorization: Bearer …` and `UW-CLIENT-API-ID: 100001`.
 
@@ -76,7 +78,20 @@ The manager book sits on the same Unusual Whales tape. It does not pick stocks.
 - **Watchlist** — pin a ticker or a specific option contract. Stored in `localStorage` (`flowguard.watchlist`). Toggle *Watchlist only* to filter the tape.
 - **Manager notes** — optional note per alert id (`flowguard.notes`).
 - **Dismiss** — hide an alert from picks and the tape (`flowguard.dismissed`). Restore one name or restore all.
-- **Price watches** — options only. **Bought** / **Watch entry** resolve a live UW quote **on tap** (not on every row render). Default adverse 15% / approach 5%. The 15-minute check uses **one contract historic** per armed watch (not the board poll) to see if premium followed through. Watches older than one session with no premium follow-through **expire and are deleted** from the server book (`GET /api/watches`). Aged **call** watches without follow-through hard-expire (MMM class). Live premium **≤−40% vs arm** also deletes. GH-class (last still ≥+5% or historic confirmed) stays armed. If the daily UW cap is hit, arming uses the alert print and watch checks fail closed (last flow print, no UW retry). Armed watches live in Vercel Blob; expired rows are archived then dropped. `localStorage` syncs the armed list and will not resurrect tombstoned ids. An external checker reads `GET /api/watches` and `GET /api/watches/check` (check persists the prune). On each arm/remove/expire the server also POSTs to `WATCH_WEBHOOK_URL` if set. Never auto-trades.
+- **Price watches** — options only. **Bought** / **Watch entry** resolve a live UW quote **on tap** (not on every row render). Default adverse 15% / approach 5%. The 15-minute check uses **one contract historic** per armed watch (not the board poll) to see if premium followed through. Watches older than one session with no premium follow-through **expire and are deleted** from the server book (`GET /api/watches`). Aged **call** watches without follow-through hard-expire (MMM class). Live premium **≤−40% vs arm** also deletes. GH-class (last still ≥+5% or historic confirmed) stays armed. If the daily UW cap is hit, arming uses the alert print and watch checks fail closed (last flow print, no UW retry). Armed watches live in Vercel Blob; expired rows are archived then dropped. `localStorage` syncs the armed list and will not resurrect tombstoned ids. An external checker reads `GET /api/watches` and `GET /api/watches/check` (check persists the prune). Actionable **adverse** (consider cutting) and **entry-approach** fires ping **Pushover and Telegram** (60-minute dedupe per watch+status). Chat webhook (`WATCH_WEBHOOK_URL`) stays as backup. Never auto-trades.
+
+## Lock-screen alerts (Pushover + Telegram)
+
+Set these as Production secrets on the Vercel project (or in `.env.local`). A channel is skipped if its pair is empty. Secrets are never logged or returned by the API.
+
+| Env | Where to get it |
+| --- | --- |
+| `PUSHOVER_APP_TOKEN` | [Create a Pushover application](https://pushover.net/apps/build) — the API token/key |
+| `PUSHOVER_USER_KEY` | Your user key on [pushover.net](https://pushover.net) (the device is already linked to this account) |
+| `TELEGRAM_BOT_TOKEN` | Message [@BotFather](https://t.me/BotFather) → `/newbot` |
+| `TELEGRAM_CHAT_ID` | Message your bot, then open `https://api.telegram.org/bot<token>/getUpdates` and copy `chat.id` |
+
+After env is set, `POST /api/notify/test` sends **FlowGuard test** to every configured channel. `POST /api/notify` with `{ "title", "body" }` sends an arbitrary ping. `GET /api/notify` only reports which channels are configured (no secrets).
 
 No brokerage routing. Notes and pins stay in the browser. Price watches are durable on the server.
 
