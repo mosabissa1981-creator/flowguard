@@ -37,8 +37,13 @@ yarn-error.log*
 # vercel
 .vercel
 
-# local watch file store
-/data/watches.json
+# local watch file store and desk dumps
+/data/
+/desk/
+/dumps/
+*.dump
+*.dump.json
+agent-tools/
 
 # typescript
 *.tsbuildinfo
