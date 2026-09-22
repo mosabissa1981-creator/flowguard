@@ -44,6 +44,7 @@ Set `UNUSUAL_WHALES_API_KEY` in `.env.local`, or paste it in the **Unusual Whale
 | `GET /api/premove` | Building ask-side flow on a still-quiet underlying (UW `stock-state` `close` vs `prev_close`). Mid-size stacked hits over late whale floors. |
 | `GET /api/morning` | Frozen morning shortlist — top 5–8 from **this session's** 9:30–10:00 ET window. No fallback to older whale floors. |
 | `GET /api/tide` | `GET /api/market/market-tide` |
+| `GET /api/congress` | `GET /api/congress/recent-trades` — research panel only. **Not** an input to picks, premove, morning, or conviction. |
 | `GET /api/ticker/{ticker}/net-prem` | `GET /api/stock/{ticker}/net-prem-ticks` |
 | `GET/POST /api/watches/check` | One `GET /api/option-contract/{id}/historic` (`limit=5`) per armed watch on the 15-min path. Quote + fade path (last vs open / prior, ask vs bid volume, IV) from that payload. Last flow print if historic is empty or the 429 breaker is open. Not on the board poll. |
 | `GET/POST/DELETE /api/watches` | Vercel Blob (`flowguard/watches.json`) — durable across deploys; external checker reads `GET /api/watches` |
@@ -53,7 +54,7 @@ Set `UNUSUAL_WHALES_API_KEY` in `.env.local`, or paste it in the **Unusual Whale
 
 Requests use `Authorization: Bearer …` and `UW-CLIENT-API-ID: 100001`.
 
-**Quota:** Unusual Whales allows 40,000 requests/day. The board auto-refreshes every **15 minutes** (`BOARD_REFRESH_MS` in `lib/refresh.ts`). Flow, picks, premove, and morning share **one** session tape (cached 12 min in memory + blob, slightly under the poll). Market tide and stock-state use the same 12 min TTL. Ticker tide is derived from the tape (no per-name net-prem on poll). Chain quotes are not fetched on poll. Bought/Watch quotes run **on tap only**. Price-alert checks run every 15 minutes and fail closed on 429. Manual refresh (`?fresh=1`) may bypass cache but still respects the circuit breaker. A 429 trips a circuit breaker until next UTC midnight — no further UW calls. Mock/demo names are never shown when a key is configured; 429 serves last-good live tape or an empty board with a hard banner.
+**Quota:** Unusual Whales allows 40,000 requests/day. The board auto-refreshes every **15 minutes** (`BOARD_REFRESH_MS` in `lib/refresh.ts`). Flow, picks, premove, and morning share **one** session tape (cached 12 min in memory + blob, slightly under the poll). Market tide and stock-state use the same 12 min TTL. Ticker tide is derived from the tape (no per-name net-prem on poll). Chain quotes are not fetched on poll. Bought/Watch quotes run **on tap only**. Price-alert checks run every 15 minutes and fail closed on 429. Congress disclosures are cached **30 minutes** (`CONGRESS_TTL_MS`) and are not part of the tape. Manual refresh (`?fresh=1`) may bypass cache but still respects the circuit breaker. A 429 trips a circuit breaker until next UTC midnight — no further UW calls. Mock/demo names are never shown when a key is configured; 429 serves last-good live tape or an empty board with a hard banner. Congress 429/missing key returns an empty list with a status — never sample politicians.
 
 If a live request fails, the screener does **not** substitute the demo tape.
 
@@ -67,6 +68,15 @@ If a live request fails, the screener does **not** substitute the demo tape.
 - Auto-refresh every **15 minutes**, with pause. Server tape cache is 12 minutes so a 15-minute poll usually does one UW pull; faster traffic hits cache. Tap refresh to force a fetch (still blocked after 429).
 
 Click a row for the detail drawer: score chips, ask/bid split, market tide, ticker net-premium ticks, pin, note, and dismiss.
+
+## Congress (context only)
+
+`GET /api/congress` is a research panel. It does **not** feed Picks of the Day, Premove, the morning shortlist, or conviction scoring. Options flow remains the only pick engine.
+
+- UW endpoint: `GET /api/congress/recent-trades` (`limit`, `ticker`, `date`).
+- **Window field: `filed_at_date`** (when the trade was disclosed). Default `days=7` requests each weekday in the last 7 America/New_York calendar days, then keeps rows whose filing date falls in that window. `transaction_date` is shown and is often older; it is the window key only when `filed_at_date` is missing.
+- Query: `limit` (default 40, max 200), `side=buy|sell|all` (default **buy**), optional `ticker`, `days` (1–7) or `window=week|day`, optional `date=YYYY-MM-DD` for one market day. `fresh=1` bypasses the 30-minute cache.
+- Missing key, auth failure, or 429: `{ source: "empty", status, trades: [] }` with a plain message. No mock politicians.
 
 ## Manager layer
 

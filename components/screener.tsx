@@ -9,6 +9,7 @@ import { FilterBar } from "@/components/filter-bar";
 import { FlowList, FlowListSkeleton } from "@/components/flow-list";
 import { DetailDrawer } from "@/components/detail-drawer";
 import { TideBar } from "@/components/tide-bar";
+import { CongressPanel } from "@/components/congress-panel";
 import { MorningPanel } from "@/components/morning-panel";
 import { PremovePanel } from "@/components/premove-panel";
 import { PicksPanel } from "@/components/picks-panel";
@@ -119,6 +120,8 @@ export function Screener({
   const [morningLoading, setMorningLoading] = useState(!initialMorning);
   const [premoveData, setPremoveData] = useState<PicksResponse | null>(initialPremove ?? null);
   const [premoveLoading, setPremoveLoading] = useState(!initialPremove);
+  const [congressPoll, setCongressPoll] = useState(0);
+  const [congressBust, setCongressBust] = useState(0);
 
   const [uwConfigured, setUwConfigured] = useState(initialUwConfigured);
   const [uwLocked, setUwLocked] = useState(false);
@@ -242,6 +245,8 @@ export function Screener({
     setPremoveLoading(false);
     setRefreshing(false);
     setSecondsLeft(BOARD_REFRESH_MS / 1000);
+    if (forceFresh) setCongressBust((value) => value + 1);
+    else setCongressPoll((value) => value + 1);
   }, [loadFlow, loadPicks, loadPremove]);
 
   useEffect(() => {
@@ -661,6 +666,8 @@ export function Screener({
         priceWatches={priceWatches}
         onSavePriceWatch={savePriceWatch}
       />
+
+      <CongressPanel pollNonce={congressPoll} cacheBust={congressBust} />
 
       <PriceWatchesPanel
         evaluations={

@@ -212,3 +212,56 @@ export type WatchCheckResponse = {
   /** Armed ids deleted from the server store this check. */
   removedIds?: string[];
 };
+
+/** Research-only congressional disclosure. Never an input to picks or conviction. */
+export type CongressSide = "buy" | "sell" | "all";
+
+export type CongressTxnSide = "buy" | "sell" | "other";
+
+export type CongressTrade = {
+  id: string;
+  name: string;
+  ticker: string;
+  txnType: string;
+  side: CongressTxnSide;
+  amounts: string;
+  /** Disclosed trade date (YYYY-MM-DD). Often older than the filing. */
+  transactionDate: string;
+  /** STOCK Act filing date (YYYY-MM-DD). This is the window and sort key. */
+  filedAtDate: string;
+  memberType: string | null;
+  issuer: string | null;
+  politicianId: string | null;
+};
+
+export type CongressStatus = "ok" | "missing_key" | "quota" | "auth" | "error";
+
+export type CongressQuery = {
+  limit: number;
+  side: CongressSide;
+  ticker: string | null;
+  days: number;
+  /** Single UW market date. When set, the week window is not applied. */
+  date: string | null;
+};
+
+export type CongressResponse = {
+  source: "live" | "empty";
+  status: CongressStatus;
+  message: string;
+  fetchedAt: string;
+  /** Window and sort use this field. Transaction date is display-only. */
+  dateField: "filed_at_date";
+  endpoint: "/api/congress/recent-trades";
+  windowDays: number;
+  windowStart: string | null;
+  windowEnd: string | null;
+  datesQueried: string[];
+  side: CongressSide;
+  ticker: string | null;
+  limit: number;
+  contextOnly: true;
+  scoring: "excluded";
+  trades: CongressTrade[];
+  warning?: string;
+};
