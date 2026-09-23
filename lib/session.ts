@@ -43,6 +43,25 @@ export function sessionMorningCutoffUtc(now = new Date()): Date {
   return new Date(`${date}T10:00:00${offset}`);
 }
 
+/**
+ * Late-afternoon tape. Sep 2026 backtest: prints after 14:00 ET were ~97% flat
+ * and should not lead the actionable card. The live board still shows them.
+ */
+export const LATE_SESSION_HOUR_ET = 14;
+
+export function sessionLateCutoffUtc(now = new Date()): Date {
+  const date = tradingDateET(now);
+  const offset = etOffsetForLocalWall(date, LATE_SESSION_HOUR_ET, 0);
+  return new Date(`${date}T${pad(LATE_SESSION_HOUR_ET)}:00:00${offset}`);
+}
+
+export function isLateSessionPrint(createdAt: string, now = new Date()): boolean {
+  const created = new Date(createdAt);
+  if (!Number.isFinite(created.getTime())) return false;
+  if (!isInCurrentSession(createdAt, now)) return false;
+  return created.getTime() >= sessionLateCutoffUtc(now).getTime();
+}
+
 export function sessionHasOpened(now = new Date()): boolean {
   return now.getTime() >= sessionOpenUtc(now).getTime();
 }

@@ -1,25 +1,26 @@
 import { loadRankedFlow } from "@/lib/flow-service";
+import { PICKS_FILTERS } from "@/lib/filters";
 import { buildPickCopy } from "@/lib/thesis";
-import type { FlowFilters, PicksResponse } from "@/lib/types";
+import { loadPremoveContractKeys } from "@/lib/premove";
+import { compareActionable, withActionableAdjustments } from "@/lib/scoring";
+import type { PicksResponse } from "@/lib/types";
 
-export const PICKS_FILTERS: FlowFilters = {
-  minPremium: 10_000,
-  minDte: 0,
-  maxDte: 60,
-  side: "all",
-  minConviction: 55,
-  unusual: true,
-  strictAntiFade: true,
-  ticker: "",
-};
+export { PICKS_FILTERS };
 
 export const MAX_PICKS = 10;
 
 export async function loadDailyPicks(opts?: { forceFresh?: boolean }): Promise<PicksResponse> {
-  const ranked = await loadRankedFlow(PICKS_FILTERS, opts);
-  const picks = ranked.items.slice(0, MAX_PICKS).map((row) => {
+  const [ranked, premoveKeys] = await Promise.all([
+    loadRankedFlow(PICKS_FILTERS, opts),
+    loadPremoveContractKeys(opts),
+  ]);
+
+  const adjusted = withActionableAdjustments(ranked.items, premoveKeys);
+  adjusted.sort(compareActionable);
+
+  const picks = adjusted.slice(0, MAX_PICKS).map((row, index) => {
     const copy = buildPickCopy(row);
-    return { ...row, ...copy };
+    return { ...row, rank: index + 1, ...copy };
   });
 
   return {

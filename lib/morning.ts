@@ -2,7 +2,10 @@ import "server-only";
 
 import { loadRankedFlow } from "@/lib/flow-service";
 import { buildPickCopy } from "@/lib/thesis";
-import { PICKS_FILTERS, MAX_PICKS } from "@/lib/picks";
+import { PICKS_FILTERS } from "@/lib/filters";
+import { MAX_PICKS } from "@/lib/picks";
+import { loadPremoveContractKeys } from "@/lib/premove";
+import { compareActionable, withActionableAdjustments } from "@/lib/scoring";
 import type { MorningShortlistResponse } from "@/lib/types";
 import {
   isInMorningWindow,
@@ -42,11 +45,16 @@ export async function loadMorningShortlist(): Promise<MorningShortlistResponse> 
     strictAntiFade: true,
   });
 
-  const morningAlerts = ranked.items.filter((row) => isInMorningWindow(row.alert.created_at));
+  const premoveKeys = await loadPremoveContractKeys();
+  const morningAlerts = withActionableAdjustments(
+    ranked.items.filter((row) => isInMorningWindow(row.alert.created_at)),
+    premoveKeys,
+  );
+  morningAlerts.sort(compareActionable);
 
-  const picks = morningAlerts.slice(0, Math.min(MAX_PICKS, MAX_MORNING)).map((row) => {
+  const picks = morningAlerts.slice(0, Math.min(MAX_PICKS, MAX_MORNING)).map((row, index) => {
     const copy = buildPickCopy(row);
-    return { ...row, ...copy };
+    return { ...row, rank: index + 1, ...copy };
   });
 
   const result: MorningShortlistResponse = {
