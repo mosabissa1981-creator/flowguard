@@ -48,9 +48,10 @@ export function PicksPanel({
           <h2 className="font-medium">Highest-conviction options setups after strict anti-fade</h2>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
             Same Unusual Whales tape and conviction score as the live feed. Lottery DTE, tiny
-            premium, bid-side dumps, fighting-tide, aged watches, and one-and-done prints
-            (ask-sweep + tide with no follow-through) are already cut. Each pick has an
-            options hold window — never a stock hold, never hold to expiry.
+            premium, bid-side dumps, fighting-tide, aged watches, and no-follow-through prints
+            are cut. DTE of 9 or less is demoted, not banned. Late-afternoon prints stay on the
+            live board and sort behind earlier-session names. Each pick has an options hold window — never a
+            stock hold, never hold to expiry.
           </p>
         </div>
         <Badge className="rounded-md bg-amber-500/15 text-amber-200">
@@ -62,7 +63,7 @@ export function PicksPanel({
         <p className="text-sm text-muted-foreground">Building the book from ranked flow…</p>
       ) : picks.length === 0 ? (
         <p className="text-sm text-muted-foreground">
-          No setups cleared strict anti-fade in today's session. Not filling from older floor alerts.
+          No setups cleared strict anti-fade in this session. Not filling from older floor alerts.
         </p>
       ) : (
         <div className="grid gap-3 lg:grid-cols-2">

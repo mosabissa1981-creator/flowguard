@@ -7,7 +7,7 @@ import {
   isFloorOnlyCandidate,
   type ChainFadeSignal,
 } from "@/lib/chain-context";
-import { hoursSinceCreated, printAgeBand } from "@/lib/session";
+import { hoursSinceCreated, isLateSessionPrint, printAgeBand } from "@/lib/session";
 import { followThroughFromPeers } from "@/lib/follow-through";
 import { alertOtmPct, moneynessBand } from "@/lib/moneyness";
 
@@ -162,16 +162,30 @@ export function scoreAlert(
     );
   }
 
-  if (dte >= 7 && dte <= 45) {
-    const delta = 8;
+  // Sep 2026 backtest: prefer 11–30. DTE ≤9 is a heavy soft demote, not a hard ban
+  // (a quiet tape would otherwise go empty). 0–2 DTE stays the lottery hard-fade.
+  if (dte >= 11 && dte <= 30) {
+    const delta = 12;
     score += delta;
     chips.push(
       chip(
         "dte-sweet",
-        "Sweet-spot DTE",
+        "11–30 DTE",
         "boost",
         delta,
-        `${dte} DTE sits in the 7–45 window where theta is real but not a same-day coin flip.`,
+        `${dte} DTE sits in the 11–30 primary window. Theta is real, but it is not a same-week lottery.`,
+      ),
+    );
+  } else if (dte >= 31 && dte <= 45) {
+    const delta = 8;
+    score += delta;
+    chips.push(
+      chip(
+        "dte-ok",
+        "31–45 DTE",
+        "boost",
+        delta,
+        `${dte} DTE is still a multi-session contract. The primary band is 11–30.`,
       ),
     );
   } else if (dte <= 2) {
@@ -186,11 +200,17 @@ export function scoreAlert(
         `${dte} DTE. These reverse after a few hours more often than they trend.`,
       ),
     );
-  } else if (dte < 7) {
-    const delta = -6;
+  } else if (dte <= 9) {
+    const delta = -16;
     score += delta;
     chips.push(
-      chip("short-dte", "Short DTE", "penalty", delta, `${dte} DTE is still lottery-adjacent for swing entries.`),
+      chip(
+        "short-dte",
+        "Short DTE",
+        "penalty",
+        delta,
+        `${dte} DTE is inside the ≤9 band. Demoted so it rarely leads the card — not removed, so a quiet day still has a board.`,
+      ),
     );
   } else if (dte > 90) {
     const delta = -4;
@@ -324,36 +344,53 @@ export function scoreAlert(
   const marketTide = context.marketTide ?? null;
   const localBias = tickerTide?.bias ?? null;
   const tapeBias = marketTide?.bias ?? null;
-  const fightBias = localBias && localBias !== "neutral" ? localBias : tapeBias;
+  // Market tide fight is call flow into a bearish tape, or put flow into a bullish tape.
+  // Ticker-tide fights still use the existing aggressive-flow chip. Sep 2026: 0W / 3L / 74 flat.
+  const marketOpposes =
+    !!tapeBias &&
+    tapeBias !== "neutral" &&
+    ((isCall && tapeBias === "bearish") || (!isCall && tapeBias === "bullish"));
+  const tickerOpposes =
+    aggressive &&
+    !!localBias &&
+    localBias !== "neutral" &&
+    ((isCall && localBias === "bearish") || (!isCall && localBias === "bullish"));
+  const marketAligned =
+    !!tapeBias &&
+    tapeBias !== "neutral" &&
+    ((isCall && tapeBias === "bullish") || (!isCall && tapeBias === "bearish"));
+  const tickerAligned =
+    !!localBias &&
+    localBias !== "neutral" &&
+    ((isCall && localBias === "bullish") || (!isCall && localBias === "bearish"));
 
-  if (aggressive && fightBias && fightBias !== "neutral") {
-    const aligned =
-      (isCall && fightBias === "bullish") || (!isCall && fightBias === "bearish");
-    if (aligned) {
-      const delta = 6;
-      score += delta;
-      chips.push(
-        chip(
-          "with-tide",
-          localBias ? "With ticker tide" : "With market tide",
-          "boost",
-          delta,
-          `${alert.type.toUpperCase()} buying lines up with a ${fightBias} tape.`,
-        ),
-      );
-    } else {
-      const delta = -10;
-      score += delta;
-      chips.push(
-        chip(
-          "fight-tide",
-          "Fighting tide",
-          "penalty",
-          delta,
-          `${alert.type.toUpperCase()} buying against a ${fightBias} ${localBias ? "ticker" : "market"} tide. Fade magnet.`,
-        ),
-      );
-    }
+  if (marketOpposes || tickerOpposes) {
+    const delta = -24;
+    score += delta;
+    chips.push(
+      chip(
+        "fight-tide",
+        "Fighting tide",
+        "penalty",
+        delta,
+        marketOpposes
+          ? `${alert.type.toUpperCase()} flow against a ${tapeBias} market tide. Sep 2026 backtest: tide fights did not pay (0W / 3L / 74 flat).`
+          : `${alert.type.toUpperCase()} buying against a ${localBias} ticker tide. Fade magnet.`,
+      ),
+    );
+  } else if (aggressive && (tickerAligned || marketAligned)) {
+    const delta = 6;
+    score += delta;
+    const useTicker = tickerAligned;
+    chips.push(
+      chip(
+        "with-tide",
+        useTicker ? "With ticker tide" : "With market tide",
+        "boost",
+        delta,
+        `${alert.type.toUpperCase()} buying lines up with a ${useTicker ? localBias : tapeBias} tape.`,
+      ),
+    );
   }
 
   const ageBand = printAgeBand(alert.created_at, now);
@@ -540,4 +577,119 @@ export function rankAlerts(
   });
 
   return scored.map((row, index) => ({ ...row, rank: index + 1 }));
+}
+
+/** Same contract across Picks and Premove. Chain id when UW sent one, else the alert id. */
+export function contractKey(row: Pick<RankedFlow, "alert">): string {
+  return row.alert.option_chain || row.alert.id;
+}
+
+export function hasScoreChip(row: Pick<RankedFlow, "chips">, id: string): boolean {
+  return row.chips.some((chip) => chip.id === id);
+}
+
+/**
+ * Hard exclude from Picks, Premove, and the morning shortlist.
+ * Sep 2026: no follow-through was 6/6 losers; tide fight was 0W / 3L / 74 flat.
+ * The live board still ranks these rows (tide fight is only docked there).
+ */
+export function excludedFromActionable(row: Pick<RankedFlow, "chips">): boolean {
+  return hasScoreChip(row, "no-follow") || hasScoreChip(row, "fight-tide");
+}
+
+/** Lower sorts first. 11–30 leads; ≤9 trails when scores tie (including the 100 clamp). */
+export function dtePreference(dte: number): number {
+  if (dte >= 11 && dte <= 30) return 0;
+  if (dte >= 31 && dte <= 45) return 1;
+  if (dte <= 9) return 3;
+  return 2;
+}
+
+const BOTH_LANE_DELTA = 8;
+const HIGH_SCORE_DELTA = 6;
+const HIGH_SCORE_MIN = 90;
+const LATE_PRINT_DELTA = -18;
+
+/**
+ * Picks / Premove / morning only. Does not change the live-board score from `scoreAlert`.
+ * Overlap and ≥90 are boosts. Late-afternoon prints are docked and sorted behind earlier tape.
+ */
+export function applyActionableOverlay(
+  row: RankedFlow,
+  opts: { onBoth: boolean; now?: Date },
+): RankedFlow {
+  const chips = [...row.chips];
+  let score = row.score;
+  const base = row.score;
+
+  if (opts.onBoth && !hasScoreChip(row, "both")) {
+    score += BOTH_LANE_DELTA;
+    chips.push(
+      chip(
+        "both",
+        "Both lanes",
+        "boost",
+        BOTH_LANE_DELTA,
+        "Qualifies for Picks and Premove. Sep 2026 backtest: the overlap was the set worth acting on.",
+      ),
+    );
+  }
+
+  if (base >= HIGH_SCORE_MIN && !hasScoreChip(row, "score-90")) {
+    score += HIGH_SCORE_DELTA;
+    chips.push(
+      chip(
+        "score-90",
+        "Score 90+",
+        "boost",
+        HIGH_SCORE_DELTA,
+        `Base conviction ${base} is at least 90. Preferred on the actionable shortlist.`,
+      ),
+    );
+  }
+
+  if (isLateSessionPrint(row.alert.created_at, opts.now) && !hasScoreChip(row, "late-print")) {
+    score += LATE_PRINT_DELTA;
+    chips.push(
+      chip(
+        "late-print",
+        "Late print",
+        "penalty",
+        LATE_PRINT_DELTA,
+        "Printed at or after 14:00 ET. Late live-board tape was ~97% flat — still on the board, not the lead of this card.",
+      ),
+    );
+  }
+
+  return {
+    ...row,
+    score: Math.round(clamp(score, 0, 100)),
+    chips,
+  };
+}
+
+export function withActionableAdjustments(
+  rows: RankedFlow[],
+  otherKeys: Set<string>,
+  now?: Date,
+): RankedFlow[] {
+  return rows
+    .filter((row) => !excludedFromActionable(row))
+    .map((row) =>
+      applyActionableOverlay(row, {
+        onBoth: otherKeys.has(contractKey(row)),
+        now,
+      }),
+    );
+}
+
+/** Late prints sort after any earlier-session name, then score, then the 11–30 DTE preference. */
+export function compareActionable(a: RankedFlow, b: RankedFlow): number {
+  const lateA = hasScoreChip(a, "late-print") ? 1 : 0;
+  const lateB = hasScoreChip(b, "late-print") ? 1 : 0;
+  if (lateA !== lateB) return lateA - lateB;
+  if (b.score !== a.score) return b.score - a.score;
+  const dteDelta = dtePreference(a.dte) - dtePreference(b.dte);
+  if (dteDelta !== 0) return dteDelta;
+  return toNumber(b.alert.total_premium) - toNumber(a.alert.total_premium);
 }

@@ -11,6 +11,18 @@ export const DEFAULT_FILTERS: FlowFilters = {
   ticker: "",
 };
 
+/** Picks of the Day / morning entry cut. Shared so Premove can detect overlap without a cycle. */
+export const PICKS_FILTERS: FlowFilters = {
+  minPremium: 10_000,
+  minDte: 0,
+  maxDte: 60,
+  side: "all",
+  minConviction: 55,
+  unusual: true,
+  strictAntiFade: true,
+  ticker: "",
+};
+
 export function parseFlowFilters(searchParams: URLSearchParams): FlowFilters {
   const sideRaw = searchParams.get("side") ?? "all";
   const side = sideRaw === "call" || sideRaw === "put" ? sideRaw : "all";

@@ -13,7 +13,7 @@ import type { DailyPick, PicksResponse, PriceWatch, ScoreChip } from "@/lib/type
 import { formatDte, formatExpiry, formatPremium, formatStrike } from "@/lib/format";
 import type { ManagerNoteMap } from "@/lib/manager";
 
-const WHY_CHIP_ORDER = ["building", "quiet", "fresh", "with-tide", "chain-repeat", "mid-size"];
+const WHY_CHIP_ORDER = ["both", "score-90", "building", "quiet", "fresh", "with-tide", "chain-repeat", "mid-size"];
 
 function whyChips(chips: ScoreChip[]): ScoreChip[] {
   const mapped = chips.map((chip) =>

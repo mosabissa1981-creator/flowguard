@@ -44,7 +44,16 @@ export function buildPickCopy(row: RankedFlow): PickCopy {
     mechanics.push(`volume/OI ${Number(alert.volume_oi_ratio).toFixed(2)}x`);
   }
   if (hasChip(chips, "dte-sweet")) {
-    mechanics.push("DTE sits in the 7–45 hold window instead of a same-day lottery");
+    mechanics.push("DTE sits in the 11–30 primary window");
+  }
+  if (hasChip(chips, "dte-ok")) {
+    mechanics.push("DTE is 31–45, still multi-session, outside the 11–30 primary band");
+  }
+  if (hasChip(chips, "both")) {
+    mechanics.push("it also qualifies for Premove");
+  }
+  if (hasChip(chips, "score-90")) {
+    mechanics.push("base conviction is 90 or higher");
   }
   if (hasChip(chips, "sweep")) mechanics.push("intermarket sweep");
   if (hasChip(chips, "floor")) mechanics.push("floor print");
@@ -61,7 +70,10 @@ export function buildPickCopy(row: RankedFlow): PickCopy {
     reasons.push("Docked for print age — not a live setup.");
   }
   if (hasChip(chips, "no-follow")) {
-    reasons.push("One-and-done — ask-sweep + tide never confirmed. Off Picks / Premove.");
+    reasons.push("One-and-done — no follow-through. Off Picks, Premove, and the morning shortlist.");
+  }
+  if (hasChip(chips, "late-print")) {
+    reasons.push("Late-afternoon print. It stays on the live board and ranks behind earlier-session names.");
   }
 
   const fadeRisks: string[] = [];
@@ -113,6 +125,9 @@ export function buildPremoveCopy(row: RankedFlow): PickCopy {
   if (hasChip(chips, "ask-sweep") || hasChip(chips, "sweep")) mechanics.push("ask-side sweep");
   if (hasChip(chips, "with-tide")) mechanics.push("tide is not fighting the print");
   if (hasChip(chips, "follow-thru")) mechanics.push("later ask-side confirmation");
+  if (hasChip(chips, "both")) mechanics.push("also qualifies for Picks");
+  if (hasChip(chips, "score-90")) mechanics.push("base conviction is 90 or higher");
+  if (hasChip(chips, "dte-sweet")) mechanics.push("DTE is in the 11–30 primary window");
   mechanics.push(`${Math.round(askShare * 100)}% ask-side premium`);
 
   if (mechanics.length > 0) {
@@ -127,7 +142,7 @@ export function buildPremoveCopy(row: RankedFlow): PickCopy {
   ) {
     reasons.push(
       hasChip(chips, "no-follow")
-        ? "One-and-done — no follow-through, not premove."
+        ? "One-and-done — no follow-through. Off Picks, Premove, and the morning shortlist."
         : "Docked for print age — too old to treat as premove.",
     );
   }

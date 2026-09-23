@@ -1,12 +1,20 @@
 import "server-only";
 
 import { loadRankedFlow } from "@/lib/flow-service";
+import { PICKS_FILTERS } from "@/lib/filters";
 import { buildPremoveCopy } from "@/lib/thesis";
 import { applyPremoveOverlay, hasPremoveAccumulation } from "@/lib/premove-score";
-import { fetchStockStates, hasUnusualWhalesKey } from "@/lib/uw";
+import { fetchStockStates, hasUnusualWhalesKey, type StockState } from "@/lib/uw";
 import { isUwBlocked } from "@/lib/uw-quota";
 import { toNumber } from "@/lib/numbers";
-import type { FlowFilters, PicksResponse, RankedFlow } from "@/lib/types";
+import {
+  contractKey,
+  dtePreference,
+  excludedFromActionable,
+  hasScoreChip,
+  withActionableAdjustments,
+} from "@/lib/scoring";
+import type { FlowAlert, FlowFilters, FlowResponse, PicksResponse, RankedFlow } from "@/lib/types";
 
 export const PREMOVE_FILTERS: FlowFilters = {
   minPremium: 20_000,
@@ -22,11 +30,53 @@ export const PREMOVE_FILTERS: FlowFilters = {
 export const MAX_PREMOVE = 8;
 const MIN_PREMOVE_SCORE = 50;
 
-export async function loadPremoveShortlist(opts?: { forceFresh?: boolean }): Promise<PicksResponse> {
+export function selectPremoveRows(
+  items: RankedFlow[],
+  peers: FlowAlert[],
+  spots: Record<string, StockState | null | undefined>,
+  now = new Date(),
+): RankedFlow[] {
+  return items
+    .filter((row) => row.askShare >= 0.55)
+    .filter((row) => !row.stale)
+    .filter((row) => !excludedFromActionable(row))
+    .filter(
+      (row) =>
+        !row.chips.some((chip) =>
+          ["lottery", "post-fade", "aged", "aged-call", "aged-floor"].includes(chip.id),
+        ),
+    )
+    .filter((row) => hasPremoveAccumulation(row, peers))
+    .map((row) =>
+      applyPremoveOverlay(row, {
+        peers,
+        spot: spots[row.alert.ticker] ?? null,
+        now,
+      }),
+    )
+    .filter((row) => row.score >= MIN_PREMOVE_SCORE)
+    .filter((row) => !row.chips.some((chip) => chip.id === "extended" && chip.delta <= -20))
+    .filter((row) => !hasScoreChip(row, "late-whale"))
+    .filter((row) => {
+      const prem = toNumber(row.alert.total_premium);
+      const stacked = hasScoreChip(row, "mid-size") || hasScoreChip(row, "building");
+      if (prem >= 1_000_000 && !stacked) return false;
+      return true;
+    });
+}
+
+type PremoveQualifying = {
+  ranked: FlowResponse;
+  rows: RankedFlow[];
+};
+
+let qualifyingInflight: { key: string; promise: Promise<PremoveQualifying> } | null = null;
+
+async function computePremoveQualifying(opts?: { forceFresh?: boolean }): Promise<PremoveQualifying> {
   const ranked = await loadRankedFlow(PREMOVE_FILTERS, opts);
   const peers = ranked.items.map((row) => row.alert);
+  const spots: Record<string, StockState | null> = {};
 
-  let spots: Awaited<ReturnType<typeof fetchStockStates>> = {};
   const allowSpot =
     ranked.source === "live" &&
     !ranked.quotaBlocked &&
@@ -35,9 +85,9 @@ export async function loadPremoveShortlist(opts?: { forceFresh?: boolean }): Pro
   if (allowSpot) {
     const tickers = [...new Set(ranked.items.map((row) => row.alert.ticker))].slice(0, 8);
     try {
-      spots = await fetchStockStates(tickers, 6);
+      Object.assign(spots, await fetchStockStates(tickers, 6));
     } catch {
-      spots = {};
+      // Quiet-underlying boost is optional. Missing spots must not fail the lane.
     }
   } else if (ranked.source === "mock") {
     for (const row of ranked.items) {
@@ -52,49 +102,66 @@ export async function loadPremoveShortlist(opts?: { forceFresh?: boolean }): Pro
     }
   }
 
-  const overlaid: RankedFlow[] = ranked.items
-    .filter((row) => row.askShare >= 0.55)
-    .filter((row) => !row.stale)
-    .filter(
-      (row) =>
-        !row.chips.some((chip) =>
-          ["lottery", "post-fade", "aged", "aged-call", "aged-floor", "no-follow"].includes(chip.id),
-        ),
-    )
-    .filter((row) => hasPremoveAccumulation(row, peers))
-    .map((row) =>
-      applyPremoveOverlay(row, {
-        peers,
-        spot: spots[row.alert.ticker] ?? null,
-      }),
-    )
-    .filter((row) => row.score >= MIN_PREMOVE_SCORE)
-    .filter((row) => !row.chips.some((chip) => chip.id === "extended" && chip.delta <= -20))
-    .filter((row) => !row.chips.some((chip) => chip.id === "late-whale"))
-    .filter((row) => {
-      const prem = toNumber(row.alert.total_premium);
-      const stacked = row.chips.some((chip) => chip.id === "mid-size" || chip.id === "building");
-      if (prem >= 1_000_000 && !stacked) return false;
-      return true;
-    });
+  return {
+    ranked,
+    rows: selectPremoveRows(ranked.items, peers, spots),
+  };
+}
 
-  overlaid.sort((a, b) => {
-    if (b.score !== a.score) return b.score - a.score;
-    const buildScore = (row: RankedFlow) =>
-      row.chips.filter((chip) => chip.id === "building" || chip.id === "mid-size" || chip.id === "quiet")
-        .length;
-    const buildDelta = buildScore(b) - buildScore(a);
-    if (buildDelta !== 0) return buildDelta;
-    const jumbo = (row: RankedFlow) => (toNumber(row.alert.total_premium) >= 750_000 ? 1 : 0);
-    if (jumbo(a) !== jumbo(b)) return jumbo(a) - jumbo(b);
-    return 0;
+function loadPremoveQualifying(opts?: { forceFresh?: boolean }): Promise<PremoveQualifying> {
+  const key = opts?.forceFresh ? "fresh" : "cached";
+  if (qualifyingInflight?.key === key) return qualifyingInflight.promise;
+  const promise = computePremoveQualifying(opts).finally(() => {
+    if (qualifyingInflight?.promise === promise) qualifyingInflight = null;
   });
+  qualifyingInflight = { key, promise };
+  return promise;
+}
+
+/** Qualifying Premove chains, before the top-N cut. Used to boost Picks overlap. */
+export async function loadPremoveContractKeys(opts?: { forceFresh?: boolean }): Promise<Set<string>> {
+  const { rows } = await loadPremoveQualifying(opts);
+  return new Set(rows.map((row) => contractKey(row)));
+}
+
+async function loadPickContractKeys(opts?: { forceFresh?: boolean }): Promise<Set<string>> {
+  const ranked = await loadRankedFlow(PICKS_FILTERS, opts);
+  return new Set(
+    ranked.items.filter((row) => !excludedFromActionable(row)).map((row) => contractKey(row)),
+  );
+}
+
+function comparePremove(a: RankedFlow, b: RankedFlow): number {
+  const lateA = hasScoreChip(a, "late-print") ? 1 : 0;
+  const lateB = hasScoreChip(b, "late-print") ? 1 : 0;
+  if (lateA !== lateB) return lateA - lateB;
+  if (b.score !== a.score) return b.score - a.score;
+  const dteDelta = dtePreference(a.dte) - dtePreference(b.dte);
+  if (dteDelta !== 0) return dteDelta;
+  const buildScore = (row: RankedFlow) =>
+    row.chips.filter((chip) => chip.id === "building" || chip.id === "mid-size" || chip.id === "quiet")
+      .length;
+  const buildDelta = buildScore(b) - buildScore(a);
+  if (buildDelta !== 0) return buildDelta;
+  const jumbo = (row: RankedFlow) => (toNumber(row.alert.total_premium) >= 750_000 ? 1 : 0);
+  if (jumbo(a) !== jumbo(b)) return jumbo(a) - jumbo(b);
+  return 0;
+}
+
+export async function loadPremoveShortlist(opts?: { forceFresh?: boolean }): Promise<PicksResponse> {
+  const [{ ranked, rows }, pickKeys] = await Promise.all([
+    loadPremoveQualifying(opts),
+    loadPickContractKeys(opts),
+  ]);
+
+  const adjusted = withActionableAdjustments(rows, pickKeys);
+  adjusted.sort(comparePremove);
 
   const seenChains = new Set<string>();
   const seenTickerCount = new Map<string, number>();
   const unique: RankedFlow[] = [];
-  for (const row of overlaid) {
-    const chain = row.alert.option_chain || row.alert.id;
+  for (const row of adjusted) {
+    const chain = contractKey(row);
     if (seenChains.has(chain)) continue;
     const tickerN = seenTickerCount.get(row.alert.ticker) ?? 0;
     if (tickerN >= 2) continue;
