@@ -6,7 +6,6 @@ import { tideFromPremiums, toBool, toNumber } from "@/lib/numbers";
 import { loadStoredUwKey, saveStoredUwKey } from "@/lib/uw-key-store";
 import {
   CHAIN_TTL_MS,
-  CONGRESS_TTL_MS,
   FLOW_TTL_MS,
   HISTORIC_TTL_MS,
   NET_PREM_TTL_MS,
@@ -652,29 +651,5 @@ export async function fetchStockStates(tickers: string[], limit = 6): Promise<Re
     }
   }
   return out;
-}
-
-/**
- * One market date of congressional disclosures.
- * UW `GET /api/congress/recent-trades` — `date` is a trading date (YYYY-MM-DD).
- * Cached 30 minutes. Not used by picks, premove, or conviction.
- */
-export async function fetchCongressRecentTrades(params: {
-  date?: string;
-  ticker?: string;
-  limit?: number;
-  skipCache?: boolean;
-}): Promise<Record<string, unknown>[]> {
-  const payload = await uwGet<{ data?: Record<string, unknown>[] }>(
-    "/api/congress/recent-trades",
-    {
-      limit: Math.min(Math.max(params.limit ?? 200, 1), 200),
-      ticker: params.ticker ? params.ticker.toUpperCase() : undefined,
-      date: params.date,
-    },
-    CONGRESS_TTL_MS,
-    Boolean(params.skipCache),
-  );
-  return payload.data ?? [];
 }
 
