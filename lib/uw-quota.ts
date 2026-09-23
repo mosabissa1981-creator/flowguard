@@ -18,6 +18,8 @@ export const QUOTE_TTL_MS = 15 * 60_000;
 /** Same 15-min bucket as quotes — historic rides the watch-check path, not the board poll. */
 export const HISTORIC_TTL_MS = QUOTE_TTL_MS;
 export const CHAIN_TTL_MS = 10 * 60_000;
+/** Congress disclosures move slowly. One UW pull per market date, then sit for 30 min. */
+export const CONGRESS_TTL_MS = 30 * 60_000;
 
 export class UwQuotaError extends Error {
   readonly status = 429;
