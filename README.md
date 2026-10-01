@@ -158,3 +158,39 @@ Next.js App Router, TypeScript, Tailwind CSS, shadcn/ui.
 - `ivEvents` + an informational `event-iv` chip and `exitPlan.eventRisk` when an expiry spans CPI/PPI/NFP/FOMC.
 - Yields: official Treasury daily par-curve CSV first (prior close + 5-session trend, bear-steepening flag);
   Yahoo only supplies the intraday last before Treasury posts the day's close.
+
+## Shadow modules (study only — never change the live lists)
+
+Each module returns `{ module, verdict: pass|flag|boost|skip, score, confidence, reason, data }` per finalist
+(the ≤8 AI-review candidates), stored per day in Blob (`flowguard/shadow/day-YYYY-MM-DD.json`).
+
+| Module | Source | Flags / boosts |
+| --- | --- | --- |
+| `news_x_check` | Grok + xAI `web_search`/`x_search` (one batched call for new issuers) | flag: flow chasing public news / high fade risk; boost: catalyst not yet priced |
+| `x_sentiment_shift` | same call | boost: X chatter rising while price flat, aligned; flag: chatter against the side |
+| `earnings_check` | UW `/stock/{t}/info` + `/earnings/{t}` (only if earnings < expiry), cached daily | flag: earnings before expiry (implied + avg 1-day move) |
+| `same_buyer_tracking` | UW `/option-contract/{id}/historic` (prior sessions only) + `study/candidate-history.json` | boost: repeated ask-side adds + OI growth / repeat appearances; flag: bid-heavy + OI shrinking |
+| `worth_the_price` | Black–Scholes from the print IV + UW `/volatility/stats` (RV, IV rank) | flag: target needs > 1σ move by the time stop |
+| `regime_analogs` | `study/regime-days.json` (yields Δ, tide, calendar type) | boost/flag by how the same pick type did on the closest days |
+| `adaptive_exits` | σ-scaled target/stop/time stop logged next to the fixed plan | flag: fixed target ≫ typical move |
+| `debate` | one combined Grok call: bull / bear / macro + judge per finalist | take → boost, avoid → flag |
+
+Endpoints: `GET /api/shadow` (today; `?day=YYYY-MM-DD` stored day for the study routine to save as
+`study/shadow-YYYY-MM-DD.json`; `&full=1` raw caches; `?readonly=1`), `GET /api/brief` (premarket brief, once per
+trading day from 8:25 CT; also attached read-only to `/api/regime` as `brief`), `GET /api/release-read` (post-release
+hot/cool read for NFP/CPI/PPI/PCE/ISM/FOMC/minutes ≥3 min after release), `GET /api/weights-proposal`
+(`scripts/propose-weights.mjs`, proposal only). The shadow pass also runs after `/api/morning` and `/api/ai-picks`
+responses (`after()`), so it needs no extra cron.
+
+Cost guards: LLM only on trading days 9:00–16:15 ET, ≥30 min apart, only for new issuers/contracts, ≤6 runs/day,
+hard daily cap `SHADOW_LLM_DAILY_USD` (default $1, provider-reported cost). Env: `SHADOW_SEARCH_MODEL` (default
+`grok-4.3`), `SHADOW_LLM_MODEL` (default `LLM_MODEL`), `SHADOW_MAX_LLM_RUNS`, `SHADOW_UW=off`, `SHADOW_SEARCH=off`,
+`SHADOW_MODE=off`, `SHADOW_BRIEF_IN_AI_PICKS=1` (opt-in: add the brief to the AI-picks prompt). Without
+`LLM_API_KEY` the LLM modules return `skip`. Local replay:
+`SHADOW_LOCAL_DIR=/tmp/shadow npx tsx --conditions=react-server scripts/shadow-local.ts <studyDir> 2026-09-30 09:52`.
+`scripts/build-study-summary.mjs` adds `shadowAccuracy` (per module: W/L/flat of boosted vs passed vs flagged).
+
+## Notify auth
+
+`POST /api/notify` and `POST /api/notify/test` require `NOTIFY_SECRET` (header `x-flowguard-key` or `?key=`);
+`GET /api/notify` (health) stays public. Fails closed when the env var is missing.

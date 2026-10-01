@@ -12,6 +12,7 @@ import { TideBar } from "@/components/tide-bar";
 import { RegimeBanner } from "@/components/regime-banner";
 import { MorningPanel } from "@/components/morning-panel";
 import { AiPicksPanel } from "@/components/ai-picks-panel";
+import { ShadowPanel } from "@/components/shadow-panel";
 import { PremovePanel } from "@/components/premove-panel";
 import { PicksPanel } from "@/components/picks-panel";
 import { PriceWatchesPanel } from "@/components/price-watches-panel";
@@ -610,6 +611,8 @@ export function Screener({
       </header>
 
       <AiPicksPanel onSelect={setSelectedId} />
+
+      <ShadowPanel />
 
       <MorningPanel
         morning={

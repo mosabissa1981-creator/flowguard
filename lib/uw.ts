@@ -679,3 +679,75 @@ export async function fetchEconomicCalendar(): Promise<UwEconEvent[]> {
     reported_period: row.reported_period == null ? null : asString(row.reported_period),
   }));
 }
+
+const DAY_TTL_MS = 12 * 3600_000;
+
+/** Shadow earnings_check. GET /api/stock/{ticker}/info (next_earnings_date). Cached 12h; null on error. */
+export async function fetchTickerInfo(
+  ticker: string,
+): Promise<{ nextEarningsDate: string | null; announceTime: string | null; sector: string | null; beta: number | null } | null> {
+  if (await isUwBlocked()) return null;
+  try {
+    const payload = await uwGet<{ data?: Record<string, unknown> }>(
+      `/api/stock/${encodeURIComponent(ticker.toUpperCase())}/info`,
+      undefined,
+      DAY_TTL_MS,
+    );
+    const d = payload.data ?? {};
+    const beta = toNumber(d.beta);
+    return {
+      nextEarningsDate: asString(d.next_earnings_date).slice(0, 10) || null,
+      announceTime: asString(d.announce_time) || null,
+      sector: asString(d.sector) || null,
+      beta: Number.isFinite(beta) && beta !== 0 ? beta : null,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** Shadow worth_the_price. GET /api/stock/{ticker}/volatility/stats (iv, iv_rank 0–100, rv). Cached 12h. */
+export async function fetchVolStats(
+  ticker: string,
+): Promise<{ iv: number | null; ivRank: number | null; rv: number | null; ivLow: number | null; ivHigh: number | null } | null> {
+  if (await isUwBlocked()) return null;
+  try {
+    const payload = await uwGet<{ data?: Record<string, unknown> }>(
+      `/api/stock/${encodeURIComponent(ticker.toUpperCase())}/volatility/stats`,
+      undefined,
+      DAY_TTL_MS,
+    );
+    const d = payload.data ?? {};
+    const num = (v: unknown) => {
+      const n = toNumber(v);
+      return Number.isFinite(n) && n > 0 ? n : null;
+    };
+    return { iv: num(d.iv), ivRank: num(d.iv_rank), rv: num(d.rv), ivLow: num(d.iv_low), ivHigh: num(d.iv_high) };
+  } catch {
+    return null;
+  }
+}
+
+/** Shadow earnings_check. GET /api/earnings/{ticker} — upcoming estimate row + past reactions. Cached 12h. */
+export async function fetchEarningsHistory(
+  ticker: string,
+): Promise<Array<{ reportDate: string; reportTime: string | null; source: string | null; expectedMovePct: number | null; postMove1dPct: number | null }> | null> {
+  if (await isUwBlocked()) return null;
+  try {
+    const payload = await uwGet<{ data?: Array<Record<string, unknown>> }>(
+      `/api/earnings/${encodeURIComponent(ticker.toUpperCase())}`,
+      undefined,
+      DAY_TTL_MS,
+    );
+    const num = (v: unknown) => (v == null || v === "" ? null : Number.isFinite(Number(v)) ? Number(v) : null);
+    return (payload.data ?? []).slice(0, 12).map((r) => ({
+      reportDate: asString(r.report_date).slice(0, 10),
+      reportTime: r.report_time == null ? null : asString(r.report_time),
+      source: r.source == null ? null : asString(r.source),
+      expectedMovePct: num(r.expected_move_perc),
+      postMove1dPct: num(r.post_earnings_move_1d),
+    }));
+  } catch {
+    return null;
+  }
+}

@@ -91,7 +91,7 @@ function candidateFacts(c: Candidate) {
   };
 }
 
-function buildPrompt(cands: Candidate[], regime: RegimeSnapshot | null, maxPicks: number) {
+function buildPrompt(cands: Candidate[], regime: RegimeSnapshot | null, maxPicks: number, brief?: string | null) {
   const study = loadStudySummary(15);
   const system = [
     "You are the risk-aware desk reviewer for FlowGuard, an unusual-options-flow screener.",
@@ -125,6 +125,7 @@ function buildPrompt(cands: Candidate[], regime: RegimeSnapshot | null, maxPicks
         }
       : "unavailable",
     maxPicks,
+    ...(brief ? { premarketBrief: brief } : {}),
     studyOutcomes: {
       since: study.since,
       through: study.through,
@@ -314,7 +315,13 @@ export async function gatherCandidates(): Promise<{
 async function compute(opts: { force?: boolean }): Promise<AiPicksResponse> {
   const gathered = await gatherCandidates();
   const regime = await loadRegimeSafe();
-  return reviewCandidates(gathered, regime, opts);
+  // Pre-market brief as extra LLM context is opt-in (SHADOW_BRIEF_IN_AI_PICKS=1) so shadow mode leaves AI picks unchanged by default.
+  let brief: string | null = null;
+  if (process.env.SHADOW_BRIEF_IN_AI_PICKS === "1") {
+    const { loadBrief, briefLine } = await import("@/lib/shadow/brief");
+    brief = briefLine(await loadBrief({ generate: false }).catch(() => null));
+  }
+  return reviewCandidates(gathered, regime, { ...opts, brief });
 }
 
 /**
@@ -324,7 +331,7 @@ async function compute(opts: { force?: boolean }): Promise<AiPicksResponse> {
 export async function reviewCandidates(
   gathered: Awaited<ReturnType<typeof gatherCandidates>>,
   regime: RegimeSnapshot | null,
-  opts: { force?: boolean; persist?: boolean } = {},
+  opts: { force?: boolean; persist?: boolean; brief?: string | null } = {},
 ): Promise<AiPicksResponse> {
   const { cands, source, fetchedAt, quotaBlocked, warning } = gathered;
   const persistState = opts.persist !== false;
@@ -449,7 +456,7 @@ export async function reviewCandidates(
   if (persistState) await saveAiPicksState(base0);
 
   try {
-    const { system, user } = buildPrompt(cands, regime, maxPicks);
+    const { system, user } = buildPrompt(cands, regime, maxPicks, opts.brief);
     const { text, provider, model, usage } = await callLlm(system, user);
     const decision = parseDecision(text);
     if (!decision) {
