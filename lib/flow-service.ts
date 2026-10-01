@@ -33,17 +33,29 @@ function looksUnusual(alert: FlowAlert): boolean {
   return rule.length > 0 && rule.toLowerCase() !== "none";
 }
 
+/**
+ * Direction-aware ticker tide (same convention as the Puts lane): ask-side calls and bid-side puts
+ * are bullish premium; ask-side puts and bid-side calls are bearish. Previously ask/bid were summed
+ * regardless of type, so heavy put BUYING read as a "bullish" ticker tide and penalised put setups.
+ */
 function tickerTidesFromAlerts(alerts: FlowAlert[]): Record<string, TideSnapshot | null> {
-  const byTicker = new Map<string, { ask: number; bid: number }>();
+  const byTicker = new Map<string, { bull: number; bear: number }>();
   for (const alert of alerts) {
-    const cur = byTicker.get(alert.ticker) ?? { ask: 0, bid: 0 };
-    cur.ask += toNumber(alert.total_ask_side_prem);
-    cur.bid += toNumber(alert.total_bid_side_prem);
+    const cur = byTicker.get(alert.ticker) ?? { bull: 0, bear: 0 };
+    const ask = toNumber(alert.total_ask_side_prem);
+    const bid = toNumber(alert.total_bid_side_prem);
+    if (String(alert.type).toLowerCase() === "put") {
+      cur.bear += ask;
+      cur.bull += bid;
+    } else {
+      cur.bull += ask;
+      cur.bear += bid;
+    }
     byTicker.set(alert.ticker, cur);
   }
   const out: Record<string, TideSnapshot | null> = {};
   for (const [ticker, prem] of byTicker) {
-    out[ticker] = tideFromPremiums(prem.ask, prem.bid, null);
+    out[ticker] = tideFromPremiums(prem.bull, prem.bear, null);
   }
   return out;
 }
