@@ -58,9 +58,11 @@ export type LaneDebateDoc = {
   };
   verdicts: Record<string, LaneDebateVerdict>;
   pending: string[];
+  /** Admin-requested sample debates on picks/candidates supplied by hand. Not scored in the study summary. */
+  samples?: LaneDebateVerdict[];
 };
 
-type LanePick = {
+export type LanePick = {
   lane: string;
   side: "call" | "put";
   contract: string;
@@ -277,6 +279,35 @@ async function doRefresh(opts: { force?: boolean }): Promise<LaneDebateDoc> {
   doc.updatedAt = new Date().toISOString();
   await saveDoc(KIND, day, doc);
   return doc;
+}
+
+/**
+ * Admin-only: debate hand-supplied picks (e.g. an unlogged candidate) in one call. Stored under `samples`
+ * (never scored, never changes picks). Shared shadow daily budget still applies.
+ */
+export async function sampleLaneDebate(picks: LanePick[]): Promise<{ samples: LaneDebateVerdict[]; usage: LlmUsageRecord | null; status: string }> {
+  const now = new Date();
+  const day = tradingDateET(now);
+  if (!shadowLlmConfig()) return { samples: [], usage: null, status: "no-key" };
+  if ((await budgetLeft(day)) <= 0) return { samples: [], usage: null, status: "budget" };
+  const regime = await loadRegimeSafe();
+  const regimeCtx = regime
+    ? {
+        label: regime.label,
+        reasons: regime.reasons.slice(0, 5),
+        us30yChangeBp: regime.yields.us30y.changeBp,
+        yieldsRising: regime.yields.rising,
+        marketTide: regime.tide?.bias ?? null,
+      }
+    : "unavailable";
+  const { results, usage } = await runLaneDebate(picks.slice(0, MAX_BATCH), regimeCtx, now);
+  const doc = (await loadLaneDebate(day)) ?? blank(day);
+  doc.llm.usage.push({ ...usage, module: "lane_debate_sample" });
+  doc.llm.spendUsd = Math.round((doc.llm.spendUsd + usage.costUsd) * 10000) / 10000;
+  doc.samples = [...(doc.samples ?? []), ...results].slice(-24);
+  doc.updatedAt = new Date().toISOString();
+  await saveDoc(KIND, day, doc);
+  return { samples: results, usage, status: "ok" };
 }
 
 export function laneDebatePersistence(): string {

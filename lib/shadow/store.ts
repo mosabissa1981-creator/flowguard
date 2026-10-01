@@ -53,7 +53,8 @@ export async function loadDoc<T>(kind: string, day: string, opts: { fresh?: bool
     const value = (await response.json()) as T;
     mem.set(p, { at: Date.now(), value });
     return value;
-  } catch {
+  } catch (e) {
+    console.error(`[shadow/store] blob read failed for ${p}:`, e instanceof Error ? e.message : e);
     return (hit?.value as T) ?? null;
   }
 }
@@ -80,8 +81,9 @@ export async function saveDoc(kind: string, day: string, value: unknown): Promis
       allowOverwrite: true,
       cacheControlMaxAge: 0,
     });
-  } catch {
+  } catch (e) {
     // Blob suspended / over quota — memory still guards warm instances.
+    console.error(`[shadow/store] blob write failed for ${p}:`, e instanceof Error ? e.message : e);
   }
 }
 
@@ -89,4 +91,41 @@ export function persistenceMode(): "local" | "blob" | "memory" {
   if (localDir()) return "local";
   if (blobToken()) return "blob";
   return "memory";
+}
+
+/** Admin diagnostic: write + fresh read of a tiny doc. Returns error messages only (no secrets). */
+export async function storeHealth(): Promise<{ mode: string; write: string; read: string; ms: number }> {
+  const t0 = Date.now();
+  const mode = persistenceMode();
+  const stamp = new Date().toISOString();
+  const p = docPath("health", "check");
+  let write = "skipped";
+  let read = "skipped";
+  if (mode === "blob") {
+    try {
+      await put(p, JSON.stringify({ stamp }), {
+        access: "private",
+        contentType: "application/json",
+        addRandomSuffix: false,
+        allowOverwrite: true,
+        cacheControlMaxAge: 0,
+      });
+      write = "ok";
+    } catch (e) {
+      write = `error: ${(e instanceof Error ? e.message : String(e)).slice(0, 200)}`;
+    }
+    try {
+      const { blobs } = await list({ prefix: p, limit: 2 });
+      const blob = blobs.find((b) => b.pathname === p);
+      if (!blob) read = "error: not listed";
+      else {
+        const r = await fetch(blob.url, { headers: { Authorization: `Bearer ${blobToken()}` }, cache: "no-store" });
+        const v = r.ok ? ((await r.json()) as { stamp?: string }) : null;
+        read = !r.ok ? `error: HTTP ${r.status}` : v?.stamp === stamp ? "ok (fresh)" : `stale (got ${v?.stamp ?? "?"})`;
+      }
+    } catch (e) {
+      read = `error: ${(e instanceof Error ? e.message : String(e)).slice(0, 200)}`;
+    }
+  }
+  return { mode, write, read, ms: Date.now() - t0 };
 }
