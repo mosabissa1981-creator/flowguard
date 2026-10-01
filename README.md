@@ -127,3 +127,20 @@ Next.js App Router, TypeScript, Tailwind CSS, shadcn/ui.
   from actionable lists; +8 morning ask-side (9:30–11:00 ET, ≥70% ask), +4 extra for 11–30 DTE,
   +10 quiet underlying / −10 extended (re-uses Premove's stock-state spots). Ties at the 100 clamp are
   broken by the unclamped `rawScore`.
+
+## AI picks + exit plans (Phase B)
+
+- `GET /api/ai-picks` — top ~8 actionable candidates (morning lane first, issuer/sector capped) plus the
+  regime, flow facts and the study-book summary go to an LLM, which returns 3 (risky/report-day) to 5 (calm)
+  picks with confidence + reason and an explicit skip reason for every other candidate. Guardrails (list cap,
+  1/issuer on risky days, sector cap) are re-applied after the model. 12-min cache; `?rerun=1` bypasses it.
+  Zero extra UW calls — it re-uses the morning / picks / premove lists.
+- LLM config (Vercel env): `LLM_API_KEY` (required to enable), optional `LLM_PROVIDER`
+  (`openai` | `anthropic`; auto-detected from an `sk-ant-` key), `LLM_MODEL`, `LLM_BASE_URL`
+  (any OpenAI-compatible endpoint, e.g. xAI / Groq / OpenRouter). Without a key — or on LLM error / bad
+  JSON — the endpoint returns a deterministic rules fallback (`engine: "deterministic"`, `llmStatus` says why).
+- Every pick in `/api/ai-picks`, `/api/morning`, `/api/picks`, `/api/premove` carries `exitPlan`:
+  entry (flow print), target (+30% risky / +40% calm / +50% calm high-confidence), stop (−25%), time stop
+  (3 sessions risky / 5 calm, capped at half the DTE) and `alertLevels` for the price-alert routine.
+- `GET /api/study-summary?n=20` — compact study-book outcomes from `study/study-summary.json`.
+  Refresh with `node scripts/build-study-summary.mjs <path-to-study-dir>` and commit.

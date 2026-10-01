@@ -4,6 +4,7 @@ import { buildPickCopy } from "@/lib/thesis";
 import { loadPremoveContext } from "@/lib/premove";
 import { compareActionable, withActionableAdjustments } from "@/lib/scoring";
 import { applyConcentrationCaps } from "@/lib/issuers";
+import { buildExitPlan } from "@/lib/exit-plan";
 import { loadRegimeSafe, regimeBrief, regimeCaps, regimeListCap, toActionableRegime } from "@/lib/regime";
 import type { PicksResponse } from "@/lib/types";
 
@@ -31,7 +32,12 @@ export async function loadDailyPicks(opts?: { forceFresh?: boolean }): Promise<P
   );
   const picks = kept.map((row, index) => {
     const copy = buildPickCopy(row);
-    return { ...row, rank: index + 1, ...copy };
+    return {
+      ...row,
+      rank: index + 1,
+      ...copy,
+      exitPlan: buildExitPlan(row, { riskyRegime: Boolean(regime?.rules.active) }),
+    };
   });
 
   return {

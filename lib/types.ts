@@ -109,9 +109,24 @@ export type FlowResponse = {
   authFailed?: boolean;
 };
 
+export type ExitPlan = {
+  /** Option premium per share used as entry (flow print at alert time). */
+  entry: number;
+  entryBasis: "flow-print" | "ask-at-print";
+  target: number;
+  targetPct: number;
+  stop: number;
+  stopPct: number;
+  timeStop: { date: string; sessions: number; rule: string };
+  /** Ready-made levels for the price-alert routine. */
+  alertLevels: { kind: "target" | "stop"; premium: number; pct: number }[];
+  note: string;
+};
+
 export type DailyPick = RankedFlow & {
   thesis: string;
   fadeRisks: string[];
+  exitPlan?: ExitPlan;
 };
 
 export type RegimeBrief = {
@@ -283,4 +298,46 @@ export type RegimeSnapshot = {
     tide: "uw-cache" | "uw" | "unavailable";
   };
   warnings: string[];
+};
+
+export type AiPick = DailyPick & {
+  /** 0–100 */
+  confidence: number;
+  aiReason: string;
+  lanes: string[];
+  exitPlan: ExitPlan;
+};
+
+export type AiSkip = {
+  option_chain: string;
+  ticker: string;
+  reason: string;
+};
+
+export type StudySummaryBrief = {
+  since: string;
+  through: string | null;
+  totals: { w: number; l: number; flat: number };
+  buckets: Record<string, { w: number; l: number; flat: number }>;
+  correlatedLossClusters: { day: string; issuer: string; n: number; losers: number; winners: number }[];
+  lessons: string[];
+};
+
+export type AiPicksResponse = {
+  source: TapeSource;
+  fetchedAt: string;
+  generatedAt: string;
+  engine: "llm" | "deterministic";
+  llmStatus: "ok" | "no-key" | "error" | "invalid-output" | "skipped";
+  llmProvider?: string;
+  llmModel?: string;
+  llmError?: string;
+  regime: RegimeBrief | null;
+  picks: AiPick[];
+  skips: AiSkip[];
+  candidatesConsidered: number;
+  study: StudySummaryBrief | null;
+  warning?: string;
+  quotaBlocked?: boolean;
+  disclaimer: string;
 };

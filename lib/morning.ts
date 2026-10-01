@@ -6,6 +6,7 @@ import { PICKS_FILTERS } from "@/lib/filters";
 import { MAX_PICKS } from "@/lib/picks";
 import { loadPremoveContext } from "@/lib/premove";
 import { applyConcentrationCaps } from "@/lib/issuers";
+import { buildExitPlan } from "@/lib/exit-plan";
 import { loadRegimeSafe, regimeBrief, regimeCaps, regimeListCap, toActionableRegime } from "@/lib/regime";
 import { compareActionable, withActionableAdjustments } from "@/lib/scoring";
 import type { MorningShortlistResponse } from "@/lib/types";
@@ -63,7 +64,12 @@ export async function loadMorningShortlist(): Promise<MorningShortlistResponse> 
   );
   const picks = kept.map((row, index) => {
     const copy = buildPickCopy(row);
-    return { ...row, rank: index + 1, ...copy };
+    return {
+      ...row,
+      rank: index + 1,
+      ...copy,
+      exitPlan: buildExitPlan(row, { riskyRegime: Boolean(regime?.rules.active) }),
+    };
   });
 
   const result: MorningShortlistResponse = {

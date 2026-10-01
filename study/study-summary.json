@@ -1,0 +1,527 @@
+{
+  "generatedAt": "2026-10-01T00:54:52.904Z",
+  "since": "2026-09-24",
+  "through": "2026-09-30",
+  "days": 5,
+  "definition": "winner ≥ +15% option premium by EOD check, loser ≤ −15%, else expired_flat. Entry = flow print.",
+  "totals": {
+    "w": 9,
+    "l": 10,
+    "flat": 63
+  },
+  "buckets": {
+    "morning": {
+      "w": 9,
+      "l": 10,
+      "flat": 19
+    },
+    "late": {
+      "w": 0,
+      "l": 0,
+      "flat": 41
+    },
+    "other": {
+      "w": 0,
+      "l": 0,
+      "flat": 3
+    },
+    "bothLaneScore100": {
+      "w": 3,
+      "l": 5,
+      "flat": 6
+    },
+    "quietUnderlying": {
+      "w": 6,
+      "l": 2,
+      "flat": 30
+    },
+    "dte11to30": {
+      "w": 7,
+      "l": 10,
+      "flat": 43
+    },
+    "calls": {
+      "w": 9,
+      "l": 10,
+      "flat": 41
+    },
+    "puts": {
+      "w": 0,
+      "l": 0,
+      "flat": 22
+    }
+  },
+  "correlatedLossClusters": [
+    {
+      "day": "2026-09-24",
+      "issuer": "APP",
+      "n": 2,
+      "losers": 2,
+      "winners": 0
+    },
+    {
+      "day": "2026-09-30",
+      "issuer": "GOOGL",
+      "n": 6,
+      "losers": 6,
+      "winners": 0
+    }
+  ],
+  "lessons": [
+    "All decided trades came from the morning shortlist; late prints (≥14:00 ET) were all flat.",
+    "Both-lane score-100 is not an edge (ties at the clamp); do not treat overlap as confirmation.",
+    "Same-issuer clusters (GOOG/GOOGL 9/30, APP 9/24) lose together — one bet, not several.",
+    "Quiet underlying + morning ask-side in 11–30 DTE produced the cleanest winners (INTC 130C +33%, META 800C +42%).",
+    "Rising long yields into reports hurt long-duration tech calls."
+  ],
+  "recentDecided": [
+    {
+      "day": "2026-09-24",
+      "contract": "META261016C00800000",
+      "ticker": "META",
+      "type": "call",
+      "dte": 22,
+      "score": 85,
+      "lane": "BOTH",
+      "bucket": "morning",
+      "outcome": "winner",
+      "pct": 41.9,
+      "entry": 17.69,
+      "tags": [
+        "ask-side",
+        "follow-through",
+        "building",
+        "quiet underlying"
+      ],
+      "quiet": true
+    },
+    {
+      "day": "2026-09-24",
+      "contract": "VKTX261002C00033000",
+      "ticker": "VKTX",
+      "type": "call",
+      "dte": 8,
+      "score": 59,
+      "lane": "Premove-only",
+      "bucket": "morning",
+      "outcome": "winner",
+      "pct": 41.7,
+      "entry": 3,
+      "tags": [
+        "ask-side",
+        "follow-through",
+        "building",
+        "quiet underlying"
+      ],
+      "quiet": true
+    },
+    {
+      "day": "2026-09-24",
+      "contract": "META261005C00765000",
+      "ticker": "META",
+      "type": "call",
+      "dte": 11,
+      "score": 79,
+      "lane": "Picks-only",
+      "bucket": "morning",
+      "outcome": "winner",
+      "pct": 33.5,
+      "entry": 22.1,
+      "tags": [
+        "ask-side",
+        "follow-through"
+      ],
+      "quiet": false
+    },
+    {
+      "day": "2026-09-24",
+      "contract": "CRWV261009C00098000",
+      "ticker": "CRWV",
+      "type": "call",
+      "dte": 15,
+      "score": 91,
+      "lane": "BOTH",
+      "bucket": "morning",
+      "outcome": "winner",
+      "pct": 24.9,
+      "entry": 2.09,
+      "tags": [
+        "ask-side",
+        "clean ask sweep",
+        "follow-through",
+        "building",
+        "quiet underlying"
+      ],
+      "quiet": true
+    },
+    {
+      "day": "2026-09-24",
+      "contract": "META261030C00750000",
+      "ticker": "META",
+      "type": "call",
+      "dte": 36,
+      "score": 100,
+      "lane": "BOTH",
+      "bucket": "morning",
+      "outcome": "winner",
+      "pct": 24.3,
+      "entry": 52,
+      "tags": [
+        "ask-side",
+        "clean ask sweep",
+        "follow-through",
+        "building",
+        "quiet underlying"
+      ],
+      "quiet": true
+    },
+    {
+      "day": "2026-09-24",
+      "contract": "APP261009C00337500",
+      "ticker": "APP",
+      "type": "call",
+      "dte": 15,
+      "score": 100,
+      "lane": "BOTH",
+      "bucket": "morning",
+      "outcome": "loser",
+      "pct": -27.7,
+      "entry": 8.3,
+      "tags": [
+        "ask-side",
+        "clean ask sweep",
+        "follow-through",
+        "building",
+        "quiet underlying"
+      ],
+      "quiet": true
+    },
+    {
+      "day": "2026-09-24",
+      "contract": "APP261016C00330000",
+      "ticker": "APP",
+      "type": "call",
+      "dte": 22,
+      "score": 85,
+      "lane": "BOTH",
+      "bucket": "morning",
+      "outcome": "loser",
+      "pct": -22.3,
+      "entry": 13.51,
+      "tags": [
+        "ask-side",
+        "follow-through",
+        "building",
+        "quiet underlying"
+      ],
+      "quiet": true
+    },
+    {
+      "day": "2026-09-25",
+      "contract": "NEM261016C00120000",
+      "ticker": "NEM",
+      "type": "call",
+      "dte": 21,
+      "score": 80,
+      "lane": "BOTH",
+      "bucket": "morning",
+      "outcome": "winner",
+      "pct": 28.8,
+      "entry": 5.2,
+      "tags": [
+        "ask-side",
+        "sweet-spot DTE",
+        "modest OTM",
+        "single-leg",
+        "tide aligned",
+        "fresh",
+        "building",
+        "chain repeat",
+        "both lanes"
+      ],
+      "quiet": false
+    },
+    {
+      "day": "2026-09-25",
+      "contract": "LNG261016C00275000",
+      "ticker": "LNG",
+      "type": "call",
+      "dte": 21,
+      "score": 87,
+      "lane": "Picks-only",
+      "bucket": "morning",
+      "outcome": "loser",
+      "pct": -27.3,
+      "entry": 8.8,
+      "tags": [
+        "ask-side",
+        "solid premium",
+        "sweet-spot DTE",
+        "sweep",
+        "clean ask sweep",
+        "modest OTM",
+        "single-leg",
+        "tide aligned",
+        "fresh"
+      ],
+      "quiet": false
+    },
+    {
+      "day": "2026-09-29",
+      "contract": "AMD261016C00650000",
+      "ticker": "AMD",
+      "type": "call",
+      "dte": 17,
+      "score": 97,
+      "lane": "BOTH",
+      "bucket": "morning",
+      "outcome": "loser",
+      "pct": -31.5,
+      "entry": 16.5,
+      "tags": [
+        "ask-side",
+        "sweet-spot DTE",
+        "modest OTM",
+        "single-leg",
+        "tide aligned",
+        "fresh",
+        "follow-through",
+        "building",
+        "both lanes"
+      ],
+      "quiet": false
+    },
+    {
+      "day": "2026-09-29",
+      "contract": "META261016C00730000",
+      "ticker": "META",
+      "type": "call",
+      "dte": 17,
+      "score": 100,
+      "lane": "BOTH",
+      "bucket": "morning",
+      "outcome": "winner",
+      "pct": 49.9,
+      "entry": 20.35,
+      "tags": [
+        "ask-side",
+        "solid premium",
+        "sweet-spot DTE",
+        "sweep",
+        "modest OTM",
+        "single-leg",
+        "tide aligned",
+        "fresh",
+        "follow-through",
+        "both lanes"
+      ],
+      "quiet": false
+    },
+    {
+      "day": "2026-09-29",
+      "contract": "META261016C00750000",
+      "ticker": "META",
+      "type": "call",
+      "dte": 17,
+      "score": 87,
+      "lane": "Premove-only",
+      "bucket": "morning",
+      "outcome": "winner",
+      "pct": 60.9,
+      "entry": 13.05,
+      "tags": [
+        "ask-side",
+        "solid premium",
+        "sweet-spot DTE",
+        "modest OTM",
+        "single-leg",
+        "tide aligned",
+        "fresh",
+        "follow-through",
+        "building",
+        "quiet underlying"
+      ],
+      "quiet": true
+    },
+    {
+      "day": "2026-09-30",
+      "contract": "GOOG261016C00340000",
+      "ticker": "GOOG",
+      "type": "call",
+      "dte": 16,
+      "score": 100,
+      "lane": "BOTH",
+      "bucket": "morning",
+      "outcome": "loser",
+      "pct": -18.8,
+      "entry": 12,
+      "tags": [
+        "ask-side",
+        "solid premium",
+        "sweet-spot DTE",
+        "sweep",
+        "ask sweep",
+        "modest OTM",
+        "single-leg",
+        "tide aligned",
+        "fresh",
+        "follow-through"
+      ],
+      "quiet": false
+    },
+    {
+      "day": "2026-09-30",
+      "contract": "GOOG261023C00355000",
+      "ticker": "GOOG",
+      "type": "call",
+      "dte": 23,
+      "score": 100,
+      "lane": "BOTH",
+      "bucket": "morning",
+      "outcome": "loser",
+      "pct": -25,
+      "entry": 7,
+      "tags": [
+        "ask-side",
+        "solid premium",
+        "sweet-spot DTE",
+        "sweep",
+        "ask sweep",
+        "modest OTM",
+        "single-leg",
+        "tide aligned",
+        "fresh",
+        "follow-through"
+      ],
+      "quiet": false
+    },
+    {
+      "day": "2026-09-30",
+      "contract": "GOOGL261016C00350000",
+      "ticker": "GOOGL",
+      "type": "call",
+      "dte": 16,
+      "score": 100,
+      "lane": "BOTH",
+      "bucket": "morning",
+      "outcome": "loser",
+      "pct": -25,
+      "entry": 9,
+      "tags": [
+        "ask-side",
+        "sweet-spot DTE",
+        "modest OTM",
+        "single-leg",
+        "tide aligned",
+        "fresh",
+        "follow-through",
+        "building",
+        "mid-size stack",
+        "both lanes"
+      ],
+      "quiet": false
+    },
+    {
+      "day": "2026-09-30",
+      "contract": "GOOGL261016C00360000",
+      "ticker": "GOOGL",
+      "type": "call",
+      "dte": 16,
+      "score": 100,
+      "lane": "BOTH",
+      "bucket": "morning",
+      "outcome": "loser",
+      "pct": -26,
+      "entry": 5,
+      "tags": [
+        "ask-side",
+        "sweet-spot DTE",
+        "modest OTM",
+        "single-leg",
+        "tide aligned",
+        "fresh",
+        "follow-through",
+        "building",
+        "mid-size stack",
+        "both lanes"
+      ],
+      "quiet": false
+    },
+    {
+      "day": "2026-09-30",
+      "contract": "INTC261016C00130000",
+      "ticker": "INTC",
+      "type": "call",
+      "dte": 16,
+      "score": 100,
+      "lane": "BOTH",
+      "bucket": "morning",
+      "outcome": "winner",
+      "pct": 33.1,
+      "entry": 2.48,
+      "tags": [
+        "ask-side",
+        "solid premium",
+        "sweet-spot DTE",
+        "modest OTM",
+        "single-leg",
+        "tide aligned",
+        "fresh",
+        "building",
+        "quiet underlying",
+        "both lanes"
+      ],
+      "quiet": true
+    },
+    {
+      "day": "2026-09-30",
+      "contract": "GOOG261016C00350000",
+      "ticker": "GOOG",
+      "type": "call",
+      "dte": 16,
+      "score": 96,
+      "lane": "Picks-only",
+      "bucket": "morning",
+      "outcome": "loser",
+      "pct": -22.7,
+      "entry": 7,
+      "tags": [
+        "ask-side",
+        "sweet-spot DTE",
+        "sweep",
+        "ask sweep",
+        "modest OTM",
+        "single-leg",
+        "tide aligned",
+        "fresh",
+        "follow-through",
+        "both lanes"
+      ],
+      "quiet": false
+    },
+    {
+      "day": "2026-09-30",
+      "contract": "GOOGL261030C00350000",
+      "ticker": "GOOGL",
+      "type": "call",
+      "dte": 30,
+      "score": 85,
+      "lane": "Picks-only",
+      "bucket": "morning",
+      "outcome": "loser",
+      "pct": -16.3,
+      "entry": 15,
+      "tags": [
+        "ask-side",
+        "sweet-spot DTE",
+        "modest OTM",
+        "single-leg",
+        "tide aligned",
+        "fresh",
+        "follow-through",
+        "both lanes"
+      ],
+      "quiet": false
+    }
+  ]
+}

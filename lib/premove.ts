@@ -8,6 +8,7 @@ import { fetchStockStates, hasUnusualWhalesKey, type StockState } from "@/lib/uw
 import { isUwBlocked } from "@/lib/uw-quota";
 import { toNumber } from "@/lib/numbers";
 import { applyConcentrationCaps } from "@/lib/issuers";
+import { buildExitPlan } from "@/lib/exit-plan";
 import { loadRegimeSafe, regimeBrief, regimeCaps, regimeListCap, toActionableRegime } from "@/lib/regime";
 import {
   contractKey,
@@ -186,6 +187,7 @@ export async function loadPremoveShortlist(opts?: { forceFresh?: boolean }): Pro
     ...row,
     rank: index + 1,
     ...buildPremoveCopy(row),
+    exitPlan: buildExitPlan(row, { riskyRegime: Boolean(regime?.rules.active) }),
   }));
 
   let warning = ranked.warning;
