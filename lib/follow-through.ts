@@ -39,6 +39,8 @@ export type HistoricBar = {
   lastTapeTime: string | null;
   nbboBid: number | null;
   nbboAsk: number | null;
+  /** FLEX open interest consolidated into this standard contract that day (rare). */
+  flexOiTransfer?: number | null;
 };
 
 function signal(

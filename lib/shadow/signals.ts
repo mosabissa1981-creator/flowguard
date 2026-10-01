@@ -10,13 +10,19 @@ import {
   DP_WINDOW_MS,
   type DarkPoolSignal,
   gexSignal,
+  flexSignal,
+  type FlexSignal,
   type GexSignal,
+  insiderSignal,
+  type InsiderSignal,
+  netPremSignal,
+  type NetPremSignal,
   oiSignal,
   type OiSignal,
   parseDarkPool,
   parseGexStrikes,
 } from "@/lib/shadow/signals-core";
-import { fetchContractHistoric, fetchDarkPoolWindow, fetchGexByStrike, hasUnusualWhalesKey } from "@/lib/uw";
+import { fetchContractHistoric, fetchDarkPoolWindow, fetchGexByStrike, fetchInsiderTransactions, fetchNetPremTicks, hasUnusualWhalesKey } from "@/lib/uw";
 import { isUwBlocked } from "@/lib/uw-quota";
 
 /**
@@ -49,6 +55,11 @@ export type SignalRow = EntryRef & {
   dp?: DarkPoolSignal | null;
   gex?: GexSignal | null;
   oi?: OiSignal | null;
+  insider?: InsiderSignal | null;
+  netPrem?: NetPremSignal | null;
+  flex?: FlexSignal | null;
+  /** 2 = insider + net premium + FLEX + stricter OI. */
+  v?: number;
   computedAt: string;
 };
 
@@ -83,7 +94,7 @@ async function loggedEntries(): Promise<EntryRef[]> {
 function stats(rows: SignalRow[]) {
   const decided = rows.filter((r) => r.outcome === "winner" || r.outcome === "loser" || r.outcome === "flat");
   const out: Record<string, Record<string, { n: number; winners: number; losers: number; winRate: number | null }>> = {};
-  for (const k of ["dp", "gex", "oi"] as const) {
+  for (const k of ["dp", "gex", "oi", "insider", "netPrem", "flex"] as const) {
     out[k] = {};
     for (const r of decided) {
       const v = (r[k] as { verdict?: string } | null | undefined)?.verdict ?? "n/a";
@@ -132,14 +143,45 @@ export async function refreshSignals(opts: { force?: boolean } = {}) {
       book.rows[e.key] = { ...e, dp, gex, oi: oiSignal(null, null), computedAt: new Date().toISOString() };
       changed = true;
     }
-    // 2) OI follow-through once the next session's OI is published.
+    // 1b) v2 signals (insider trades, ticker net premium) for rows that do not have them yet.
+    const insiderCache = new Map<string, Record<string, unknown>[]>();
+    const npCache = new Map<string, Awaited<ReturnType<typeof fetchNetPremTicks>>>();
+    const needV2 = entries.filter((e) => book.rows[e.key] && (book.rows[e.key].v ?? 1) < 2 && e.printTimeUtc).slice(-MAX_NEW_PER_RUN);
+    for (const e of needV2) {
+      const row = book.rows[e.key];
+      const printMs = Date.parse(e.printTimeUtc as string);
+      try {
+        if (!insiderCache.has(e.ticker)) {
+          uwCalls += 1;
+          insiderCache.set(e.ticker, await fetchInsiderTransactions(e.ticker));
+        }
+        row.insider = insiderSignal(insiderCache.get(e.ticker) ?? [], e.side, e.day);
+      } catch {
+        row.insider = null;
+      }
+      try {
+        const nk = `${e.ticker}|${e.day}`;
+        if (!npCache.has(nk)) {
+          uwCalls += 1;
+          npCache.set(nk, await fetchNetPremTicks(e.ticker, e.day));
+        }
+        row.netPrem = netPremSignal(npCache.get(nk) ?? [], e.side, printMs);
+      } catch {
+        row.netPrem = null;
+      }
+      if (row.oi && row.oi.verdict !== "pending") row.oi = { ...row.oi, verdict: "pending" }; // re-evaluate with the v2 rule
+      row.v = 2;
+      changed = true;
+    }
+    // 2) OI follow-through (v2 rule) + FLEX transfer once the next session's OI is published.
     const pending = entries.filter((e) => e.day < today && book.rows[e.key] && (!book.rows[e.key].oi || book.rows[e.key].oi?.verdict === "pending")).slice(-MAX_OI_PER_RUN);
     for (const e of pending) {
       uwCalls += 1;
       const bars = await fetchContractHistoric(e.contract, 12).catch(() => []);
       const dayBar = bars.find((b) => b.date === e.day);
       const next = bars.find((b) => b.date > e.day);
-      book.rows[e.key].oi = oiSignal(dayBar?.openInterest ?? null, next?.openInterest ?? null);
+      book.rows[e.key].oi = oiSignal(dayBar?.openInterest ?? null, next?.openInterest ?? null, dayBar?.volume ?? null);
+      book.rows[e.key].flex = flexSignal(bars, e.day);
       changed = true;
     }
   }
@@ -163,7 +205,10 @@ export async function refreshSignals(opts: { force?: boolean } = {}) {
     definitions: {
       dp: "Dark-pool prints ≥ $1M within ±15 min of the flow print; buyer- vs seller-initiated by price vs NBBO mid. confirm = ≥ $5M with bias ≥ 0.2 in the trade's direction.",
       gex: "UW greek-exposure by strike on the print day. confirm = negative net dealer gamma (trend-friendly) with the strike inside the call wall (calls) / put wall (puts) and ≥ 2% room; conflict = positive gamma with the strike beyond the wall or < 1% room.",
-      oi: "Next-session open interest vs print-day OI on the same contract. confirm = OI up ≥ 10% (positions opened); conflict = OI down ≥ 5%.",
+      oi: "Next-session open-interest change vs the print day's contract volume. confirm = ΔOI ≥ 50% of that volume and ≥ 100 contracts (mostly opening); conflict = OI fell or ΔOI < 20% of the volume (closed / day-traded); else neutral.",
+      insider: "Form 4 trades filed in the 90 days before the print day: open-market buys (code P) ≥ $100K = bullish; discretionary sales (code S, not 10b5-1) ≥ $1M with no meaningful buys = bearish. Aligned with the pick = confirm.",
+      netPrem: "Ticker net call minus net put premium from the open up to the print (UW net-prem ticks). ≥ $1M and ≥ 25% of the larger side; aligned with the pick = confirm, against = conflict.",
+      flex: "FLEX (institutional custom-term) open interest consolidated into this contract on the print day or the next two sessions (UW daily OI flex_oi_transfer). Rare.",
     },
     stats: stats(rows),
     today_rows: rows.filter((r) => r.day === today),

@@ -7,7 +7,10 @@
  *  - Dealer positioning (GEX by strike, UW greek-exposure/strike): net gamma sign (negative = dealers chase moves,
  *    trend-friendly; positive = pinning), call wall above / put wall below spot, and whether the strike sits
  *    beyond the wall the move must break.
- *  - Open-interest follow-through: next-session OI vs print-day OI on the same contract (positions actually opened).
+ *  - Open-interest follow-through: next-session OI change vs the print day's contract volume (positions actually opened).
+ *  - Insider trades (Form 4, as of the print day by filing date): open-market buys vs discretionary sells, last 90 days.
+ *  - Net premium per ticker (UW net-prem ticks, summed up to the print time): call vs put net premium, direction-aware.
+ *  - FLEX OI transfer: FLEX (institutional custom-term) open interest consolidated into the contract (rare; UW daily OI).
  */
 
 export type DarkPoolPrint = { price: number; premium: number; nbboBid: number | null; nbboAsk: number | null; executedAt: string };
@@ -97,12 +100,85 @@ export function gexSignal(rows: GexStrike[], spot: number, side: "call" | "put",
   return { netGex: Math.round(net), regime, callWall, putWall, roomPct, strikeBeyondWall, verdict };
 }
 
-export function oiSignal(oiPrintDay: number | null, oiNextDay: number | null, printSize?: number | null): OiSignal {
+/**
+ * OI follow-through (v2, stricter): ΔOI on the next session vs the print day's contract volume.
+ * confirm = ΔOI ≥ 50% of the day's volume and ≥ 100 contracts (mostly opening); conflict = OI fell or ΔOI < 20% of
+ * the day's volume (mostly closing / day-traded); else neutral.
+ * (v1 used ΔOI ≥ +10% and confirmed ~96% of entries — not informative.)
+ */
+export function oiSignal(oiPrintDay: number | null, oiNextDay: number | null, dayVolume?: number | null): OiSignal {
   if (oiNextDay == null) return { oiPrintDay, oiNextDay, changePct: null, verdict: "pending" };
-  if (!oiPrintDay) return { oiPrintDay, oiNextDay, changePct: null, verdict: oiNextDay > (printSize ?? 0) * 0.5 ? "confirm" : "neutral" };
-  const changePct = Math.round(((oiNextDay - oiPrintDay) / oiPrintDay) * 1000) / 10;
-  const opened = printSize ? oiNextDay - oiPrintDay >= printSize * 0.5 : changePct >= 10;
-  return { oiPrintDay, oiNextDay, changePct, verdict: opened ? "confirm" : changePct <= -5 ? "conflict" : "neutral" };
+  const base = oiPrintDay ?? 0;
+  const delta = oiNextDay - base;
+  const changePct = base > 0 ? Math.round((delta / base) * 1000) / 10 : null;
+  const vol = dayVolume ?? 0;
+  let verdict: OiSignal["verdict"] = "neutral";
+  if (delta < 0 || (vol > 0 && delta < 0.2 * vol)) verdict = "conflict";
+  else if (delta >= 100 && vol > 0 && delta >= 0.5 * vol) verdict = "confirm";
+  return { oiPrintDay, oiNextDay, changePct, verdict };
+}
+
+export type InsiderSignal = { buys: number; sells: number; buyUsd: number; sellUsd: number; verdict: "confirm" | "conflict" | "neutral" | "none" };
+const INSIDER_WINDOW_DAYS = 90;
+
+/** As of `day` (by filing date), last 90 days: open-market purchases (code P) vs discretionary sales (code S, not 10b5-1). */
+export function insiderSignal(rows: Record<string, unknown>[], side: "call" | "put", day: string): InsiderSignal {
+  const from = new Date(Date.parse(`${day}T12:00:00Z`) - INSIDER_WINDOW_DAYS * 86400_000).toISOString().slice(0, 10);
+  let buys = 0;
+  let sells = 0;
+  let buyUsd = 0;
+  let sellUsd = 0;
+  for (const r of rows) {
+    const filed = String(r.filing_date ?? r.transaction_date ?? "").slice(0, 10);
+    if (!filed || filed >= day || filed < from) continue;
+    const code = String(r.transaction_code ?? "");
+    const usd = Math.abs(Number(r.amount) || 0) * (Number(r.price) || Number(r.stock_price) || 0);
+    if (code === "P") {
+      buys += 1;
+      buyUsd += usd;
+    } else if (code === "S" && !r.is_10b5_1) {
+      sells += 1;
+      sellUsd += usd;
+    }
+  }
+  let verdict: InsiderSignal["verdict"] = buys + sells === 0 ? "none" : "neutral";
+  const bullish = buyUsd >= 100_000 && buyUsd >= sellUsd * 0.5;
+  const bearish = sellUsd >= 1_000_000 && buyUsd < 100_000;
+  if (bullish) verdict = side === "call" ? "confirm" : "conflict";
+  else if (bearish) verdict = side === "put" ? "confirm" : "conflict";
+  return { buys, sells, buyUsd: Math.round(buyUsd), sellUsd: Math.round(sellUsd), verdict };
+}
+
+export type NetPremSignal = { netCallPremium: number; netPremium: number; netPutPremium: number; verdict: "confirm" | "conflict" | "neutral" | "none" };
+
+/** Ticker net premium from session start up to the print (no look-ahead). Bullish = net call − net put premium > 0. */
+export function netPremSignal(ticks: Array<{ tape_time: string; net_call_premium: string | number; net_put_premium: string | number }>, side: "call" | "put", printMs: number): NetPremSignal {
+  let c = 0;
+  let p = 0;
+  let n = 0;
+  for (const t of ticks) {
+    const ms = Date.parse(t.tape_time);
+    if (!Number.isFinite(ms) || ms > printMs) continue;
+    c += Number(t.net_call_premium) || 0;
+    p += Number(t.net_put_premium) || 0;
+    n += 1;
+  }
+  const net = c - p;
+  let verdict: NetPremSignal["verdict"] = n === 0 ? "none" : "neutral";
+  const scale = Math.max(Math.abs(c), Math.abs(p), 1);
+  if (n > 0 && Math.abs(net) >= 1_000_000 && Math.abs(net) >= 0.25 * scale) {
+    const bullish = net > 0;
+    verdict = (side === "call") === bullish ? "confirm" : "conflict";
+  }
+  return { netCallPremium: Math.round(c), netPutPremium: Math.round(p), netPremium: Math.round(net), verdict };
+}
+
+export type FlexSignal = { transferredOi: number; verdict: "confirm" | "none" };
+/** FLEX OI consolidated into the contract on the print day or the next two sessions (institutional custom-term positions). */
+export function flexSignal(bars: Array<{ date: string; flexOiTransfer?: number | null }>, day: string): FlexSignal {
+  const after = bars.filter((b) => b.date >= day).sort((a, b) => a.date.localeCompare(b.date)).slice(0, 3);
+  const t = after.reduce((s, b) => s + (b.flexOiTransfer ?? 0), 0);
+  return { transferredOi: t, verdict: t > 0 ? "confirm" : "none" };
 }
 
 export function parseDarkPool(rows: Record<string, unknown>[]): DarkPoolPrint[] {

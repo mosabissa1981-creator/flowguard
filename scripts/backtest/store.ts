@@ -219,3 +219,29 @@ export async function gexStrikes(ticker: string, day: string): Promise<Record<st
   writeJson(f, rows);
   return rows;
 }
+export async function netPremTicks(ticker: string, day: string): Promise<Record<string, unknown>[]> {
+  const f = p("signals", "netprem", `${ticker.replace(/[^A-Z0-9._-]/gi, "_")}.${day}.json.gz`);
+  const hit = readJson<Record<string, unknown>[]>(f);
+  if (hit) return hit;
+  const j = await uwJson<{ data?: Record<string, unknown>[] }>(`/api/stock/${encodeURIComponent(ticker)}/net-prem-ticks?date=${day}`);
+  const rows = (j.data ?? []).map((r) => ({ tape_time: r.tape_time, net_call_premium: r.net_call_premium, net_put_premium: r.net_put_premium }));
+  fs.mkdirSync(path.dirname(f), { recursive: true });
+  writeJson(f, rows);
+  return rows;
+}
+/** Insider transactions per ticker (newest 500; as-of filtering by filing date happens in the signal). Refreshed after 7 days. */
+export async function insiderRows(ticker: string): Promise<Record<string, unknown>[]> {
+  const f = p("signals", "insider", `${ticker.replace(/[^A-Z0-9._-]/gi, "_")}.json.gz`);
+  const hit = readJson<{ at: number; rows: Record<string, unknown>[] }>(f);
+  if (hit && Date.now() - hit.at < 7 * 86400_000) return hit.rows;
+  let rows: Record<string, unknown>[] = [];
+  try {
+    const j = await uwJson<{ data?: Record<string, unknown>[] }>(`/api/insider/transactions?ticker_symbol=${encodeURIComponent(ticker)}&limit=500`);
+    rows = (j.data ?? []).map((r) => ({ filing_date: r.filing_date, transaction_date: r.transaction_date, transaction_code: r.transaction_code, amount: r.amount, price: r.price, stock_price: r.stock_price, is_10b5_1: r.is_10b5_1 }));
+  } catch (e) {
+    if ((e as Error).name === "BudgetStop") throw e;
+  }
+  fs.mkdirSync(path.dirname(f), { recursive: true });
+  writeJson(f, { at: Date.now(), rows });
+  return rows;
+}

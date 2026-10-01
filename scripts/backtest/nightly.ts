@@ -13,7 +13,7 @@ import { spawn } from "node:child_process";
 import fs from "node:fs";
 
 import { budget, BudgetStop, STOP_AT } from "./uw-budget";
-import { addDays, contractHistory, darkPoolWindow, gexStrikes, ensureDirs, fetchFlowDay, fetchTideDay, loadFlowDay, p, readJson, ROOT, writeJson } from "./store";
+import { addDays, contractHistory, darkPoolWindow, gexStrikes, insiderRows, netPremTicks, ensureDirs, fetchFlowDay, fetchTideDay, loadFlowDay, p, readJson, ROOT, writeJson } from "./store";
 import type { ReplayDay, ReplayEntry } from "./replay-types";
 
 const args = new Map(process.argv.slice(2).map((a) => (a.includes("=") ? (a.replace(/^--/, "").split("=") as [string, string]) : [a.replace(/^--/, ""), "1"])));
@@ -51,48 +51,59 @@ type Outcome = ReplayEntry & {
   maxDrawdownPct: number | null;
   t1: number | null; t3: number | null; t5: number | null;
   oiChangeT1Pct: number | null; // open-interest follow-through on the next session (shadow signal)
-  sig?: { dp: string | null; gex: string | null; oi: string | null; dpPremiumUsd?: number | null; gexRegime?: string | null; roomPct?: number | null };
+  sig?: { v?: number; dp: string | null; gex: string | null; oi: string | null; insider?: string | null; netPrem?: string | null; flex?: string | null; dpPremiumUsd?: number | null; gexRegime?: string | null; roomPct?: number | null; netPremUsd?: number | null; insiderBuyUsd?: number | null; insiderSellUsd?: number | null; flexOi?: number | null };
   final: boolean;
 };
 
-type Bar = { date: string; last: number | null; high: number | null; low: number | null; openInterest: number | null };
+type Bar = { date: string; last: number | null; high: number | null; low: number | null; openInterest: number | null; volume: number | null; flexOiTransfer: number | null };
 
 async function barsFor(e: ReplayEntry, today: string): Promise<Bar[] | null> {
   const { parseHistoricBar } = await import("@/lib/uw");
   const chains = await contractHistory(e.contract, addDays(e.day, 12), today);
   if (!chains) return null;
-  return chains.map((c) => parseHistoricBar(c)).map((b) => ({ date: b.date, last: b.last, high: b.high, low: b.low, openInterest: b.openInterest })).sort((a, b) => a.date.localeCompare(b.date));
+  return chains.map((c) => parseHistoricBar(c)).map((b) => ({ date: b.date, last: b.last, high: b.high, low: b.low, openInterest: b.openInterest, volume: b.volume, flexOiTransfer: b.flexOiTransfer ?? null })).sort((a, b) => a.date.localeCompare(b.date));
 }
 
 /** Dark pool / GEX / OI follow-through for LOGGED entries only (candidates skip the extra UW calls). */
-async function shadowSignals(e: ReplayEntry, oiDay: number | null, oiNext: number | null): Promise<Outcome["sig"]> {
+async function shadowSignals(e: ReplayEntry, bars: Bar[], dayBar: Bar | null, next: Bar | null): Promise<Outcome["sig"]> {
   const core = await import("@/lib/shadow/signals-core");
-  const oi = core.oiSignal(oiDay, oiNext).verdict;
-  if (e.kind !== "logged" || !e.printTimeUtc) return { dp: null, gex: null, oi };
+  const oi = core.oiSignal(dayBar?.openInterest ?? null, next?.openInterest ?? null, dayBar?.volume ?? null).verdict;
+  const fl = core.flexSignal(bars, e.day);
+  const base = { v: 2, dp: null, gex: null, oi, insider: null, netPrem: null, flex: fl.verdict, flexOi: fl.transferredOi };
+  if (e.kind !== "logged" || !e.printTimeUtc) return base;
   const printMs = Date.parse(e.printTimeUtc);
   const strike = Number(e.contract.slice(-8)) / 1000;
-  let dp: string | null = null;
-  let dpPremiumUsd: number | null = null;
-  let gex: string | null = null;
-  let gexRegime: string | null = null;
-  let roomPct: number | null = null;
-  try {
+  const out: NonNullable<Outcome["sig"]> = { ...base };
+  const guard = async (fn: () => Promise<void>) => {
+    try {
+      await fn();
+    } catch (err) {
+      if (err instanceof BudgetStop) throw err;
+    }
+  };
+  await guard(async () => {
     const d = core.darkPoolSignal(core.parseDarkPool(await darkPoolWindow(e.ticker, e.day, printMs)), e.side, printMs);
-    dp = d.verdict;
-    dpPremiumUsd = d.premiumUsd;
-  } catch (err) {
-    if (err instanceof BudgetStop) throw err;
-  }
-  try {
-    const spot = e.underlying ?? 0;
-    const g = core.gexSignal(core.parseGexStrikes(await gexStrikes(e.ticker, e.day)), spot, e.side, strike);
-    gex = g?.verdict ?? null;
-    gexRegime = g?.regime ?? null;
-    roomPct = g?.roomPct ?? null;
-  } catch (err) {
-    if (err instanceof BudgetStop) throw err;
-  }
-  return { dp, gex, oi, dpPremiumUsd, gexRegime, roomPct };
+    out.dp = d.verdict;
+    out.dpPremiumUsd = d.premiumUsd;
+  });
+  await guard(async () => {
+    const g = core.gexSignal(core.parseGexStrikes(await gexStrikes(e.ticker, e.day)), e.underlying ?? 0, e.side, strike);
+    out.gex = g?.verdict ?? null;
+    out.gexRegime = g?.regime ?? null;
+    out.roomPct = g?.roomPct ?? null;
+  });
+  await guard(async () => {
+    const n = core.netPremSignal((await netPremTicks(e.ticker, e.day)) as never, e.side, printMs);
+    out.netPrem = n.verdict;
+    out.netPremUsd = n.netPremium;
+  });
+  await guard(async () => {
+    const i = core.insiderSignal(await insiderRows(e.ticker), e.side, e.day);
+    out.insider = i.verdict;
+    out.insiderBuyUsd = i.buyUsd;
+    out.insiderSellUsd = i.sellUsd;
+  });
+  return out;
 }
 
 async function scoreEntry(e: ReplayEntry, today: string): Promise<Outcome> {
@@ -104,7 +115,7 @@ async function scoreEntry(e: ReplayEntry, today: string): Promise<Outcome> {
   const dayBar = bars.find((b) => b.date === e.day);
   const next = bars.find((b) => b.date > e.day);
   const oi = dayBar?.openInterest && next?.openInterest != null ? Math.round(((next.openInterest - dayBar.openInterest) / dayBar.openInterest) * 1000) / 10 : null;
-  const sig = await shadowSignals(e, dayBar?.openInterest ?? null, next?.openInterest ?? null);
+  const sig = await shadowSignals(e, bars, dayBar ?? null, next ?? null);
   if (e.lane === "lottery") {
     const t = lottery.trackFromBars({ day: e.day, entry: e.entry, expiry: e.expiry } as never, bars, today);
     const outcome: Outcome["outcome"] = t.hit100 ? "winner" : t.final ? "loser" : "open";
@@ -125,7 +136,7 @@ async function scoreAll(today: string): Promise<Outcome[]> {
     for (const e of r?.entries ?? []) {
       const k = `${e.day}|${e.lane}|${e.kind}|${e.contract}`;
       const old = prev.get(k);
-      if ((old?.final && (old.sig || e.kind !== "logged")) || stopped) {
+      if ((old?.final && old.sig?.v === 2) || stopped) {
         all.push(old ?? { ...e, outcome: "open", outcomeSession: null, maxGainPct: null, maxDrawdownPct: null, t1: null, t3: null, t5: null, oiChangeT1Pct: null, final: false });
         continue;
       }
@@ -166,7 +177,7 @@ function summarize(all: Outcome[]) {
 function signalStats(all: Outcome[]) {
   const logged = all.filter((o) => o.kind === "logged" && ["winner", "loser", "flat"].includes(o.outcome));
   const out: Record<string, Record<string, { n: number; winners: number; losers: number; winRate: number | null }>> = {};
-  for (const k of ["dp", "gex", "oi"] as const) {
+  for (const k of ["dp", "gex", "oi", "insider", "netPrem", "flex"] as const) {
     out[k] = {};
     for (const o of logged) {
       const v = o.sig?.[k] ?? "n/a";
@@ -182,11 +193,11 @@ function signalStats(all: Outcome[]) {
 
 function writeDataset(all: Outcome[]) {
   const featKeys = [...new Set(all.flatMap((o) => Object.keys(o.features)))].sort();
-  const cols = ["day", "lane", "kind", "contract", "ticker", "side", "expiry", "entry", "printTimeUtc", ...featKeys.map((k) => `f_${k}`), "oiChangeT1Pct", "sig_dp", "sig_gex", "sig_oi", "sig_gexRegime", "sig_roomPct", "t1", "t3", "t5", "maxGainPct", "maxDrawdownPct", "outcome", "final"];
+  const cols = ["day", "lane", "kind", "contract", "ticker", "side", "expiry", "entry", "printTimeUtc", ...featKeys.map((k) => `f_${k}`), "oiChangeT1Pct", "sig_dp", "sig_gex", "sig_oi", "sig_insider", "sig_netPrem", "sig_flex", "sig_gexRegime", "sig_roomPct", "sig_dpPremiumUsd", "sig_netPremUsd", "sig_insiderBuyUsd", "sig_insiderSellUsd", "sig_flexOi", "t1", "t3", "t5", "maxGainPct", "maxDrawdownPct", "outcome", "final"];
   const esc = (v: unknown) => (v == null ? "" : /[",\n]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : String(v));
   const lines = [cols.join(",")];
   for (const o of all) {
-    const rec: Record<string, unknown> = { ...o, ...Object.fromEntries(featKeys.map((k) => [`f_${k}`, o.features[k]])), sig_dp: o.sig?.dp, sig_gex: o.sig?.gex, sig_oi: o.sig?.oi, sig_gexRegime: o.sig?.gexRegime, sig_roomPct: o.sig?.roomPct };
+    const rec: Record<string, unknown> = { ...o, ...Object.fromEntries(featKeys.map((k) => [`f_${k}`, o.features[k]])), sig_dp: o.sig?.dp, sig_gex: o.sig?.gex, sig_oi: o.sig?.oi, sig_insider: o.sig?.insider, sig_netPrem: o.sig?.netPrem, sig_flex: o.sig?.flex, sig_gexRegime: o.sig?.gexRegime, sig_roomPct: o.sig?.roomPct, sig_dpPremiumUsd: o.sig?.dpPremiumUsd, sig_netPremUsd: o.sig?.netPremUsd, sig_insiderBuyUsd: o.sig?.insiderBuyUsd, sig_insiderSellUsd: o.sig?.insiderSellUsd, sig_flexOi: o.sig?.flexOi };
     lines.push(cols.map((c) => esc(rec[c])).join(","));
   }
   fs.writeFileSync(p("datasets", "entries.csv"), lines.join("\n"));
