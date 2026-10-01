@@ -9,6 +9,8 @@ export const dynamic = "force-dynamic";
 export async function GET(request: NextRequest) {
   const filters = parseFlowFilters(request.nextUrl.searchParams);
   const forceFresh = wantFresh(request.nextUrl.searchParams);
-  const payload = await loadRankedFlow(filters, { forceFresh, scope: "window" });
+  // Board default = latest-prints window. `?scope=session` (requires `ticker=`) returns that ticker's full session.
+  const scope = request.nextUrl.searchParams.get("scope") === "session" && filters.ticker ? "session" : "window";
+  const payload = await loadRankedFlow(filters, { forceFresh, scope });
   return Response.json(payload, { headers: tapeCacheControl(forceFresh, payload.quotaBlocked) });
 }
