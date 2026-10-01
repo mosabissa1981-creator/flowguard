@@ -280,3 +280,19 @@ export async function getSessionTape(opts: { force?: boolean; allowUw?: boolean 
     durable: kvDurable(),
   };
 }
+
+/**
+ * Backtest/replay only (scripts/backtest): replace this instance's in-memory session tape with a complete,
+ * already-fetched set so lanes/picks replay a past session without UW calls. Never used by the live app.
+ */
+export function primeSessionTape(alerts: FlowAlert[], now = new Date()): void {
+  const day = tradingDateET(now);
+  const openMs = sessionOpenUtc(now).getTime();
+  const st = fresh(day);
+  for (const a of alerts) add(st, a, openMs);
+  st.meta.syncedAt = now.getTime();
+  st.meta.newestMs = alerts.reduce((m, a) => Math.max(m, Date.parse(a.created_at) || 0), 0);
+  st.meta.total = st.byId.size;
+  state = st;
+  syncing = null;
+}
