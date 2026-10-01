@@ -431,14 +431,14 @@ async function compute(): Promise<LanesResponse> {
     return tideFromPremiums(bull, bear, null).bias;
   };
 
-  // Best row per chain across both eligibility windows.
+  // Earliest qualifying print per chain (full-session tape): entry = first qualifying print, never a later re-print.
   const best = (maxDte: number) => {
     const m = new Map<string, RankedFlow>();
     for (const row of tape.items) {
       if (!laneEligible(row, maxDte)) continue;
       const k = contractKey(row);
       const cur = m.get(k);
-      if (!cur || toNumber(row.alert.total_premium) > toNumber(cur.alert.total_premium)) m.set(k, row);
+      if (!cur || (Date.parse(row.alert.created_at) < Date.parse(cur.alert.created_at))) m.set(k, row);
     }
     return [...m.values()];
   };

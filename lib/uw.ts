@@ -80,6 +80,8 @@ function buildUrl(path: string, params?: Record<string, string | number | boolea
   return url;
 }
 
+const UW_TIMEOUT_MS = 15_000;
+
 async function uwRequest<T>(url: URL, ttlMs = 0, bust = false): Promise<T> {
   if (await isUwBlocked()) {
     throw new UwQuotaError(
@@ -110,6 +112,8 @@ async function uwRequest<T>(url: URL, ttlMs = 0, bust = false): Promise<T> {
           Accept: "application/json",
         },
         cache: "no-store",
+        // Never let one slow UW request hang a route (or the session back-fill) indefinitely.
+        signal: AbortSignal.timeout(UW_TIMEOUT_MS),
       });
       if (!response.ok) {
         const body = await response.text();
@@ -257,6 +261,30 @@ export async function fetchFlowAlerts(params: {
 
   return collected;
   }, Boolean(params.skipCache));
+}
+
+/**
+ * One uncached flow-alerts page (newest first). Used by the session accumulator (lib/session-tape.ts),
+ * which does its own incremental paging and dedupe.
+ */
+export async function fetchFlowAlertsPage(params: {
+  minPremium: number;
+  newerThan?: string;
+  olderThan?: string;
+  limit?: number;
+}): Promise<FlowAlert[]> {
+  const payload = await uwGet<{ data?: Record<string, unknown>[] }>(
+    "/api/option-trades/flow-alerts",
+    {
+      limit: Math.min(params.limit ?? 200, 200),
+      min_premium: params.minPremium > 0 ? params.minPremium : undefined,
+      newer_than: params.newerThan,
+      older_than: params.olderThan,
+    },
+    0,
+    true,
+  );
+  return (payload.data ?? []).map(normalizeFlowAlert);
 }
 
 export async function fetchMarketTide(skipCache = false): Promise<TideSnapshot | null> {

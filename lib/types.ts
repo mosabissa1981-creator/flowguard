@@ -107,6 +107,21 @@ export type FlowResponse = {
   warning?: string;
   quotaBlocked?: boolean;
   authFailed?: boolean;
+  /** Full-session accumulator coverage (lib/session-tape). */
+  session?: SessionInfo;
+};
+
+export type SessionInfo = {
+  prints: number;
+  fromIso: string | null;
+  toIso: string | null;
+  complete: boolean;
+  holes: number;
+  syncedAt: string | null;
+  uwCallsToday: number;
+  /** false = per-instance memory only (no Redis). */
+  durable: boolean;
+  scope: "session" | "window";
 };
 
 export type ExitPlan = {

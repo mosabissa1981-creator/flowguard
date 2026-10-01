@@ -238,14 +238,14 @@ async function compute(): Promise<LotteryResponse> {
   const regime = await loadRegimeSafe(ranked.tide);
   const live = ranked.source !== "mock";
 
-  // Best contract per chain, eligible only.
+  // Earliest qualifying print per chain (full-session tape), eligible only.
   const byChain = new Map<string, { row: RankedFlow; score: number; reasons: string[] }>();
   for (const row of ranked.items) {
     if (!lotteryEligible(row)) continue;
     const { score, reasons } = baseScore(row);
     const k = contractKey(row);
     const cur = byChain.get(k);
-    if (!cur || score > cur.score) byChain.set(k, { row, score, reasons });
+    if (!cur || Date.parse(row.alert.created_at) < Date.parse(cur.row.alert.created_at)) byChain.set(k, { row, score, reasons });
   }
   const pre = [...byChain.values()].sort((a, b) => b.score - a.score);
 

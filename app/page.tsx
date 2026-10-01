@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 
 export default async function Home() {
   const [initialFlow, initialPicks, initialMorning, initialPremove] = await Promise.all([
-    loadRankedFlow(DEFAULT_FILTERS),
+    loadRankedFlow(DEFAULT_FILTERS, { scope: "window" }),
     loadDailyPicks(),
     loadMorningShortlist(),
     loadPremoveShortlist(),

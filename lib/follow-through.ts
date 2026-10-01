@@ -1,6 +1,7 @@
 import type { FlowAlert } from "@/lib/types";
 import { askShare, toNumber } from "@/lib/numbers";
 import { hoursSinceCreated, printAgeBand } from "@/lib/session";
+import { alertMs, alertNums } from "@/lib/alert-time";
 
 /** Hours after a print before missing confirmation counts as one-and-done. */
 export const FOLLOW_THROUGH_GRACE_HOURS = 2;
@@ -52,43 +53,53 @@ function signal(
   };
 }
 
-function laterPeers(alert: FlowAlert, peers: FlowAlert[]): FlowAlert[] {
-  const alertTs = new Date(alert.created_at).getTime();
-  if (!Number.isFinite(alertTs)) return [];
-  return peers.filter((peer) => {
-    if (peer.id === alert.id) return false;
-    const ts = new Date(peer.created_at).getTime();
-    return Number.isFinite(ts) && ts > alertTs;
-  });
-}
-
-/** Confirming ask-side flow after the print, from the shared session tape. No UW. */
+/** Confirming ask-side flow after the print, from the shared session tape. No UW. Single pass, no allocation. */
 export function followThroughFromPeers(
   alert: FlowAlert,
   peers: FlowAlert[],
   now = new Date(),
 ): FollowThroughSignal {
   const hours = hoursSinceCreated(alert.created_at, now);
-  const later = laterPeers(alert, peers);
+  const alertTs = alertMs(alert);
   const alertPx = toNumber(alert.price);
+  let laterAskCount = 0;
+  let chainHits = 0;
+  let laterUp: FlowAlert | null = null;
+  if (Number.isFinite(alertTs)) {
+    for (const peer of peers) {
+      if (peer.id === alert.id) continue;
+      const ts = alertMs(peer);
+      if (!(Number.isFinite(ts) && ts > alertTs)) continue;
+      const sameChain = Boolean(alert.option_chain) && peer.option_chain === alert.option_chain;
+      const sameSide = peer.ticker === alert.ticker && peer.type === alert.type;
+      if (sameChain || sameSide) {
+        const n = alertNums(peer, askShare, toNumber);
+        if (n.askShare >= 0.55 && n.premium >= 10_000) {
+          laterAskCount += 1;
+          if (peer.option_chain === alert.option_chain) chainHits += 1;
+        }
+      }
+      if (!laterUp && sameChain) {
+        const px = alertNums(peer, askShare, toNumber).price;
+        if (alertPx > 0 && px > 0 && px >= alertPx * (1 + FOLLOW_THROUGH_UP_PCT)) laterUp = peer;
+      }
+    }
+  }
 
-  const laterAsk = later.filter((peer) => {
-    const sameChain = Boolean(alert.option_chain) && peer.option_chain === alert.option_chain;
-    const sameSide = peer.ticker === alert.ticker && peer.type === alert.type;
-    if (!sameChain && !sameSide) return false;
-    return askShare(peer) >= 0.55 && toNumber(peer.total_premium) >= 10_000;
-  });
+  return followThroughFromCounts(alert, laterAskCount, chainHits, laterUp ? toNumber(laterUp.price) : null, hours);
+}
 
-  const laterUp = later.find((peer) => {
-    if (!alert.option_chain || peer.option_chain !== alert.option_chain) return false;
-    const px = toNumber(peer.price);
-    return alertPx > 0 && px > 0 && px >= alertPx * (1 + FOLLOW_THROUGH_UP_PCT);
-  });
-
-  if (laterAsk.length > 0 || laterUp) {
-    const chainHits = laterAsk.filter((peer) => peer.option_chain === alert.option_chain).length;
-    const detail = laterUp
-      ? `Later print on ${alert.option_chain} at $${toNumber(laterUp.price).toFixed(2)} is up vs the alert.`
+/** Shared tail of follow-through (also used by the precomputed full-session peer index in lib/peer-index). */
+export function followThroughFromCounts(
+  alert: FlowAlert,
+  laterAskCount: number,
+  chainHits: number,
+  laterUpPrice: number | null,
+  hours: number,
+): FollowThroughSignal {
+  if (laterAskCount > 0 || laterUpPrice != null) {
+    const detail = laterUpPrice != null
+      ? `Later print on ${alert.option_chain} at $${laterUpPrice.toFixed(2)} is up vs the alert.`
       : chainHits > 0
         ? `${chainHits} later ask-side hit${chainHits === 1 ? "" : "s"} on ${alert.option_chain}.`
         : `Later ask-side ${alert.type} flow on ${alert.ticker} after the print.`;
