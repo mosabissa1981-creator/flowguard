@@ -367,7 +367,8 @@ export async function gatherCandidates(): Promise<{
     source: picks.source,
     fetchedAt: picks.fetchedAt,
     quotaBlocked: picks.quotaBlocked,
-    warning: picks.warning ?? morning.warning,
+    // The morning-window note ("No setups in the 9:30–10:00 ET window") is only the headline when nothing is reviewable.
+    warning: picks.warning ?? (kept.length || premoveCands.length ? undefined : morning.warning),
   };
 }
 
