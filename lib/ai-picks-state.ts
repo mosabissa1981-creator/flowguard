@@ -20,6 +20,8 @@ export type AiPicksState = {
   valueKey: string;
   valueAt: number;
   lastError?: string;
+  /** AI-review LLM spend (USD) accumulated for `day`; capped by AI_PICKS_DAILY_USD (default $1). */
+  spendUsd?: number;
 };
 
 const BLOB_PATH = "flowguard/ai-picks-state.json";

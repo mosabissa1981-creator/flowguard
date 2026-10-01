@@ -12,9 +12,12 @@ import { askShare, toNumber } from "@/lib/numbers";
 import { tradingDateET } from "@/lib/session";
 import { loadAiPicksState, saveAiPicksState, type AiPicksState } from "@/lib/ai-picks-state";
 import { clamp } from "@/lib/numbers";
-import type { AiPick, AiPicksResponse, AiSkip, DailyPick, RegimeSnapshot } from "@/lib/types";
+import { estimateCost } from "@/lib/shadow/llm";
+import type { AiPick, AiPicksResponse, AiPremoveReview, AiSkip, DailyPick, RegimeSnapshot } from "@/lib/types";
 
 const MAX_CANDIDATES = 8;
+/** Premove ("Before the move") lane candidates sent to the same LLM call for a separate review. */
+const MAX_PREMOVE_CANDIDATES = 6;
 /** Reasoning models (e.g. grok-4.x) need ~20–40s on this prompt; route maxDuration is 60s. */
 const LLM_TIMEOUT_MS = Math.min(55_000, Math.max(5_000, Number(process.env.LLM_TIMEOUT_MS) || 50_000));
 const CACHE_MS = 12 * 60_000;
@@ -22,15 +25,21 @@ const CACHE_MS = 12 * 60_000;
 const LLM_MIN_INTERVAL_MS = 30 * 60_000;
 /** After a failed LLM call, wait this long before trying again. */
 const LLM_ERROR_BACKOFF_MS = 10 * 60_000;
+/** Hard daily $ cap for the AI-picks LLM (main + premove share one call). Admin reruns respect it too. */
+function dailyBudgetUsd(): number {
+  const v = Number(process.env.AI_PICKS_DAILY_USD);
+  return Number.isFinite(v) && v > 0 ? v : 1;
+}
 const DISCLAIMER =
   "Options-flow screen, not financial advice. AI picks rank unusual flow; they do not predict prices.";
 
 type Candidate = DailyPick & { lanes: string[] };
 
-type LlmDecision = {
+type LlmList = {
   picks: { contract: string; confidence: number; reason: string }[];
   skips: { contract: string; reason: string }[];
 };
+type LlmDecision = LlmList & { premove: LlmList | null };
 
 let cache: { key: string; at: number; value: AiPicksResponse } | null = null;
 let inflight: { key: string; promise: Promise<AiPicksResponse> } | null = null;
@@ -91,7 +100,14 @@ function candidateFacts(c: Candidate) {
   };
 }
 
-function buildPrompt(cands: Candidate[], regime: RegimeSnapshot | null, maxPicks: number, brief?: string | null) {
+function buildPrompt(
+  cands: Candidate[],
+  premoveCands: Candidate[],
+  regime: RegimeSnapshot | null,
+  maxPicks: number,
+  maxPremovePicks: number,
+  brief?: string | null,
+) {
   const study = loadStudySummary(15);
   const system = [
     "You are the risk-aware desk reviewer for FlowGuard, an unusual-options-flow screener.",
@@ -104,7 +120,12 @@ function buildPrompt(cands: Candidate[], regime: RegimeSnapshot | null, maxPicks
     "homebuilders, IWM small caps, KRE regional banks, TLT) when the long end rises, Treasury auction afternoons,",
     "and score ties at 100 (not an edge). Expiries spanning CPI/PPI/NFP/FOMC carry elevated IV — mention it.",
     "Every candidate you do not pick must appear in skips with a short concrete reason.",
-    'Respond with JSON only: {"picks":[{"contract":"...","confidence":0-100,"reason":"<=200 chars"}],"skips":[{"contract":"...","reason":"<=160 chars"}]}',
+    "SEPARATELY review premoveCandidates (the 'Before the move' lane: ask-side premium building on a still-quiet",
+    "underlying, before the stock moves). Pick between 0 and " + maxPremovePicks + " of them (exact contract ids from",
+    "premoveCandidates only) with the same issuer/sector discipline and regime rules; on risky/report days be stricter",
+    "(the move may simply be the print). Judge whether the building looks like real positioning vs. noise, hedges, or",
+    "late-session prints. Every premove candidate you do not take goes in premove.skips with a reason.",
+    'Respond with JSON only: {"picks":[{"contract":"...","confidence":0-100,"reason":"<=200 chars"}],"skips":[{"contract":"...","reason":"<=160 chars"}],"premove":{"picks":[{"contract":"...","confidence":0-100,"reason":"<=200 chars"}],"skips":[{"contract":"...","reason":"<=160 chars"}]}}',
   ].join(" ");
   const user = {
     regime: regime
@@ -139,11 +160,13 @@ function buildPrompt(cands: Candidate[], regime: RegimeSnapshot | null, maxPicks
       ),
     },
     candidates: cands.map(candidateFacts),
+    maxPremovePicks,
+    premoveCandidates: premoveCands.map(candidateFacts),
   };
   return { system, user: JSON.stringify(user) };
 }
 
-type LlmUsage = { promptTokens?: number; completionTokens?: number; totalTokens?: number };
+type LlmUsage = { promptTokens?: number; completionTokens?: number; totalTokens?: number; cachedTokens?: number; costUsd?: number };
 
 async function callLlm(
   system: string,
@@ -183,6 +206,7 @@ async function callLlm(
             promptTokens: json.usage.input_tokens,
             completionTokens: json.usage.output_tokens,
             totalTokens: (json.usage.input_tokens ?? 0) + (json.usage.output_tokens ?? 0),
+            costUsd: estimateCost(cfg.model, json.usage.input_tokens ?? 0, 0, json.usage.output_tokens ?? 0, 0, 0),
           }
         : undefined;
       return { text: (json.content ?? []).map((c) => c.text ?? "").join(""), provider: cfg.provider, model: cfg.model, usage };
@@ -208,13 +232,33 @@ async function callLlm(
     if (!response.ok) throw new Error(`${cfg.provider} ${response.status}: ${body.slice(0, 200)}`);
     const json = JSON.parse(body) as {
       choices?: { message?: { content?: string } }[];
-      usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
+      usage?: {
+        prompt_tokens?: number;
+        completion_tokens?: number;
+        total_tokens?: number;
+        prompt_tokens_details?: { cached_tokens?: number };
+        cost_in_usd_ticks?: number;
+      };
     };
-    const usage = json.usage
+    const u = json.usage;
+    const usage = u
       ? {
-          promptTokens: json.usage.prompt_tokens,
-          completionTokens: json.usage.completion_tokens,
-          totalTokens: json.usage.total_tokens,
+          promptTokens: u.prompt_tokens,
+          completionTokens: u.completion_tokens,
+          totalTokens: u.total_tokens,
+          cachedTokens: u.prompt_tokens_details?.cached_tokens,
+          // xAI reports exact cost in 1e-10 USD ticks; otherwise estimate from list prices (completion includes reasoning).
+          costUsd:
+            typeof u.cost_in_usd_ticks === "number" && u.cost_in_usd_ticks > 0
+              ? u.cost_in_usd_ticks / 1e10
+              : estimateCost(
+                  cfg.model,
+                  u.prompt_tokens ?? 0,
+                  u.prompt_tokens_details?.cached_tokens ?? 0,
+                  u.completion_tokens ?? 0,
+                  0,
+                  0,
+                ),
         }
       : undefined;
     return { text: json.choices?.[0]?.message?.content ?? "", provider: cfg.provider, model: cfg.model, usage };
@@ -228,19 +272,23 @@ function parseDecision(text: string): LlmDecision | null {
   const end = text.lastIndexOf("}");
   if (start < 0 || end <= start) return null;
   try {
-    const raw = JSON.parse(text.slice(start, end + 1)) as Partial<LlmDecision>;
+    const raw = JSON.parse(text.slice(start, end + 1)) as Partial<LlmList> & { premove?: Partial<LlmList> };
     if (!Array.isArray(raw.picks)) return null;
-    return {
-      picks: raw.picks
+    const list = (r: Partial<LlmList>): LlmList => ({
+      picks: (Array.isArray(r.picks) ? r.picks : [])
         .filter((p) => p && typeof p.contract === "string")
         .map((p) => ({
           contract: String(p.contract).trim(),
           confidence: clamp(Number(p.confidence) || 0, 0, 100),
           reason: String(p.reason ?? "").slice(0, 280),
         })),
-      skips: (Array.isArray(raw.skips) ? raw.skips : [])
+      skips: (Array.isArray(r.skips) ? r.skips : [])
         .filter((s) => s && typeof s.contract === "string")
         .map((s) => ({ contract: String(s.contract).trim(), reason: String(s.reason ?? "").slice(0, 240) })),
+    });
+    return {
+      ...list(raw),
+      premove: raw.premove && typeof raw.premove === "object" ? list(raw.premove) : null,
     };
   } catch {
     return null;
@@ -269,6 +317,9 @@ function shortReason(c: Candidate): string {
 
 export async function gatherCandidates(): Promise<{
   cands: Candidate[];
+  /** Premove-lane candidates for the separate premove review (may overlap `cands`). */
+  premoveCands?: Candidate[];
+  premoveWarning?: string;
   source: AiPicksResponse["source"];
   fetchedAt: string;
   quotaBlocked?: boolean;
@@ -303,8 +354,15 @@ export async function gatherCandidates(): Promise<{
     return compareActionable(a, b);
   });
   const { kept } = applyConcentrationCaps(sorted, MAX_CANDIDATES);
+  const premoveRows = (premove.source === "mock" ? [] : premove.picks).map((row): Candidate => {
+    const k = contractKey(row);
+    return { ...row, lanes: byKey.get(k)?.lanes ?? ["premove"] };
+  });
+  const premoveCands = applyConcentrationCaps([...premoveRows].sort(compareActionable), MAX_PREMOVE_CANDIDATES).kept;
   return {
     cands: kept,
+    premoveCands,
+    premoveWarning: premove.warning,
     source: picks.source,
     fetchedAt: picks.fetchedAt,
     quotaBlocked: picks.quotaBlocked,
@@ -334,13 +392,18 @@ export async function reviewCandidates(
   opts: { force?: boolean; persist?: boolean; brief?: string | null } = {},
 ): Promise<AiPicksResponse> {
   const { cands, source, fetchedAt, quotaBlocked, warning } = gathered;
+  const premoveCands = gathered.premoveCands ?? [];
   const persistState = opts.persist !== false;
   const risky = Boolean(regime?.rules.active);
   const maxPicks = risky ? 3 : 5;
+  // Premove is a speculative lane: tighter list (2 on risky/report days, 3 calm).
+  const maxPremovePicks = risky ? 2 : 3;
   const caps = regimeCaps(regime);
   const day = tradingDateET();
   // Fingerprint ignores fetchedAt: a tape refresh with the same candidates must not re-bill the LLM.
-  const key = `${day}|${regime?.label ?? "na"}|${cands.map((c) => contractKey(c)).sort().join(",")}`;
+  const key =
+    `${day}|${regime?.label ?? "na"}|${cands.map((c) => contractKey(c)).sort().join(",")}` +
+    `|pm:${premoveCands.map((c) => contractKey(c)).sort().join(",")}`;
   if (!opts.force && persistState && cache && cache.key === key && Date.now() - cache.at < CACHE_MS) return cache.value;
 
   const base = {
@@ -361,6 +424,33 @@ export async function reviewCandidates(
     exitPlan: buildExitPlan(c, { riskyRegime: risky, confidence, ivEvents: regime?.ivEvents }),
   });
 
+  const premoveBase = { candidatesConsidered: premoveCands.length, maxPicks: maxPremovePicks };
+
+  /** Deterministic premove section: regime list cap + issuer/sector caps on the lane's own ranking. */
+  const premoveFallback = (): AiPremoveReview => {
+    if (premoveCands.length === 0) {
+      return { ...premoveBase, picks: [], skips: [], warning: gathered.premoveWarning ?? "No premove candidates right now." };
+    }
+    const { kept, dropped } = applyConcentrationCaps(premoveCands, maxPremovePicks, caps);
+    const keptKeys = new Set(kept.map((c) => contractKey(c)));
+    return {
+      ...premoveBase,
+      picks: kept.map((c) => toPick(c, deterministicConfidence(c, risky), shortReason(c))),
+      skips: premoveCands
+        .filter((c) => !keptKeys.has(contractKey(c)))
+        .map((c) => {
+          const d = dropped.find((x) => x.option_chain === contractKey(c));
+          return {
+            option_chain: contractKey(c),
+            ticker: c.alert.ticker,
+            reason: d
+              ? `Skip: ${d.reason}.`
+              : `Skip: outside top ${maxPremovePicks} premove on a ${regime?.label ?? "unknown"} day (score ${c.score}).`,
+          };
+        }),
+    };
+  };
+
   const locked = lockoutWarning(regime);
   if (locked) {
     // No LLM call and no picks inside a pre-release window.
@@ -370,17 +460,24 @@ export async function reviewCandidates(
       llmStatus: "skipped",
       picks: [],
       skips: cands.map((c) => ({ option_chain: contractKey(c), ticker: c.alert.ticker, reason: locked })),
+      premove: {
+        ...premoveBase,
+        picks: [],
+        skips: premoveCands.map((c) => ({ option_chain: contractKey(c), ticker: c.alert.ticker, reason: locked })),
+        warning: locked,
+      },
       warning: locked,
     };
   }
 
-  if (cands.length === 0) {
+  if (cands.length === 0 && premoveCands.length === 0) {
     const value: AiPicksResponse = {
       ...base,
       engine: "deterministic",
       llmStatus: "skipped",
       picks: [],
       skips: [],
+      premove: premoveFallback(),
       warning: warning ?? "No actionable candidates on the tape right now.",
     };
     cache = { key, at: Date.now(), value };
@@ -407,6 +504,7 @@ export async function reviewCandidates(
       llmError,
       picks: kept.map((c) => toPick(c, deterministicConfidence(c, risky), shortReason(c))),
       skips,
+      premove: premoveFallback(),
       warning,
     };
   };
@@ -422,10 +520,23 @@ export async function reviewCandidates(
   const now = Date.now();
   const state: AiPicksState | null = persistState ? await loadAiPicksState() : null;
   const sameDay = state?.day === day;
+  const spentToday = sameDay ? (state?.spendUsd ?? 0) : 0;
+  const budget = dailyBudgetUsd();
+  const spendInfo = { llmSpendTodayUsd: Math.round(spentToday * 10000) / 10000, llmBudgetUsd: budget };
+  if (persistState && spentToday >= budget) {
+    // Hard $ cap: no more LLM calls today (admin reruns included). Serve the last AI answer if any.
+    const msg = `Daily AI review budget reached ($${spentToday.toFixed(2)} of $${budget.toFixed(2)}).`;
+    const value: AiPicksResponse =
+      state?.value && sameDay
+        ? { ...state.value, ...spendInfo, llmCachedAt: new Date(state.valueAt).toISOString(), candidatesChanged: state.valueKey !== key }
+        : { ...fallback("throttled", msg), ...spendInfo, llmProvider: cfg.provider, llmModel: cfg.model };
+    cache = { key, at: now, value };
+    return value;
+  }
   if (!opts.force && persistState && sameDay && state) {
     if (state.value && state.valueKey === key) {
       // Same candidates as the last LLM answer today: never re-bill.
-      const value = { ...state.value, llmCachedAt: new Date(state.valueAt).toISOString() };
+      const value = { ...state.value, ...spendInfo, llmCachedAt: new Date(state.valueAt).toISOString() };
       cache = { key, at: now, value };
       return value;
     }
@@ -437,6 +548,7 @@ export async function reviewCandidates(
         // Candidates changed but the model ran recently: serve the last AI answer, flagged.
         const value: AiPicksResponse = {
           ...state.value,
+          ...spendInfo,
           llmCachedAt: new Date(state.valueAt).toISOString(),
           nextLlmAt,
           candidatesChanged: true,
@@ -444,23 +556,26 @@ export async function reviewCandidates(
         cache = { key, at: now, value };
         return value;
       }
-      const value = { ...fallback("throttled", state.lastError), llmProvider: cfg.provider, llmModel: cfg.model, nextLlmAt };
+      const value = { ...fallback("throttled", state.lastError), ...spendInfo, llmProvider: cfg.provider, llmModel: cfg.model, nextLlmAt };
       cache = { key, at: now, value };
       return value;
     }
   }
   // Claim the slot before calling so concurrent instances back off.
   const base0: AiPicksState = sameDay && state
-    ? { ...state, candKey: key, attemptAt: now }
-    : { day, candKey: key, attemptAt: now, value: null, valueKey: "", valueAt: 0 };
+    ? { ...state, candKey: key, attemptAt: now, spendUsd: spentToday }
+    : { day, candKey: key, attemptAt: now, value: null, valueKey: "", valueAt: 0, spendUsd: 0 };
   if (persistState) await saveAiPicksState(base0);
 
   try {
-    const { system, user } = buildPrompt(cands, regime, maxPicks, opts.brief);
+    const { system, user } = buildPrompt(cands, premoveCands, regime, maxPicks, maxPremovePicks, opts.brief);
     const { text, provider, model, usage } = await callLlm(system, user);
+    // Count the spend whether or not the output parses.
+    base0.spendUsd = Math.round((spentToday + (usage?.costUsd ?? 0)) * 10000) / 10000;
+    const spendAfter = { llmSpendTodayUsd: base0.spendUsd, llmBudgetUsd: budget };
     const decision = parseDecision(text);
     if (!decision) {
-      const value = { ...fallback("invalid-output", "LLM returned non-JSON output"), llmProvider: provider, llmModel: model, llmUsage: usage };
+      const value = { ...fallback("invalid-output", "LLM returned non-JSON output"), ...spendAfter, llmProvider: provider, llmModel: model, llmUsage: usage };
       cache = { key, at: Date.now(), value };
       if (persistState) await saveAiPicksState({ ...base0, lastError: "invalid-output" });
       return value;
@@ -488,6 +603,40 @@ export async function reviewCandidates(
         reason: skipReasons.get(contractKey(c)) || "Skipped by AI review (no reason returned).",
       }));
     for (const p of picks) delete (p as { _p?: unknown })._p;
+
+    // Premove section: same guardrails (regime list cap + issuer/sector caps) on the model's premove choices.
+    let premove: AiPremoveReview;
+    if (premoveCands.length === 0) {
+      premove = premoveFallback();
+    } else if (!decision.premove) {
+      premove = { ...premoveFallback(), warning: "AI returned no premove section; showing the rules ranking." };
+    } else {
+      const pmByKey = new Map(premoveCands.map((c) => [contractKey(c), c]));
+      const pmChosen = decision.premove.picks
+        .filter((p) => pmByKey.has(p.contract))
+        .sort((a, b) => b.confidence - a.confidence)
+        .map((p) => ({ ...pmByKey.get(p.contract)!, _p: p }));
+      const pm = applyConcentrationCaps(pmChosen, maxPremovePicks, caps);
+      const pmPicks = pm.kept.map((c) => {
+        const { _p, ...cand } = c;
+        return toPick(cand, Math.round(_p.confidence), _p.reason || shortReason(cand));
+      });
+      const pmKeys = new Set(pmPicks.map((p) => contractKey(p)));
+      const pmReasons = new Map(decision.premove.skips.map((s) => [s.contract, s.reason]));
+      for (const d of pm.dropped) pmReasons.set(d.option_chain, `Guardrail: ${d.reason}.`);
+      premove = {
+        ...premoveBase,
+        picks: pmPicks,
+        skips: premoveCands
+          .filter((c) => !pmKeys.has(contractKey(c)))
+          .map((c) => ({
+            option_chain: contractKey(c),
+            ticker: c.alert.ticker,
+            reason: pmReasons.get(contractKey(c)) || "Skipped by AI review (no reason returned).",
+          })),
+      };
+    }
+
     const value: AiPicksResponse = {
       ...base,
       engine: "llm",
@@ -495,8 +644,10 @@ export async function reviewCandidates(
       llmProvider: provider,
       llmModel: model,
       llmUsage: usage,
+      ...spendAfter,
       picks,
       skips,
+      premove,
       warning,
     };
     cache = { key, at: Date.now(), value };
@@ -507,7 +658,7 @@ export async function reviewCandidates(
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
     // Error backoff is enforced by the shared state (LLM_ERROR_BACKOFF_MS); short local cache only.
-    const value = { ...fallback("error", msg.slice(0, 200)), llmProvider: cfg.provider, llmModel: cfg.model };
+    const value = { ...fallback("error", msg.slice(0, 200)), ...spendInfo, llmProvider: cfg.provider, llmModel: cfg.model };
     cache = { key, at: Date.now() - CACHE_MS + 2 * 60_000, value };
     if (persistState) await saveAiPicksState({ ...base0, lastError: msg.slice(0, 200) });
     return value;

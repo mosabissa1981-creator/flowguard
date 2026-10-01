@@ -340,6 +340,14 @@ export type AiSkip = {
   reason: string;
 };
 
+export type AiPremoveReview = {
+  picks: AiPick[];
+  skips: AiSkip[];
+  candidatesConsidered: number;
+  maxPicks: number;
+  warning?: string;
+};
+
 export type StudySummaryBrief = {
   since: string;
   through: string | null;
@@ -359,7 +367,10 @@ export type AiPicksResponse = {
   llmModel?: string;
   llmError?: string;
   /** Token usage reported by the provider for the call that produced this answer. */
-  llmUsage?: { promptTokens?: number; completionTokens?: number; totalTokens?: number };
+  llmUsage?: { promptTokens?: number; completionTokens?: number; totalTokens?: number; cachedTokens?: number; costUsd?: number };
+  /** AI-review LLM spend so far today (USD) and the daily cap (AI_PICKS_DAILY_USD, default $1). */
+  llmSpendTodayUsd?: number;
+  llmBudgetUsd?: number;
   /** Set when the response is a stored LLM answer (cost guard) rather than a fresh call. */
   llmCachedAt?: string;
   /** Earliest time the cost guard allows the next LLM call. */
@@ -370,6 +381,8 @@ export type AiPicksResponse = {
   picks: AiPick[];
   skips: AiSkip[];
   candidatesConsidered: number;
+  /** Separate review of the Premove ("Before the move") lane, produced by the same LLM call. */
+  premove?: AiPremoveReview;
   study: StudySummaryBrief | null;
   warning?: string;
   quotaBlocked?: boolean;
