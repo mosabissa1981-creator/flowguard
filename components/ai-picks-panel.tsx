@@ -51,7 +51,9 @@ export function AiPicksPanel({ onSelect }: { onSelect: (id: string) => void }) {
         ? "Rules fallback · LLM_API_KEY not set"
         : data?.llmStatus === "error" || data?.llmStatus === "invalid-output"
           ? "Rules fallback · LLM unavailable"
-          : "Rules";
+          : data?.llmStatus === "throttled"
+            ? "Rules · AI review queued"
+            : "Rules";
 
   return (
     <section className="rounded-xl border border-violet-400/25 bg-gradient-to-b from-violet-950/30 to-card/80 p-4">
@@ -83,6 +85,15 @@ export function AiPicksPanel({ onSelect }: { onSelect: (id: string) => void }) {
 
       {error && !data ? <p className="text-sm text-rose-300">AI picks unavailable ({error}).</p> : null}
       {loading && !data ? <p className="text-sm text-muted-foreground">Reviewing candidates…</p> : null}
+      {data?.llmCachedAt ? (
+        <p className="mb-2 text-xs text-muted-foreground">
+          AI review from{" "}
+          {new Date(data.llmCachedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
+          {data.candidatesChanged && data.nextLlmAt
+            ? ` · candidates changed, next review after ${new Date(data.nextLlmAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`
+            : ""}
+        </p>
+      ) : null}
       {data && picks.length === 0 ? (
         <p className="text-sm text-muted-foreground">{data.warning ?? "No picks right now."}</p>
       ) : null}
