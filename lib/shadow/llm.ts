@@ -1,5 +1,8 @@
 import "server-only";
 
+import { ledgerAdd, llmPersistenceGate } from "@/lib/llm-ledger";
+import { tradingDateET } from "@/lib/session";
+
 import type { LlmUsageRecord } from "@/lib/shadow/types";
 
 /**
@@ -91,7 +94,20 @@ type ResponsesBody = {
  * One JSON-only call. `search` adds xAI server-side web + X search (needs an xAI key).
  * `maxTurns` caps the agentic search loop (cost control).
  */
-export async function callShadowLlm(opts: {
+/**
+ * Gated entry point for every shadow-module LLM call: refuses when persistence is down (global $ cap
+ * cannot be enforced) and records the spend in the global ledger.
+ */
+export async function callShadowLlm(opts: Parameters<typeof callShadowLlmRaw>[0]): Promise<LlmResult> {
+  const day = tradingDateET();
+  const gate = llmPersistenceGate("shadow", day);
+  if (!gate.ok) throw new Error(gate.reason);
+  const res = await callShadowLlmRaw(opts);
+  await ledgerAdd("shadow", day, res.usage.costUsd).catch(() => 0);
+  return res;
+}
+
+async function callShadowLlmRaw(opts: {
   module: string;
   system: string;
   user: string;

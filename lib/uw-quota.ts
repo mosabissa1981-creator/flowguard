@@ -1,14 +1,18 @@
 import "server-only";
 
-import { list, put } from "@vercel/blob";
+import { kvGet, kvSet } from "@/lib/kv";
 
 import type { FlowAlert, TideSnapshot } from "@/lib/types";
 
 import { TAPE_CACHE_MS } from "@/lib/refresh";
 
-const CIRCUIT_PREFIX = "flowguard/uw-circuit-";
-const TAPE_PREFIX = "flowguard/uw-tape-";
+const CIRCUIT_KEY = "flowguard/uw-circuit.json";
+const TAPE_KEY = "flowguard/uw-tape.json";
 const MORNING_PREFIX = "flowguard/morning-";
+/** Shared tape is written at most every 5 min and re-read from the store at most every 2 min per instance. */
+const TAPE_WRITE_GAP_MS = 5 * 60_000;
+const TAPE_READ_GAP_MS = 2 * 60_000;
+const CIRCUIT_READ_GAP_MS = 60_000;
 
 export const FLOW_TTL_MS = TAPE_CACHE_MS;
 export const TIDE_TTL_MS = TAPE_CACHE_MS;
@@ -74,10 +78,6 @@ let circuitCheckedAt = 0;
 let memTape: CachedTape | null = null;
 let lastTapeWrite = 0;
 
-function blobToken(): string {
-  return process.env.BLOB_READ_WRITE_TOKEN?.trim() ?? "";
-}
-
 export async function cachedCall<T>(
   key: string,
   ttlMs: number,
@@ -104,39 +104,6 @@ export async function cachedCall<T>(
   return run;
 }
 
-async function readLatestJson<T>(prefix: string): Promise<T | null> {
-  const token = blobToken();
-  if (!token) return null;
-  try {
-    const { blobs } = await list({ prefix, limit: 3 });
-    if (blobs.length === 0) return null;
-    const latest = [...blobs].sort(
-      (a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime(),
-    )[0];
-    const response = await fetch(latest.url, {
-      headers: { Authorization: `Bearer ${token}` },
-      cache: "no-store",
-    });
-    if (!response.ok) return null;
-    return (await response.json()) as T;
-  } catch {
-    return null;
-  }
-}
-
-async function writeJson(prefix: string, payload: unknown): Promise<void> {
-  const token = blobToken();
-  if (!token) return;
-  const path = `${prefix}${Date.now()}.json`;
-  await put(path, JSON.stringify(payload), {
-    access: "private",
-    contentType: "application/json",
-    addRandomSuffix: false,
-    allowOverwrite: true,
-    cacheControlMaxAge: 0,
-  });
-}
-
 export async function getCircuit(): Promise<Circuit | null> {
   const now = Date.now();
   if (memCircuit?.open && now < memCircuit.untilMs) return memCircuit;
@@ -144,11 +111,11 @@ export async function getCircuit(): Promise<Circuit | null> {
     memCircuit = { ...memCircuit, open: false };
     return null;
   }
-  if (now - circuitCheckedAt < 15_000 && memCircuit) {
-    return memCircuit.open && now < memCircuit.untilMs ? memCircuit : null;
+  if (now - circuitCheckedAt < CIRCUIT_READ_GAP_MS) {
+    return memCircuit?.open && now < memCircuit.untilMs ? memCircuit : null;
   }
   circuitCheckedAt = now;
-  const fromBlob = await readLatestJson<Circuit>(CIRCUIT_PREFIX);
+  const fromBlob = await kvGet<Circuit>(CIRCUIT_KEY, { maxAgeMs: CIRCUIT_READ_GAP_MS });
   if (fromBlob?.open && now < fromBlob.untilMs) {
     memCircuit = fromBlob;
     return fromBlob;
@@ -169,15 +136,15 @@ export async function tripUwQuota(detail: string, untilMs = quotaResetUtcMs()): 
     trippedAt: new Date().toISOString(),
   };
   circuitCheckedAt = Date.now();
-  void writeJson(CIRCUIT_PREFIX, memCircuit).catch(() => {});
+  void kvSet(CIRCUIT_KEY, memCircuit, { tier: "hot", ttlSec: Math.max(60, Math.round((untilMs - Date.now()) / 1000) + 3600) }).catch(() => {});
   return untilMs;
 }
 
 export function rememberTape(alerts: FlowAlert[], tide: TideSnapshot | null): CachedTape {
   memTape = { savedAt: new Date().toISOString(), alerts, tide };
-  if (Date.now() - lastTapeWrite > 60_000) {
+  if (Date.now() - lastTapeWrite > TAPE_WRITE_GAP_MS) {
     lastTapeWrite = Date.now();
-    void writeJson(TAPE_PREFIX, memTape).catch(() => {});
+    void kvSet(TAPE_KEY, memTape, { tier: "hot", ttlSec: 3 * 86400 }).catch(() => {});
   }
   return memTape;
 }
@@ -185,7 +152,7 @@ export function rememberTape(alerts: FlowAlert[], tide: TideSnapshot | null): Ca
 export async function getFreshTape(ttlMs = FLOW_TTL_MS): Promise<CachedTape | null> {
   const now = Date.now();
   if (memTape && now - Date.parse(memTape.savedAt) < ttlMs) return memTape;
-  const blob = await readLatestJson<CachedTape>(TAPE_PREFIX);
+  const blob = await kvGet<CachedTape>(TAPE_KEY, { maxAgeMs: TAPE_READ_GAP_MS });
   if (blob?.savedAt && now - Date.parse(blob.savedAt) < ttlMs && Array.isArray(blob.alerts)) {
     memTape = blob;
     return blob;
@@ -196,7 +163,7 @@ export async function getFreshTape(ttlMs = FLOW_TTL_MS): Promise<CachedTape | nu
 
 export async function loadLastGoodTape(): Promise<CachedTape | null> {
   if (memTape?.alerts?.length) return memTape;
-  const blob = await readLatestJson<CachedTape>(TAPE_PREFIX);
+  const blob = await kvGet<CachedTape>(TAPE_KEY, { maxAgeMs: TAPE_READ_GAP_MS });
   if (blob?.alerts?.length) {
     memTape = blob;
     return blob;
@@ -205,9 +172,9 @@ export async function loadLastGoodTape(): Promise<CachedTape | null> {
 }
 
 export async function loadMorningSnapshot<T>(date: string): Promise<T | null> {
-  return readLatestJson<T>(`${MORNING_PREFIX}${date}-`);
+  return kvGet<T>(`${MORNING_PREFIX}${date}.json`, { maxAgeMs: 5 * 60_000 });
 }
 
 export async function saveMorningSnapshot(date: string, payload: unknown): Promise<void> {
-  await writeJson(`${MORNING_PREFIX}${date}-`, payload).catch(() => {});
+  await kvSet(`${MORNING_PREFIX}${date}.json`, payload, { tier: "rare", ttlSec: 4 * 86400, minGapMs: 10 * 60_000 }).catch(() => false);
 }
