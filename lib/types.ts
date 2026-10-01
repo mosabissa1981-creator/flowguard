@@ -71,6 +71,8 @@ export type HoldWindow = {
 export type RankedFlow = {
   rank: number;
   score: number;
+  /** Unclamped score (can exceed 100). Breaks the 100-clamp ties on actionable lists. */
+  rawScore?: number;
   chips: ScoreChip[];
   fadeProne: boolean;
   stale: boolean;
@@ -112,6 +114,12 @@ export type DailyPick = RankedFlow & {
   fadeRisks: string[];
 };
 
+export type RegimeBrief = {
+  label: RegimeLabel;
+  reasons: string[];
+  rules: RegimeRules;
+};
+
 export type PicksResponse = {
   source: TapeSource;
   fetchedAt: string;
@@ -120,6 +128,10 @@ export type PicksResponse = {
   warning?: string;
   quotaBlocked?: boolean;
   authFailed?: boolean;
+  /** Macro regime applied when this list was built (absent if the regime feed failed). */
+  regime?: RegimeBrief | null;
+  /** Contracts removed by the issuer / sector concentration caps. */
+  capDrops?: { option_chain: string; ticker: string; reason: string }[];
 };
 
 export type MorningShortlistResponse = PicksResponse & {
@@ -211,4 +223,64 @@ export type WatchCheckResponse = {
   alerts: WatchAlert[];
   /** Armed ids deleted from the server store this check. */
   removedIds?: string[];
+};
+
+export type RegimeLabel = "calm" | "risky" | "report-day";
+
+export type EconEvent = {
+  title: string;
+  country: string;
+  /** ISO with offset, as published. */
+  date: string;
+  impact: "High" | "Medium" | "Low" | "Holiday" | string;
+  forecast: string;
+  previous: string;
+};
+
+export type YieldMove = {
+  symbol: "US10Y" | "US30Y";
+  /** Percent, e.g. 5.29 */
+  last: number | null;
+  prevClose: number | null;
+  /** Basis points vs prior close. */
+  changeBp: number | null;
+  asOf: string | null;
+  source: "yahoo" | "treasury" | "none";
+};
+
+export type RegimeRules = {
+  /** True on risky / report-day. */
+  active: boolean;
+  /** Max contracts per actionable list (morning / picks / premove). */
+  maxShortlist: number;
+  /** Contracts below this DTE are dropped from actionable lists. 0 = no floor. */
+  minDte: number;
+  /** Score delta for calls on long-duration tech when long yields are rising (≤ 0). */
+  rateTechPenalty: number;
+};
+
+export type RegimeSnapshot = {
+  label: RegimeLabel;
+  tradingDate: string;
+  fetchedAt: string;
+  reasons: string[];
+  rules: RegimeRules;
+  events: {
+    /** USD high-impact (and key medium) events on the trading date, ET. */
+    today: EconEvent[];
+    /** Next USD high-impact events after today (this week). */
+    upcoming: EconEvent[];
+  };
+  yields: {
+    us10y: YieldMove;
+    us30y: YieldMove;
+    rising: boolean;
+  };
+  tide: TideSnapshot | null;
+  sources: {
+    calendar: "forexfactory" | "uw" | "unavailable";
+    yields: "yahoo" | "treasury" | "unavailable";
+    tide: "uw-cache" | "uw" | "unavailable";
+  };
+  warnings: string[];
 };

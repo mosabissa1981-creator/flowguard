@@ -33,7 +33,7 @@ export function applyPremoveOverlay(
   },
 ): RankedFlow {
   const chips = [...row.chips];
-  let score = row.score;
+  let score = row.rawScore ?? row.score;
   const now = context.now ?? new Date();
   const askHits = tickerAskHits(row.alert, context.peers);
   const chainHits = askHits.filter((peer) => peer.option_chain === row.alert.option_chain);
@@ -190,6 +190,7 @@ export function applyPremoveOverlay(
   return {
     ...row,
     score: Math.round(clamp(score, 0, 100)),
+    rawScore: Math.round(score),
     chips,
     fadeProne,
     holdWindow:

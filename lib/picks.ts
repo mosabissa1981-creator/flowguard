@@ -1,8 +1,10 @@
 import { loadRankedFlow } from "@/lib/flow-service";
 import { PICKS_FILTERS } from "@/lib/filters";
 import { buildPickCopy } from "@/lib/thesis";
-import { loadPremoveContractKeys } from "@/lib/premove";
+import { loadPremoveContext } from "@/lib/premove";
 import { compareActionable, withActionableAdjustments } from "@/lib/scoring";
+import { applyConcentrationCaps } from "@/lib/issuers";
+import { loadRegimeSafe, regimeBrief, regimeCaps, regimeListCap, toActionableRegime } from "@/lib/regime";
 import type { PicksResponse } from "@/lib/types";
 
 export { PICKS_FILTERS };
@@ -10,15 +12,24 @@ export { PICKS_FILTERS };
 export const MAX_PICKS = 10;
 
 export async function loadDailyPicks(opts?: { forceFresh?: boolean }): Promise<PicksResponse> {
-  const [ranked, premoveKeys] = await Promise.all([
+  const [ranked, premove] = await Promise.all([
     loadRankedFlow(PICKS_FILTERS, opts),
-    loadPremoveContractKeys(opts),
+    loadPremoveContext(opts),
   ]);
+  const regime = await loadRegimeSafe(ranked.tide);
 
-  const adjusted = withActionableAdjustments(ranked.items, premoveKeys);
+  const adjusted = withActionableAdjustments(ranked.items, premove.keys, undefined, {
+    spots: premove.spots,
+    regime: toActionableRegime(regime),
+  });
   adjusted.sort(compareActionable);
 
-  const picks = adjusted.slice(0, MAX_PICKS).map((row, index) => {
+  const { kept, dropped } = applyConcentrationCaps(
+    adjusted,
+    regimeListCap(regime, MAX_PICKS),
+    regimeCaps(regime),
+  );
+  const picks = kept.map((row, index) => {
     const copy = buildPickCopy(row);
     return { ...row, rank: index + 1, ...copy };
   });
@@ -31,5 +42,7 @@ export async function loadDailyPicks(opts?: { forceFresh?: boolean }): Promise<P
     warning: ranked.warning,
     quotaBlocked: ranked.quotaBlocked,
     authFailed: ranked.authFailed,
+    regime: regimeBrief(regime),
+    capDrops: dropped,
   };
 }
