@@ -16,7 +16,7 @@ import { fetchFlowAlertsPage } from "@/lib/uw";
  *    paging down with older_than until it meets what it already has;
  *  - back-fills holes (cold start mid-session, long gaps) toward the open, a few pages per sync;
  *  - syncs at most every 3 min (1 min while back-filling), ≤ 24 UW pages per sync (back-fill in 5-min chunks,
- *    4 in parallel), one instance at a time (Redis NX lock); syncs run after the response (only a cold
+ *    2 in parallel), one instance at a time (Redis NX lock); syncs run after the response (only a cold
  *    instance with nothing held waits for 3 inline pages);
  *  - stores compact rows (tuples) in 10-minute buckets via lib/kv (Redis when configured, else per-instance memory;
  *    never Blob). Closed buckets are immutable, so each instance downloads them once.
@@ -34,7 +34,7 @@ const MAX_PAGES_PER_SYNC = 24;
 const COLD_INLINE_PAGES = 3;
 const BACKFILL_SYNC_MS = 60_000;
 const BACKFILL_CHUNK_MS = 5 * 60_000;
-const BACKFILL_CONCURRENCY = 4;
+const BACKFILL_CONCURRENCY = 2;
 const BUCKET_MS = 10 * 60_000;
 const META_MAX_AGE_MS = 30_000;
 const TTL_SEC = 2 * 86400;

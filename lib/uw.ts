@@ -80,6 +80,8 @@ function buildUrl(path: string, params?: Record<string, string | number | boolea
   return url;
 }
 
+const UW_TIMEOUT_MS = 15_000;
+
 async function uwRequest<T>(url: URL, ttlMs = 0, bust = false): Promise<T> {
   if (await isUwBlocked()) {
     throw new UwQuotaError(
@@ -110,6 +112,8 @@ async function uwRequest<T>(url: URL, ttlMs = 0, bust = false): Promise<T> {
           Accept: "application/json",
         },
         cache: "no-store",
+        // Never let one slow UW request hang a route (or the session back-fill) indefinitely.
+        signal: AbortSignal.timeout(UW_TIMEOUT_MS),
       });
       if (!response.ok) {
         const body = await response.text();
