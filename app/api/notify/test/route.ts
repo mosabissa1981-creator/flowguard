@@ -1,8 +1,11 @@
 import { notifyChannels, notifyConfigured } from "@/lib/notify";
+import { notifyAuth } from "@/lib/notify-auth";
 
 export const dynamic = "force-dynamic";
 
-export async function POST() {
+export async function POST(request: Request) {
+  const auth = notifyAuth(request);
+  if (!auth.ok) return Response.json({ error: auth.error }, { status: auth.status });
   const configured = notifyConfigured();
   if (!configured.pushover && !configured.telegram) {
     return Response.json(

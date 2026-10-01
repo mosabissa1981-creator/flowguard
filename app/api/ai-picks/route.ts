@@ -1,10 +1,11 @@
 import { timingSafeEqual } from "node:crypto";
-import { NextRequest } from "next/server";
+import { NextRequest, after } from "next/server";
 
 import { loadAiPicks } from "@/lib/ai-picks";
+import { triggerShadowQuietly } from "@/lib/shadow";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 function adminOk(provided: string | null): boolean {
   const secret = process.env.AI_PICKS_ADMIN_SECRET?.trim() ?? "";
@@ -25,6 +26,8 @@ export async function GET(request: NextRequest) {
   const rerun = params.get("rerun") === "1";
   const force = rerun && adminOk(params.get("key"));
   const payload = await loadAiPicks({ force });
+  // Shadow modules annotate the same finalists after the response is sent (never changes this payload).
+  after(triggerShadowQuietly);
   return Response.json(payload, {
     headers: { "Cache-Control": rerun ? "no-store" : "s-maxage=300, stale-while-revalidate=60" },
   });

@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-01T00:54:52.904Z",
+  "generatedAt": "2026-10-01T02:33:32.543Z",
   "since": "2026-09-24",
   "through": "2026-09-30",
   "days": 5,
@@ -523,5 +523,12 @@
       ],
       "quiet": false
     }
-  ]
+  ],
+  "shadowAccuracy": {
+    "days": [],
+    "joinedCandidates": 0,
+    "unmatchedCandidates": 0,
+    "definition": "Per module: outcome mix (winner/loser/flat per the book definition) of candidates the module flagged vs passed vs boosted. A useful flag has a lower win rate / higher loss rate than pass; a useful boost has a higher win rate.",
+    "modules": {}
+  }
 }

@@ -1,0 +1,8 @@
+{
+  "note": "Hand-maintained calendar type per study day for regime_analogs (fomc | report | normal). Only sourced/known days; shadow-*.json regime snapshots override this from Oct 1 on.",
+  "days": {
+    "2026-09-04": { "type": "report", "note": "NFP (August) — first Friday; assumed, verify" },
+    "2026-09-16": { "type": "fomc", "note": "FOMC +25bp hike (study/macro-week-2026-10-01.md)" },
+    "2026-09-30": { "type": "report", "note": "PCE (cool) — study/macro-week-2026-10-01.md" }
+  }
+}
