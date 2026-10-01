@@ -82,9 +82,22 @@ export function RegimeBanner() {
         </div>
         <div className="font-mono text-[11px] opacity-90">
           {fmtYield(regime.yields.us10y)} · {fmtYield(regime.yields.us30y)}
+          {regime.yields.trend5d?.us30yBp != null
+            ? ` · 5d 30Y ${regime.yields.trend5d.us30yBp >= 0 ? "+" : ""}${regime.yields.trend5d.us30yBp.toFixed(0)}bp`
+            : ""}
           {regime.tide ? ` · tide ${regime.tide.bias}` : ""}
         </div>
       </div>
+      {regime.lockout?.active && regime.lockout.until ? (
+        <div className="mt-2 rounded-md border border-rose-400/60 bg-rose-950/70 px-2 py-1 text-xs font-semibold text-rose-50">
+          Pre-release lockout ({regime.lockout.event}) — no new picks until {fmtEventTime(regime.lockout.until)} ET.
+        </div>
+      ) : null}
+      {regime.dayRating ? (
+        <div className="mt-1 text-xs">
+          <span className="font-semibold uppercase tracking-wide">Desk rating: {regime.dayRating.rating}</span>
+        </div>
+      ) : null}
       <ul className="mt-1 space-y-0.5 text-xs leading-relaxed opacity-90">
         {regime.reasons.map((reason) => (
           <li key={reason}>{reason}</li>
@@ -95,6 +108,9 @@ export function RegimeBanner() {
           Rules on: lists capped at {regime.rules.maxShortlist}, DTE under {regime.rules.minDte} dropped
           {regime.rules.rateTechPenalty < 0
             ? `, long-duration tech calls docked ${regime.rules.rateTechPenalty}`
+            : ""}
+          {regime.rules.rateSensitivePenalty < 0
+            ? `, rate-sensitive calls (XLU/REITs/homebuilders/IWM/KRE/TLT) docked ${regime.rules.rateSensitivePenalty}`
             : ""}
           . Max 2 per issuer (GOOG+GOOGL = one), 3 per sector.
         </p>

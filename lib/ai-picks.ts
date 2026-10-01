@@ -4,7 +4,7 @@ import { loadDailyPicks } from "@/lib/picks";
 import { loadMorningShortlist } from "@/lib/morning";
 import { loadPremoveShortlist } from "@/lib/premove";
 import { applyConcentrationCaps, issuerKey, sectorOf } from "@/lib/issuers";
-import { loadRegimeSafe, regimeBrief, regimeCaps } from "@/lib/regime";
+import { lockoutWarning, loadRegimeSafe, regimeBrief, regimeCaps } from "@/lib/regime";
 import { compareActionable, contractKey } from "@/lib/scoring";
 import { buildExitPlan } from "@/lib/exit-plan";
 import { loadStudySummary, studyBrief } from "@/lib/study-summary";
@@ -78,7 +78,9 @@ function buildPrompt(cands: Candidate[], regime: RegimeSnapshot | null, maxPicks
     "Rules: pick between 0 and " + maxPicks + " contracts ONLY from the candidate list (use the exact contract id).",
     "Never pick two contracts from the same issuer on a risky/report day; treat GOOG and GOOGL as one issuer.",
     "Prefer: morning ask-side prints, quiet underlying, 11–30 DTE, single-leg sweeps. Distrust: late prints,",
-    "same-issuer clusters, long-duration tech calls when long yields rise, score ties at 100 (not an edge).",
+    "same-issuer clusters, long-duration tech calls when long yields rise, rate-sensitive calls (utilities, REITs,",
+    "homebuilders, IWM small caps, KRE regional banks, TLT) when the long end rises, Treasury auction afternoons,",
+    "and score ties at 100 (not an edge). Expiries spanning CPI/PPI/NFP/FOMC carry elevated IV — mention it.",
     "Every candidate you do not pick must appear in skips with a short concrete reason.",
     'Respond with JSON only: {"picks":[{"contract":"...","confidence":0-100,"reason":"<=200 chars"}],"skips":[{"contract":"...","reason":"<=160 chars"}]}',
   ].join(" ");
@@ -93,6 +95,11 @@ function buildPrompt(cands: Candidate[], regime: RegimeSnapshot | null, maxPicks
           eventsToday: regime.events.today.filter((e) => e.impact === "High").map((e) => `${e.date} ${e.title}`),
           nextHighImpact: regime.events.upcoming.slice(0, 3).map((e) => `${e.date} ${e.title}`),
           rules: regime.rules,
+          yieldTrend5d: regime.yields.trend5d,
+          deskDayRating: regime.dayRating,
+          auctionToday: regime.auctionToday,
+          lockoutWindows: regime.lockout.windows,
+          ivEvents: regime.ivEvents,
         }
       : "unavailable",
     maxPicks,
@@ -280,8 +287,21 @@ async function compute(opts: { rerun?: boolean }): Promise<AiPicksResponse> {
     ...c,
     confidence,
     aiReason: reason,
-    exitPlan: buildExitPlan(c, { riskyRegime: risky, confidence }),
+    exitPlan: buildExitPlan(c, { riskyRegime: risky, confidence, ivEvents: regime?.ivEvents }),
   });
+
+  const locked = lockoutWarning(regime);
+  if (locked) {
+    // No LLM call and no picks inside a pre-release window.
+    return {
+      ...base,
+      engine: "deterministic",
+      llmStatus: "skipped",
+      picks: [],
+      skips: cands.map((c) => ({ option_chain: contractKey(c), ticker: c.alert.ticker, reason: locked })),
+      warning: locked,
+    };
+  }
 
   if (cands.length === 0) {
     const value: AiPicksResponse = {

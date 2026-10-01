@@ -51,14 +51,17 @@ const SECTORS: Record<string, string[]> = {
   "EV / Auto": ["TSLA", "RIVN", "LCID", "NIO", "XPEV", "LI", "F", "GM", "STLA", "TM"],
   "Crypto-linked": ["COIN", "MSTR", "MARA", "RIOT", "CLSK", "HUT", "IBIT", "BITO", "BMNR", "HOOD", "CRCL", "GBTC", "ETHA"],
   "China ADR": ["BABA", "JD", "PDD", "BIDU", "BEKE", "FXI", "KWEB", "TCEHY"],
-  Financials: ["JPM", "BAC", "C", "WFC", "GS", "MS", "SCHW", "XLF", "KRE", "SOFI", "PYPL", "SQ", "XYZ", "AFRM", "V", "MA", "AXP", "BRK"],
+  Financials: ["JPM", "BAC", "C", "WFC", "GS", "MS", "SCHW", "XLF", "SOFI", "PYPL", "SQ", "XYZ", "AFRM", "V", "MA", "AXP", "BRK"],
   Energy: ["XOM", "CVX", "OXY", "COP", "SLB", "HAL", "XLE", "USO", "YPF", "DVN", "EOG", "UNG"],
   "Health care": ["LLY", "NVO", "UNH", "PFE", "MRNA", "JNJ", "ABBV", "MRK", "XLV", "XBI", "HIMS", "CVS", "AMGN", "BMY"],
   Consumer: ["WMT", "TGT", "COST", "HD", "LOW", "NKE", "SBUX", "MCD", "DIS", "CMG", "LULU", "ROKU", "UBER", "LYFT", "ABNB", "DASH", "BKNG", "XLY"],
   Industrials: ["BA", "CAT", "DE", "GE", "RTX", "LMT", "MMM", "UPS", "FDX", "XLI", "TRMB"],
   "Rates / bonds": ["UST-LONG", "IEF", "SHY", "HYG", "LQD", "AGG"],
   "Index": ["NDX", "SPX", "RUT", "DIA", "VIX", "UVXY", "VXX"],
-  "Utilities": ["XLU", "NEE", "DUK", "SO", "VST", "CEG", "NRG", "OKLO", "SMR"],
+  "Utilities": ["XLU", "NEE", "DUK", "SO", "D", "AEP", "EXC", "XEL", "VST", "CEG", "NRG", "OKLO", "SMR"],
+  REITs: ["XLRE", "VNQ", "IYR", "O", "AMT", "PLD", "SPG", "CCI", "EQIX", "PSA", "DLR", "WELL", "VICI", "ARE"],
+  Homebuilders: ["XHB", "ITB", "DHI", "LEN", "PHM", "TOL", "NVR", "KBH", "BLDR", "TMHC", "MTH"],
+  "Regional banks": ["KRE", "ZION", "KEY", "CFG", "RF", "HBAN", "WAL", "FITB", "TFC", "MTB", "CMA", "FLG", "NYCB", "PNC", "USB"],
   Metals: ["GLD", "SLV", "GDX", "NEM", "FCX", "MP"],
 };
 
@@ -76,6 +79,18 @@ const LONG_DURATION_TECH = new Set<string>([
   "NVDA", "AMD", "AVGO", "SMCI", "ARM", "MRVL", "TSLA", "NDX", "COIN", "MSTR", "HOOD", "ROKU",
   "UBER", "ABNB", "DASH", "RIVN", "ARKK",
 ]);
+
+/**
+ * Rate-sensitive groups to size down when long-end yields rise (desk macro note Oct 2026):
+ * utilities, REITs, homebuilders, small caps (IWM — floating-rate debt), regional banks, long bonds.
+ */
+const RATE_SENSITIVE_SECTORS = new Set(["Utilities", "REITs", "Homebuilders", "Regional banks", "Rates / bonds"]);
+const RATE_SENSITIVE_ISSUERS = new Set(["RUT"]);
+
+export function isRateSensitive(ticker: string): boolean {
+  const issuer = issuerKey(ticker);
+  return RATE_SENSITIVE_ISSUERS.has(issuer) || RATE_SENSITIVE_SECTORS.has(sectorOf(ticker));
+}
 
 export function issuerKey(ticker: string): string {
   const t = (ticker || "").trim().toUpperCase();

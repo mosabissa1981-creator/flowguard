@@ -144,3 +144,17 @@ Next.js App Router, TypeScript, Tailwind CSS, shadcn/ui.
   (3 sessions risky / 5 calm, capped at half the DTE) and `alertLevels` for the price-alert routine.
 - `GET /api/study-summary?n=20` — compact study-book outcomes from `study/study-summary.json`.
   Refresh with `node scripts/build-study-summary.mjs <path-to-study-dir>` and commit.
+
+### Regime v2: seed calendar, lockouts, auctions, rate-sensitive sectors
+- `lib/macro-seed.ts` — researched Oct 1–9 2026 calendar (+ CPI 10/14, PPI 10/15, FOMC 10/28) with desk day
+  ratings (good / careful / careful-afternoon / sit-out), merged with the live calendar. Replay:
+  `npx tsx --conditions=react-server scripts/regime-seed-check.ts`.
+- Pre-release lockout: NFP/CPI/PPI/ISM/PCE/GDP/FOMC/minutes and 10Y/20Y/30Y auctions open a window
+  (pre-market releases: open → max(release+60m, open+30m); intraday: release−30m → release+45m; auctions
+  −15m → +45m). While active, picks / premove / AI picks return no new picks with a lockout warning.
+- Long-bond auction afternoons (after 12:00 ET) → at least `risky`.
+- Calls on rate-sensitive groups (utilities, REITs, homebuilders, IWM, KRE/regional banks, long bonds) docked
+  −12 on risky days / −6 calm when the long end is rising (day ≥ +3bp or 5-session ≥ +10bp).
+- `ivEvents` + an informational `event-iv` chip and `exitPlan.eventRisk` when an expiry spans CPI/PPI/NFP/FOMC.
+- Yields: official Treasury daily par-curve CSV first (prior close + 5-session trend, bear-steepening flag);
+  Yahoo only supplies the intraday last before Treasury posts the day's close.

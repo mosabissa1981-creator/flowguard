@@ -25,7 +25,12 @@ export function addSessions(date: string, sessions: number): string {
  */
 export function buildExitPlan(
   row: Pick<RankedFlow, "alert" | "dte">,
-  opts: { riskyRegime: boolean; confidence?: number; now?: Date } = { riskyRegime: false },
+  opts: {
+    riskyRegime: boolean;
+    confidence?: number;
+    now?: Date;
+    ivEvents?: { date: string; title: string }[];
+  } = { riskyRegime: false },
 ): ExitPlan {
   const print = toNumber(row.alert.price);
   const askAtPrint = toNumber(row.alert.ask);
@@ -52,6 +57,9 @@ export function buildExitPlan(
       sessions,
       rule: `Exit by 15:30 ET on ${timeDate} (${sessions} session${sessions === 1 ? "" : "s"}) if neither target nor stop hit.`,
     },
+    eventRisk: (opts.ivEvents ?? [])
+      .filter((e) => e.date >= today && e.date <= row.alert.expiry.slice(0, 10))
+      .map((e) => `${e.title} ${e.date} — elevated IV; time stop before it unless the trade is the event.`),
     alertLevels: [
       { kind: "target", premium: target, pct: Math.round(targetPct * 100) },
       { kind: "stop", premium: stop, pct: Math.round(stopPct * 100) },
