@@ -13,6 +13,7 @@ import { RegimeBanner } from "@/components/regime-banner";
 import { MorningPanel } from "@/components/morning-panel";
 import { AiPicksPanel } from "@/components/ai-picks-panel";
 import { ShadowPanel } from "@/components/shadow-panel";
+import { PanelBoundary } from "@/components/panel-boundary";
 import { PremovePanel } from "@/components/premove-panel";
 import { PicksPanel } from "@/components/picks-panel";
 import { PriceWatchesPanel } from "@/components/price-watches-panel";
@@ -569,7 +570,9 @@ export function Screener({
           </div>
         </div>
         <TideBar tide={rejectMock ? null : (data?.tide ?? null)} />
-        <RegimeBanner />
+        <PanelBoundary name="Regime">
+          <RegimeBanner />
+        </PanelBoundary>
         <UwKeyForm
           configured={uwConfigured}
           open={uwKeyOpen}
@@ -610,9 +613,13 @@ export function Screener({
         </div>
       </header>
 
-      <AiPicksPanel onSelect={setSelectedId} />
+      <PanelBoundary name="AI picks">
+        <AiPicksPanel onSelect={setSelectedId} />
+      </PanelBoundary>
 
-      <ShadowPanel />
+      <PanelBoundary name="Shadow signals">
+        <ShadowPanel />
+      </PanelBoundary>
 
       <MorningPanel
         morning={

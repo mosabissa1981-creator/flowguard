@@ -76,7 +76,7 @@ export function ShadowPanel() {
   }, [load]);
 
   const order = data?.moduleOrder ?? (Object.keys(SHORT) as ShadowModuleId[]);
-  const cands = data?.candidates ?? [];
+  const cands = Array.isArray(data?.candidates) ? data.candidates : [];
 
   return (
     <section className="rounded-xl border border-amber-400/20 bg-card/60 p-3">
@@ -88,8 +88,8 @@ export function ShadowPanel() {
         </div>
         {data ? (
           <div className="flex items-center gap-1.5 text-[10px]">
-            <Badge className="rounded-md bg-amber-500/10 text-amber-200">LLM {data.llm.status}</Badge>
-            <Badge className="rounded-md bg-amber-500/10 text-amber-200">${data.llm.spendUsd.toFixed(2)} today</Badge>
+            <Badge className="rounded-md bg-amber-500/10 text-amber-200">LLM {data.llm?.status ?? "—"}</Badge>
+            <Badge className="rounded-md bg-amber-500/10 text-amber-200">${Number(data.llm?.spendUsd ?? 0).toFixed(2)} today</Badge>
             <Badge className="rounded-md bg-amber-500/10 text-amber-200">UW {data.uwCalls}</Badge>
           </div>
         ) : null}
@@ -100,7 +100,7 @@ export function ShadowPanel() {
           <span className="font-medium text-amber-200">Brief ({brief.brief.riskTone}):</span> {brief.brief.summary}
         </p>
       ) : null}
-      {(reads?.reads ?? []).filter((r) => r.read).map((r) => (
+      {(Array.isArray(reads?.reads) ? reads.reads : []).filter((r) => r.read).map((r) => (
         <p key={r.event} className="mb-1 text-xs">
           <span
             className={cn(
@@ -131,12 +131,12 @@ export function ShadowPanel() {
             </thead>
             <tbody>
               {cands.map((c) => {
-                const vs = data?.verdicts[c.contract] ?? [];
+                const vs = data?.verdicts?.[c.contract] ?? [];
                 return (
                   <tr key={c.contract}>
                     <td className="whitespace-nowrap pr-2">
                       {c.ticker} {c.strike}
-                      {c.side === "call" ? "C" : "P"} {c.expiry.slice(5)}
+                      {c.side === "call" ? "C" : "P"} {c.expiry?.slice(5)}
                     </td>
                     {order.map((m) => {
                       const v = vs.find((x) => x.module === m);
@@ -158,8 +158,8 @@ export function ShadowPanel() {
           </table>
         </div>
       ) : null}
-      {data?.dayNotes.regime_analogs?.note ? (
-        <p className="mt-1 text-[10px] text-muted-foreground">Analogs: {data.dayNotes.regime_analogs.note}</p>
+      {data?.dayNotes?.regime_analogs?.note ? (
+        <p className="mt-1 text-[10px] text-muted-foreground">Analogs: {data.dayNotes?.regime_analogs?.note}</p>
       ) : null}
       <p className="mt-1 text-[10px] text-muted-foreground">▲ boost · ▼ flag · · pass · – skip. Hover a cell for the reason. Full JSON: /api/shadow</p>
     </section>

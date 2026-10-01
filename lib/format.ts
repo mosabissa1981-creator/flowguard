@@ -4,6 +4,7 @@ const compactCurrency = new Intl.NumberFormat("en-US", {
   style: "currency",
   currency: "USD",
   notation: "compact",
+  minimumFractionDigits: 0,
   maximumFractionDigits: 1,
 });
 
@@ -15,6 +16,7 @@ const fullCurrency = new Intl.NumberFormat("en-US", {
 
 const compactNumber = new Intl.NumberFormat("en-US", {
   notation: "compact",
+  minimumFractionDigits: 0,
   maximumFractionDigits: 1,
 });
 
