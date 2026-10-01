@@ -260,8 +260,8 @@ async function compute(): Promise<PutsResponse> {
   const day = tradingDateET();
   const ranked = await loadRankedFlow(PUTS_FILTERS);
   const regime = await loadRegimeSafe(ranked.tide);
-  // Directional ticker tide from the same cached session tape (no UW call). The main engine's ticker tide is
-  // ask-vs-bid regardless of side, so heavy put buying reads "bullish" there; here put-ask + call-bid = bearish.
+  // Directional ticker tide from the same cached session tape (no UW call): put-ask + call-bid = bearish.
+  // Kept local (not the engine's tide) so a candidate chain's own put buying can be excluded from its confirmation.
   const tape = await loadRankedFlow({ ...PUTS_FILTERS, side: "all", minPremium: 10_000, minDte: 0, maxDte: 3650 });
   const dir = new Map<string, { bull: number; bear: number }>();
   const own = new Map<string, number>(); // put ask-side premium per chain, excluded from that chain's own confirmation

@@ -2,7 +2,7 @@ import "server-only";
 
 import { after } from "next/server";
 
-import { kvDurable, kvGet, kvSet, kvSetNx } from "@/lib/kv";
+import { kvDurable, kvGet, kvSet, kvDel, kvSetNx } from "@/lib/kv";
 import { sessionOpenUtc, tradingDateET } from "@/lib/session";
 import type { FlowAlert } from "@/lib/types";
 import { fetchFlowAlertsPage } from "@/lib/uw";
@@ -235,8 +235,13 @@ export async function getSessionTape(opts: { force?: boolean; allowUw?: boolean 
     const cold = st.byId.size === 0;
     const run = (pages: number) =>
       (async () => {
-        if (!(await kvSetNx(`flowguard/tape/${day}/lock`, String(Date.now()), 90))) return;
-        await sync(st, openMs, pages);
+        const lock = `flowguard/tape/${day}/lock`;
+        if (!(await kvSetNx(lock, String(Date.now()), 90))) return;
+        try {
+          await sync(st, openMs, pages);
+        } finally {
+          await kvDel(lock).catch(() => {}); // release so back-fill can continue on the next due request (TTL is only a crash guard)
+        }
       })().finally(() => {
         syncing = null;
       });
