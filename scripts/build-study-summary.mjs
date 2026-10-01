@@ -8,6 +8,10 @@
  *   scored over multi-day horizons (max gain reached, +100/+300/+1000% hits, expired-worthless rate). Kept out of totals.
  * Puts (test mode): study/puts-YYYY-MM-DD.json (saved daily from /api/puts/track) -> summary.puts,
  *   win/loss/flat at +40% target / -25% stop within 3 sessions, T+1..T+5 returns, by regime label and tide. Kept out of totals.
+ * Setup lanes (test mode): study/lanes-YYYY-MM-DD.json (saved daily from /api/lanes/track) -> summary.lanes[<laneId>],
+ *   W/L/flat at +40% / -25% within each lane's time stop, win rate, avg T+1/T+3/T+5, by regime. Kept out of totals.
+ * Lane debate (shadow): study/lane-debate-YYYY-MM-DD.json (from /api/shadow/lanes?day=) -> summary.laneDebate,
+ *   TAKE vs SKIP outcome mix per lane and per side, joined to puts-/lanes- tracking outcomes.
  * `--yields` refreshes study/treasury-yields.json from the Treasury par-yield CSV (otherwise the cached file is used).
  */
 import fs from "node:fs";
@@ -258,6 +262,109 @@ summary.puts = {
 };
 
 // ---------------------------------------------------------------------------
+// Setup lanes (TEST mode). Each daily file = full cumulative /api/lanes/track snapshot { lanes: [{ lane, entries }] }.
+// Reuses putStats (same tracking shape: tracking.outcome + tracking.returns).
+// ---------------------------------------------------------------------------
+const laneFiles = fs.readdirSync(studyDir).filter((f) => /^lanes-\d{4}-\d{2}-\d{2}\.json$/.test(f)).sort();
+const laneEntries = new Map(); // laneId -> Map(day|contract -> entry)
+for (const f of laneFiles) {
+  let doc;
+  try {
+    doc = JSON.parse(fs.readFileSync(path.join(studyDir, f), "utf8"));
+  } catch {
+    continue;
+  }
+  for (const ln of doc.lanes || []) {
+    const id = ln.lane;
+    if (!id) continue;
+    const m = laneEntries.get(id) || new Map();
+    for (const e of ln.entries || []) {
+      if (!e || !e.contract || !e.day) continue;
+      const k = `${e.day}|${e.contract}`;
+      const prev = m.get(k);
+      if (!prev || !prev.tracking || (e.tracking && String(e.tracking.asOf) >= String(prev.tracking.asOf))) m.set(k, e);
+    }
+    laneEntries.set(id, m);
+  }
+}
+summary.lanes = {
+  mode: "test",
+  files: laneFiles.length,
+  definition:
+    "Separate from the same-day ±15% book. Entry = flow print. Within each lane's time stop (earnings lanes 5 sessions, capped to exit before the report; others 3): winner = option high ≥ +40% first, loser = low ≤ −25% first (same session both = loser), flat = neither. T+1..T+5 = closes vs entry.",
+  byLane: Object.fromEntries(
+    [...laneEntries.entries()].map(([id, m]) => {
+      const list = [...m.values()].sort((a, b) => (a.day + a.contract).localeCompare(b.day + b.contract));
+      const byRegime = {};
+      for (const e of list) (byRegime[e.regimeLabel ?? "unknown"] ||= []).push(e);
+      return [
+        id,
+        {
+          ...putStats(list),
+          days: [...new Set(list.map((e) => e.day))],
+          byRegime: Object.fromEntries(Object.entries(byRegime).map(([k, v]) => [k, putStats(v)])),
+          recent: list.slice(-15).map((e) => ({ day: e.day, contract: e.contract, entry: e.entry ?? e.price, outcome: e.tracking?.outcome ?? "open", t1: e.tracking?.returns?.t1 ?? null, t3: e.tracking?.returns?.t3 ?? null })),
+        },
+      ];
+    }),
+  ),
+};
+
+// ---------------------------------------------------------------------------
+// Lane debate (shadow) — scores TAKE vs SKIP verdicts against TEST-lane outcomes (puts + setup lanes).
+// ---------------------------------------------------------------------------
+const laneOutcome = new Map(); // `${lane}|${day}|${contract}` -> tracking
+for (const e of putsEntries) if (e.tracking) laneOutcome.set(`puts|${e.day}|${e.contract}`, e.tracking);
+for (const [id, m] of laneEntries) for (const e of m.values()) if (e.tracking) laneOutcome.set(`${id}|${e.day}|${e.contract}`, e.tracking);
+const debateFiles = fs.readdirSync(studyDir).filter((f) => /^lane-debate-\d{4}-\d{2}-\d{2}\.json$/.test(f)).sort();
+const dbBlank = () => ({ take: { w: 0, l: 0, flat: 0, open: 0 }, skip: { w: 0, l: 0, flat: 0, open: 0 } });
+const dbByLane = {};
+const dbBySide = { call: dbBlank(), put: dbBlank() };
+let dbVerdicts = 0;
+let dbSpend = 0;
+const dbAdd = (b, verdict, t) => {
+  const k = verdict === "take" ? "take" : "skip";
+  const o = t?.outcome;
+  if (o === "winner") b[k].w += 1;
+  else if (o === "loser") b[k].l += 1;
+  else if (o === "flat") b[k].flat += 1;
+  else b[k].open += 1;
+};
+for (const f of debateFiles) {
+  let doc;
+  try {
+    doc = JSON.parse(fs.readFileSync(path.join(studyDir, f), "utf8"));
+  } catch {
+    continue;
+  }
+  dbSpend += doc.llm?.spendUsd ?? 0;
+  for (const v of Object.values(doc.verdicts || {})) {
+    dbVerdicts += 1;
+    const t = laneOutcome.get(`${v.lane}|${doc.day}|${v.contract}`);
+    dbAdd((dbByLane[v.lane] ||= dbBlank()), v.verdict, t);
+    if (dbBySide[v.side]) dbAdd(dbBySide[v.side], v.verdict, t);
+  }
+}
+const dbRates = (b) => {
+  const r = (x) => {
+    const n = x.w + x.l + x.flat;
+    return { ...x, decided: n, winRate: n ? Math.round((x.w / n) * 1000) / 10 : null, lossRate: n ? Math.round((x.l / n) * 1000) / 10 : null };
+  };
+  const take = r(b.take);
+  const skip = r(b.skip);
+  return { take, skip, edge: take.decided && skip.decided ? { takeWinRate: take.winRate, skipWinRate: skip.winRate, takeLossRate: take.lossRate, skipLossRate: skip.lossRate } : null };
+};
+summary.laneDebate = {
+  mode: "shadow",
+  files: debateFiles.length,
+  verdicts: dbVerdicts,
+  spendUsd: Math.round(dbSpend * 10000) / 10000,
+  definition: "Direction-aware bull/bear/macro debate → TAKE/SKIP per TEST-lane pick (never changes picks). Outcomes from the lane trackers (+40% / -25% within the lane time stop). A useful debate has take win rate > skip win rate.",
+  byLane: Object.fromEntries(Object.entries(dbByLane).map(([k, b]) => [k, dbRates(b)])),
+  bySide: { call: dbRates(dbBySide.call), put: dbRates(dbBySide.put) },
+};
+
+// ---------------------------------------------------------------------------
 // Lottery lane (TEST mode). Separate from the +/-15% same-day book: each daily file is the full
 // cumulative /api/lottery/track snapshot, so the newest tracking per (day, contract) wins.
 // ---------------------------------------------------------------------------
@@ -338,6 +445,8 @@ fs.mkdirSync(path.dirname(out), { recursive: true });
 fs.writeFileSync(out, JSON.stringify(summary, null, 2) + "\n");
 console.log(`wrote ${out}: ${rows.length} rows, ${decided.length} decided, ${clusters.length} clusters`);
 console.log(`puts (test): ${putsFiles.length} file(s), ${putsEntries.length} logged, W/L/F ${summary.puts.overall.w}/${summary.puts.overall.l}/${summary.puts.overall.flat}`);
+console.log(`setup lanes (test): ${laneFiles.length} file(s), ${Object.keys(summary.lanes.byLane).length} lane(s)`);
+console.log(`lane debate (shadow): ${debateFiles.length} file(s), ${dbVerdicts} verdict(s)`);
 console.log(`lottery (test): ${lotteryFiles.length} file(s), ${lotteryEntries.length} logged picks, ${summary.lottery.overall.final} final`);
 console.log(`shadow accuracy: ${shadowDays.length} shadow day(s), ${shadowJoined} candidates joined to book outcomes, ${shadowUnmatched} unmatched`);
 
