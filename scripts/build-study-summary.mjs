@@ -4,6 +4,8 @@
  * Usage: node scripts/build-study-summary.mjs [studyDir] [--since 2026-09-23] [--recent 40]
  * The AI-picks prompt reads this file (and /api/study-summary serves it).
  * Also: shadowAccuracy (from study/shadow-*.json), study/regime-days.json, study/candidate-history.json.
+ * Lottery (test mode): study/lottery-YYYY-MM-DD.json (saved daily from /api/lottery/track) -> summary.lottery,
+ *   scored over multi-day horizons (max gain reached, +100/+300/+1000% hits, expired-worthless rate). Kept out of totals.
  * `--yields` refreshes study/treasury-yields.json from the Treasury par-yield CSV (otherwise the cached file is used).
  */
 import fs from "node:fs";
@@ -190,9 +192,87 @@ const shadowAccuracy = {
 };
 summary.shadowAccuracy = shadowAccuracy;
 
+// ---------------------------------------------------------------------------
+// Lottery lane (TEST mode). Separate from the +/-15% same-day book: each daily file is the full
+// cumulative /api/lottery/track snapshot, so the newest tracking per (day, contract) wins.
+// ---------------------------------------------------------------------------
+const lotteryFiles = fs.readdirSync(studyDir).filter((f) => /^lottery-\d{4}-\d{2}-\d{2}\.json$/.test(f)).sort();
+const lotteryByKey = new Map();
+for (const f of lotteryFiles) {
+  let doc;
+  try {
+    doc = JSON.parse(fs.readFileSync(path.join(studyDir, f), "utf8"));
+  } catch {
+    continue;
+  }
+  for (const e of doc.entries || []) {
+    if (!e || !e.contract || !e.day) continue;
+    const k = `${e.day}|${e.contract}`;
+    const prev = lotteryByKey.get(k);
+    if (!prev || !prev.tracking || (e.tracking && String(e.tracking.asOf) >= String(prev.tracking.asOf))) lotteryByKey.set(k, e);
+  }
+}
+const lotteryEntries = [...lotteryByKey.values()].sort((a, b) => (a.day + a.contract).localeCompare(b.day + b.contract));
+const lotStats = (list) => {
+  const tracked = list.filter((e) => e.tracking);
+  const finals = tracked.filter((e) => e.tracking.final);
+  const pct = (n, d) => (d ? Math.round((n / d) * 1000) / 10 : null);
+  const gains = tracked.map((e) => e.tracking.maxGainPct).filter((g) => typeof g === "number").sort((a, b) => a - b);
+  const hits = (k) => tracked.filter((e) => e.tracking[k]).length;
+  const worthless = finals.filter((e) => e.tracking.expiredWorthless).length;
+  return {
+    n: list.length,
+    tracked: tracked.length,
+    final: finals.length,
+    hit100: hits("hit100"),
+    hit300: hits("hit300"),
+    hit1000: hits("hit1000"),
+    hit100Rate: pct(hits("hit100"), tracked.length),
+    hit300Rate: pct(hits("hit300"), tracked.length),
+    hit1000Rate: pct(hits("hit1000"), tracked.length),
+    expiredWorthless: worthless,
+    expiredWorthlessRate: pct(worthless, finals.length),
+    medianMaxGainPct: gains.length ? gains[Math.floor(gains.length / 2)] : null,
+  };
+};
+const lotGroup = (keyFn) => {
+  const m = {};
+  for (const e of lotteryEntries) (m[keyFn(e)] ||= []).push(e);
+  return Object.fromEntries(Object.entries(m).map(([k, v]) => [k, lotStats(v)]));
+};
+summary.lottery = {
+  mode: "test",
+  files: lotteryFiles.length,
+  days: [...new Set(lotteryEntries.map((e) => e.day))],
+  definition:
+    "Multi-day horizon, not same-day W/L. Entry = flow print. maxGainPct = best daily high after the entry day vs entry; hit100/300/1000 = reached +100/+300/+1000% at any point before expiry; expiredWorthless = expired with last <= max($0.05, 10% of entry). Rates over tracked (hits) / final (worthless) entries.",
+  overall: lotStats(lotteryEntries),
+  byCatalyst: lotGroup((e) => e.catalyst?.kind ?? "none"),
+  bySide: lotGroup((e) => e.side || "unk"),
+  byPriceBand: lotGroup((e) => ((e.entry ?? e.price) >= 0.1 && (e.entry ?? e.price) <= 0.6 ? "0.10-0.60" : "other")),
+  byDte: lotGroup((e) => (e.dte <= 10 ? "5-10" : e.dte <= 20 ? "11-20" : "21-30")),
+  topRunners: lotteryEntries
+    .filter((e) => typeof e.tracking?.maxGainPct === "number")
+    .sort((a, b) => b.tracking.maxGainPct - a.tracking.maxGainPct)
+    .slice(0, 10)
+    .map((e) => ({ day: e.day, contract: e.contract, entry: e.entry ?? e.price, maxHigh: e.tracking.maxHigh, maxGainPct: e.tracking.maxGainPct, maxHighDate: e.tracking.maxHighDate, catalyst: e.catalyst?.kind ?? null })),
+  entries: lotteryEntries.slice(-40).map((e) => ({
+    day: e.day,
+    contract: e.contract,
+    entry: e.entry ?? e.price,
+    dte: e.dte,
+    catalyst: e.catalyst ? `${e.catalyst.kind} ${e.catalyst.date}` : null,
+    maxGainPct: e.tracking?.maxGainPct ?? null,
+    last: e.tracking?.last ?? null,
+    final: e.tracking?.final ?? false,
+    expiredWorthless: e.tracking?.expiredWorthless ?? null,
+  })),
+};
+
 fs.mkdirSync(path.dirname(out), { recursive: true });
 fs.writeFileSync(out, JSON.stringify(summary, null, 2) + "\n");
 console.log(`wrote ${out}: ${rows.length} rows, ${decided.length} decided, ${clusters.length} clusters`);
+console.log(`lottery (test): ${lotteryFiles.length} file(s), ${lotteryEntries.length} logged picks, ${summary.lottery.overall.final} final`);
 console.log(`shadow accuracy: ${shadowDays.length} shadow day(s), ${shadowJoined} candidates joined to book outcomes, ${shadowUnmatched} unmatched`);
 
 // ---------------------------------------------------------------------------
