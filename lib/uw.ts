@@ -484,7 +484,7 @@ export async function fetchOptionQuote(
   return quoteFromFlowPrint(flowPrint);
 }
 
-function parseHistoricBar(raw: Record<string, unknown>): HistoricBar {
+export function parseHistoricBar(raw: Record<string, unknown>): HistoricBar {
   return {
     date: asString(raw.date),
     last: firstPositive(raw.last_price, raw.close, raw.price),
@@ -778,4 +778,26 @@ export async function fetchEarningsHistory(
   } catch {
     return null;
   }
+}
+
+/** Shadow signals: large dark-pool prints for one ticker in [fromMs, toMs]. GET /api/darkpool/{ticker}. Cached 12h. */
+export async function fetchDarkPoolWindow(ticker: string, day: string, fromMs: number, toMs: number): Promise<Record<string, unknown>[]> {
+  if (await isUwBlocked()) return [];
+  const payload = await uwGet<{ data?: Record<string, unknown>[] }>(
+    `/api/darkpool/${encodeURIComponent(ticker.toUpperCase())}`,
+    { date: day, limit: 500, min_premium: 1_000_000, newer_than: Math.floor(fromMs / 1000), older_than: Math.ceil(toMs / 1000) },
+    DAY_TTL_MS,
+  );
+  return payload.data ?? [];
+}
+
+/** Shadow signals: dealer gamma by strike for one day. GET /api/stock/{ticker}/greek-exposure/strike. Cached 12h. */
+export async function fetchGexByStrike(ticker: string, day: string): Promise<Record<string, unknown>[]> {
+  if (await isUwBlocked()) return [];
+  const payload = await uwGet<{ data?: Record<string, unknown>[] }>(
+    `/api/stock/${encodeURIComponent(ticker.toUpperCase())}/greek-exposure/strike`,
+    { date: day },
+    DAY_TTL_MS,
+  );
+  return payload.data ?? [];
 }
