@@ -7,10 +7,10 @@ import {
   isFloorOnlyCandidate,
   type ChainFadeSignal,
 } from "@/lib/chain-context";
-import { hoursSinceCreated, isLateSessionPrint, printAgeBand } from "@/lib/session";
+import { hoursSinceCreated, isLateSessionPrint, printAgeBand, tradingDateET } from "@/lib/session";
 import { followThroughFromPeers } from "@/lib/follow-through";
 import { alertOtmPct, moneynessBand } from "@/lib/moneyness";
-import { isLongDurationTech } from "@/lib/issuers";
+import { isLongDurationTech, isRateSensitive } from "@/lib/issuers";
 
 const BASE_SCORE = 32;
 const STALE_CAP = 32;
@@ -629,7 +629,10 @@ export type ActionableRegime = {
   label: string;
   minDte: number;
   rateTechPenalty: number;
+  rateSensitivePenalty?: number;
   yieldsRising: boolean;
+  /** Scheduled vol events (CPI/PPI/NFP/FOMC) — expiries spanning them carry elevated IV. */
+  ivEvents?: { date: string; title: string }[];
 };
 
 function etHour(iso: string): number | null {
@@ -759,6 +762,41 @@ export function applyActionableOverlay(
         "penalty",
         regime.rateTechPenalty,
         `Long yields rising on a ${regime.label} day. Sep 30: six GOOG/GOOGL calls lost 16–26% as 10Y/30Y rose ahead of reports.`,
+      ),
+    );
+  }
+
+  if (
+    regime &&
+    (regime.rateSensitivePenalty ?? 0) < 0 &&
+    row.alert.type === "call" &&
+    isRateSensitive(row.alert.ticker) &&
+    !hasScoreChip(row, "rate-sensitive")
+  ) {
+    const delta = regime.rateSensitivePenalty ?? 0;
+    score += delta;
+    chips.push(
+      chip(
+        "rate-sensitive",
+        "Rate-sensitive vs rising long end",
+        "penalty",
+        delta,
+        "Utilities / REITs / homebuilders / small caps / regional banks / long bonds lag when 10Y–30Y rise. Size down.",
+      ),
+    );
+  }
+
+  const expiry = row.alert.expiry?.slice(0, 10) ?? "";
+  const today = tradingDateET(opts.now ?? new Date());
+  const spanned = (regime?.ivEvents ?? []).filter((e) => e.date >= today && e.date <= expiry);
+  if (spanned.length > 0 && !hasScoreChip(row, "event-iv")) {
+    chips.push(
+      chip(
+        "event-iv",
+        "Expiry spans macro event",
+        "penalty",
+        0,
+        `Expiry ${expiry} spans ${spanned.map((e) => `${e.title} ${e.date.slice(5)}`).join(", ")} — elevated IV now, likely crush after. Informational.`,
       ),
     );
   }

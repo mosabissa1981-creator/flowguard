@@ -11,6 +11,7 @@ import { DetailDrawer } from "@/components/detail-drawer";
 import { TideBar } from "@/components/tide-bar";
 import { RegimeBanner } from "@/components/regime-banner";
 import { MorningPanel } from "@/components/morning-panel";
+import { AiPicksPanel } from "@/components/ai-picks-panel";
 import { PremovePanel } from "@/components/premove-panel";
 import { PicksPanel } from "@/components/picks-panel";
 import { PriceWatchesPanel } from "@/components/price-watches-panel";
@@ -607,6 +608,8 @@ export function Screener({
           {!quotaDown && data?.warning ? <span className="text-amber-300">{data.warning}</span> : null}
         </div>
       </header>
+
+      <AiPicksPanel onSelect={setSelectedId} />
 
       <MorningPanel
         morning={

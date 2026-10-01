@@ -109,15 +109,34 @@ export type FlowResponse = {
   authFailed?: boolean;
 };
 
+export type ExitPlan = {
+  /** Option premium per share used as entry (flow print at alert time). */
+  entry: number;
+  entryBasis: "flow-print" | "ask-at-print";
+  target: number;
+  targetPct: number;
+  stop: number;
+  stopPct: number;
+  timeStop: { date: string; sessions: number; rule: string };
+  /** Ready-made levels for the price-alert routine. */
+  alertLevels: { kind: "target" | "stop"; premium: number; pct: number }[];
+  /** Scheduled macro events before expiry (elevated IV / crush risk). */
+  eventRisk: string[];
+  note: string;
+};
+
 export type DailyPick = RankedFlow & {
   thesis: string;
   fadeRisks: string[];
+  exitPlan?: ExitPlan;
 };
 
 export type RegimeBrief = {
   label: RegimeLabel;
   reasons: string[];
   rules: RegimeRules;
+  lockout?: RegimeLockout;
+  dayRating?: RegimeSnapshot["dayRating"];
 };
 
 export type PicksResponse = {
@@ -245,7 +264,18 @@ export type YieldMove = {
   /** Basis points vs prior close. */
   changeBp: number | null;
   asOf: string | null;
-  source: "yahoo" | "treasury" | "none";
+  /** treasury = official daily par curve; treasury+yahoo = intraday last vs official prior close. */
+  source: "yahoo" | "treasury" | "treasury+yahoo" | "none";
+};
+
+export type LockoutWindow = { start: string; end: string; event: string };
+
+export type RegimeLockout = {
+  /** True while a major release window is open — no new picks. */
+  active: boolean;
+  until: string | null;
+  event: string | null;
+  windows: LockoutWindow[];
 };
 
 export type RegimeRules = {
@@ -257,6 +287,8 @@ export type RegimeRules = {
   minDte: number;
   /** Score delta for calls on long-duration tech when long yields are rising (≤ 0). */
   rateTechPenalty: number;
+  /** Score delta for calls on rate-sensitive sectors (utilities, REITs, homebuilders, IWM, KRE, long bonds) when long yields rise. */
+  rateSensitivePenalty: number;
 };
 
 export type RegimeSnapshot = {
@@ -275,12 +307,63 @@ export type RegimeSnapshot = {
     us10y: YieldMove;
     us30y: YieldMove;
     rising: boolean;
+    /** Official Treasury closes, last 5 sessions. */
+    trend5d: { us2yBp: number | null; us10yBp: number | null; us30yBp: number | null; bearSteepening: boolean } | null;
   };
+  /** Researched day rating (seed calendar), when one exists for the date. */
+  dayRating: { rating: "good" | "careful" | "careful-afternoon" | "sit-out"; note: string } | null;
+  lockout: RegimeLockout;
+  /** Treasury 10Y/20Y/30Y auction today (afternoon = careful). */
+  auctionToday: string | null;
+  /** Scheduled vol events (CPI/PPI/NFP/FOMC) in the next ~45 days — expiries spanning them carry elevated IV. */
+  ivEvents: { date: string; title: string }[];
   tide: TideSnapshot | null;
   sources: {
     calendar: "forexfactory" | "uw" | "unavailable";
-    yields: "yahoo" | "treasury" | "unavailable";
+    yields: "yahoo" | "treasury" | "treasury+yahoo" | "unavailable";
     tide: "uw-cache" | "uw" | "unavailable";
   };
   warnings: string[];
+};
+
+export type AiPick = DailyPick & {
+  /** 0–100 */
+  confidence: number;
+  aiReason: string;
+  lanes: string[];
+  exitPlan: ExitPlan;
+};
+
+export type AiSkip = {
+  option_chain: string;
+  ticker: string;
+  reason: string;
+};
+
+export type StudySummaryBrief = {
+  since: string;
+  through: string | null;
+  totals: { w: number; l: number; flat: number };
+  buckets: Record<string, { w: number; l: number; flat: number }>;
+  correlatedLossClusters: { day: string; issuer: string; n: number; losers: number; winners: number }[];
+  lessons: string[];
+};
+
+export type AiPicksResponse = {
+  source: TapeSource;
+  fetchedAt: string;
+  generatedAt: string;
+  engine: "llm" | "deterministic";
+  llmStatus: "ok" | "no-key" | "error" | "invalid-output" | "skipped";
+  llmProvider?: string;
+  llmModel?: string;
+  llmError?: string;
+  regime: RegimeBrief | null;
+  picks: AiPick[];
+  skips: AiSkip[];
+  candidatesConsidered: number;
+  study: StudySummaryBrief | null;
+  warning?: string;
+  quotaBlocked?: boolean;
+  disclaimer: string;
 };

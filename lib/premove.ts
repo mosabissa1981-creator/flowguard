@@ -8,7 +8,8 @@ import { fetchStockStates, hasUnusualWhalesKey, type StockState } from "@/lib/uw
 import { isUwBlocked } from "@/lib/uw-quota";
 import { toNumber } from "@/lib/numbers";
 import { applyConcentrationCaps } from "@/lib/issuers";
-import { loadRegimeSafe, regimeBrief, regimeCaps, regimeListCap, toActionableRegime } from "@/lib/regime";
+import { buildExitPlan } from "@/lib/exit-plan";
+import { lockoutWarning, loadRegimeSafe, regimeBrief, regimeCaps, regimeListCap, toActionableRegime } from "@/lib/regime";
 import {
   contractKey,
   dtePreference,
@@ -182,13 +183,15 @@ export async function loadPremoveShortlist(opts?: { forceFresh?: boolean }): Pro
     regimeCaps(regime),
   );
 
-  const picks = unique.map((row, index) => ({
+  const locked = lockoutWarning(regime);
+  const picks = (locked ? [] : unique).map((row, index) => ({
     ...row,
     rank: index + 1,
     ...buildPremoveCopy(row),
+    exitPlan: buildExitPlan(row, { riskyRegime: Boolean(regime?.rules.active), ivEvents: regime?.ivEvents }),
   }));
 
-  let warning = ranked.warning;
+  let warning = locked ?? ranked.warning;
   if (picks.length === 0 && !warning) {
     warning =
       "No building ask-side setups on a still-quiet underlying in this session. Not filling from late whale floors.";

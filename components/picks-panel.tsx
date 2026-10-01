@@ -49,8 +49,8 @@ export function PicksPanel({
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
             Same Unusual Whales tape and conviction score as the live feed. Lottery DTE, tiny
             premium, bid-side dumps, fighting-tide, aged watches, and no-follow-through prints
-            are cut. DTE of 9 or less is demoted, not banned. Late-afternoon prints stay on the
-            live board and sort behind earlier-session names. Each pick has an options hold window — never a
+            are cut. DTE of 9 or less is demoted, not banned. Late prints (14:00 ET or later) stay on the
+            live board but are excluded here; max 2 per issuer and 3 per sector, tighter on risky macro days. Each pick has an options hold window — never a
             stock hold, never hold to expiry.
           </p>
         </div>

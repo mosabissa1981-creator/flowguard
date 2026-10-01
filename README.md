@@ -127,3 +127,34 @@ Next.js App Router, TypeScript, Tailwind CSS, shadcn/ui.
   from actionable lists; +8 morning ask-side (9:30–11:00 ET, ≥70% ask), +4 extra for 11–30 DTE,
   +10 quiet underlying / −10 extended (re-uses Premove's stock-state spots). Ties at the 100 clamp are
   broken by the unclamped `rawScore`.
+
+## AI picks + exit plans (Phase B)
+
+- `GET /api/ai-picks` — top ~8 actionable candidates (morning lane first, issuer/sector capped) plus the
+  regime, flow facts and the study-book summary go to an LLM, which returns 3 (risky/report-day) to 5 (calm)
+  picks with confidence + reason and an explicit skip reason for every other candidate. Guardrails (list cap,
+  1/issuer on risky days, sector cap) are re-applied after the model. 12-min cache; `?rerun=1` bypasses it.
+  Zero extra UW calls — it re-uses the morning / picks / premove lists.
+- LLM config (Vercel env): `LLM_API_KEY` (required to enable), optional `LLM_PROVIDER`
+  (`openai` | `anthropic`; auto-detected from an `sk-ant-` key), `LLM_MODEL`, `LLM_BASE_URL`
+  (any OpenAI-compatible endpoint, e.g. xAI / Groq / OpenRouter). Without a key — or on LLM error / bad
+  JSON — the endpoint returns a deterministic rules fallback (`engine: "deterministic"`, `llmStatus` says why).
+- Every pick in `/api/ai-picks`, `/api/morning`, `/api/picks`, `/api/premove` carries `exitPlan`:
+  entry (flow print), target (+30% risky / +40% calm / +50% calm high-confidence), stop (−25%), time stop
+  (3 sessions risky / 5 calm, capped at half the DTE) and `alertLevels` for the price-alert routine.
+- `GET /api/study-summary?n=20` — compact study-book outcomes from `study/study-summary.json`.
+  Refresh with `node scripts/build-study-summary.mjs <path-to-study-dir>` and commit.
+
+### Regime v2: seed calendar, lockouts, auctions, rate-sensitive sectors
+- `lib/macro-seed.ts` — researched Oct 1–9 2026 calendar (+ CPI 10/14, PPI 10/15, FOMC 10/28) with desk day
+  ratings (good / careful / careful-afternoon / sit-out), merged with the live calendar. Replay:
+  `npx tsx --conditions=react-server scripts/regime-seed-check.ts`.
+- Pre-release lockout: NFP/CPI/PPI/ISM/PCE/GDP/FOMC/minutes and 10Y/20Y/30Y auctions open a window
+  (pre-market releases: open → max(release+60m, open+30m); intraday: release−30m → release+45m; auctions
+  −15m → +45m). While active, picks / premove / AI picks return no new picks with a lockout warning.
+- Long-bond auction afternoons (after 12:00 ET) → at least `risky`.
+- Calls on rate-sensitive groups (utilities, REITs, homebuilders, IWM, KRE/regional banks, long bonds) docked
+  −12 on risky days / −6 calm when the long end is rising (day ≥ +3bp or 5-session ≥ +10bp).
+- `ivEvents` + an informational `event-iv` chip and `exitPlan.eventRisk` when an expiry spans CPI/PPI/NFP/FOMC.
+- Yields: official Treasury daily par-curve CSV first (prior close + 5-session trend, bear-steepening flag);
+  Yahoo only supplies the intraday last before Treasury posts the day's close.
