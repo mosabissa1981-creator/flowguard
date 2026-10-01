@@ -14,6 +14,9 @@ export async function daySpendUsd(day: string): Promise<number> {
   let total = shadow?.llm.spendUsd ?? 0;
   total += brief?.usage?.costUsd ?? 0;
   for (const r of reads?.reads ?? []) total += r.usage?.costUsd ?? 0;
+  // Lane-debate shadow module (TEST-lane picks) shares the same daily budget.
+  const laneDebate = await loadDoc<{ llm?: { spendUsd?: number } }>("lanedebate", day);
+  total += laneDebate?.llm?.spendUsd ?? 0;
   return Math.round(total * 10000) / 10000;
 }
 

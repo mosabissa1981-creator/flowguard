@@ -17,6 +17,7 @@ import { PanelBoundary } from "@/components/panel-boundary";
 import { PremoveAiPanel } from "@/components/premove-ai-panel";
 import { LotteryPanel } from "@/components/lottery-panel";
 import { PutsPanel } from "@/components/puts-panel";
+import { LanesPanel } from "@/components/lanes-panel";
 import { PremovePanel } from "@/components/premove-panel";
 import { PicksPanel } from "@/components/picks-panel";
 import { PriceWatchesPanel } from "@/components/price-watches-panel";
@@ -686,6 +687,10 @@ export function Screener({
 
       <PanelBoundary name="Puts">
         <PutsPanel />
+      </PanelBoundary>
+
+      <PanelBoundary name="Setup lanes">
+        <LanesPanel />
       </PanelBoundary>
 
       <PicksPanel
