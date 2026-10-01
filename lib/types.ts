@@ -354,10 +354,18 @@ export type AiPicksResponse = {
   fetchedAt: string;
   generatedAt: string;
   engine: "llm" | "deterministic";
-  llmStatus: "ok" | "no-key" | "error" | "invalid-output" | "skipped";
+  llmStatus: "ok" | "no-key" | "error" | "invalid-output" | "skipped" | "throttled";
   llmProvider?: string;
   llmModel?: string;
   llmError?: string;
+  /** Token usage reported by the provider for the call that produced this answer. */
+  llmUsage?: { promptTokens?: number; completionTokens?: number; totalTokens?: number };
+  /** Set when the response is a stored LLM answer (cost guard) rather than a fresh call. */
+  llmCachedAt?: string;
+  /** Earliest time the cost guard allows the next LLM call. */
+  nextLlmAt?: string;
+  /** True when candidates changed since the stored LLM answer (refresh pending the throttle). */
+  candidatesChanged?: boolean;
   regime: RegimeBrief | null;
   picks: AiPick[];
   skips: AiSkip[];

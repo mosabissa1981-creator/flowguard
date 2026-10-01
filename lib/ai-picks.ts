@@ -9,12 +9,19 @@ import { compareActionable, contractKey } from "@/lib/scoring";
 import { buildExitPlan } from "@/lib/exit-plan";
 import { loadStudySummary, studyBrief } from "@/lib/study-summary";
 import { askShare, toNumber } from "@/lib/numbers";
+import { tradingDateET } from "@/lib/session";
+import { loadAiPicksState, saveAiPicksState, type AiPicksState } from "@/lib/ai-picks-state";
 import { clamp } from "@/lib/numbers";
 import type { AiPick, AiPicksResponse, AiSkip, DailyPick, RegimeSnapshot } from "@/lib/types";
 
 const MAX_CANDIDATES = 8;
-const LLM_TIMEOUT_MS = 25_000;
+/** Reasoning models (e.g. grok-4.x) need ~20–40s on this prompt; route maxDuration is 60s. */
+const LLM_TIMEOUT_MS = Math.min(55_000, Math.max(5_000, Number(process.env.LLM_TIMEOUT_MS) || 50_000));
 const CACHE_MS = 12 * 60_000;
+/** Cost guard: at most one LLM call per 30 min per trading day, and only when candidates change. */
+const LLM_MIN_INTERVAL_MS = 30 * 60_000;
+/** After a failed LLM call, wait this long before trying again. */
+const LLM_ERROR_BACKOFF_MS = 10 * 60_000;
 const DISCLAIMER =
   "Options-flow screen, not financial advice. AI picks rank unusual flow; they do not predict prices.";
 
@@ -33,12 +40,27 @@ function llmConfig() {
   if (!key) return null;
   const explicit = process.env.LLM_PROVIDER?.trim().toLowerCase();
   const provider = explicit || (key.startsWith("sk-ant-") ? "anthropic" : "openai");
+  // xAI keys (xai-…) are OpenAI-compatible; default to the xAI endpoint + Grok when not overridden.
+  const isXai = provider !== "anthropic" && key.startsWith("xai-");
   const model =
-    process.env.LLM_MODEL?.trim() || (provider === "anthropic" ? "claude-sonnet-4-5" : "gpt-4.1-mini");
-  const baseUrl =
+    process.env.LLM_MODEL?.trim() ||
+    (provider === "anthropic" ? "claude-sonnet-4-5" : isXai ? "grok-4.7" : "gpt-4.1-mini");
+  const baseUrl = (
     process.env.LLM_BASE_URL?.trim() ||
-    (provider === "anthropic" ? "https://api.anthropic.com/v1" : "https://api.openai.com/v1");
-  return { key, provider, model, baseUrl: baseUrl.replace(/\/$/, "") };
+    (provider === "anthropic"
+      ? "https://api.anthropic.com/v1"
+      : isXai
+        ? "https://api.x.ai/v1"
+        : "https://api.openai.com/v1")
+  ).replace(/\/$/, "");
+  // Grok 4.x reasons by default (~170s / ~18k tokens on this prompt); "low" keeps it ~20–30s / ~7k tokens.
+  // LLM_REASONING_EFFORT=none disables the field for providers that reject it.
+  const effortEnv = process.env.LLM_REASONING_EFFORT?.trim().toLowerCase();
+  const reasoningEffort =
+    effortEnv === "none" || effortEnv === "off"
+      ? undefined
+      : effortEnv || (baseUrl.includes("api.x.ai") ? "low" : undefined);
+  return { key, provider, model, baseUrl, reasoningEffort };
 }
 
 function candidateFacts(c: Candidate) {
@@ -120,7 +142,12 @@ function buildPrompt(cands: Candidate[], regime: RegimeSnapshot | null, maxPicks
   return { system, user: JSON.stringify(user) };
 }
 
-async function callLlm(system: string, user: string): Promise<{ text: string; provider: string; model: string }> {
+type LlmUsage = { promptTokens?: number; completionTokens?: number; totalTokens?: number };
+
+async function callLlm(
+  system: string,
+  user: string,
+): Promise<{ text: string; provider: string; model: string; usage?: LlmUsage }> {
   const cfg = llmConfig();
   if (!cfg) throw new Error("no-key");
   const controller = new AbortController();
@@ -146,8 +173,18 @@ async function callLlm(system: string, user: string): Promise<{ text: string; pr
       });
       const body = await response.text();
       if (!response.ok) throw new Error(`anthropic ${response.status}: ${body.slice(0, 200)}`);
-      const json = JSON.parse(body) as { content?: { type: string; text?: string }[] };
-      return { text: (json.content ?? []).map((c) => c.text ?? "").join(""), provider: cfg.provider, model: cfg.model };
+      const json = JSON.parse(body) as {
+        content?: { type: string; text?: string }[];
+        usage?: { input_tokens?: number; output_tokens?: number };
+      };
+      const usage = json.usage
+        ? {
+            promptTokens: json.usage.input_tokens,
+            completionTokens: json.usage.output_tokens,
+            totalTokens: (json.usage.input_tokens ?? 0) + (json.usage.output_tokens ?? 0),
+          }
+        : undefined;
+      return { text: (json.content ?? []).map((c) => c.text ?? "").join(""), provider: cfg.provider, model: cfg.model, usage };
     }
     // OpenAI and OpenAI-compatible (xAI, Groq, OpenRouter, Together…) via LLM_BASE_URL.
     const response = await fetch(`${cfg.baseUrl}/chat/completions`, {
@@ -157,6 +194,7 @@ async function callLlm(system: string, user: string): Promise<{ text: string; pr
         model: cfg.model,
         temperature: 0.2,
         response_format: { type: "json_object" },
+        ...(cfg.reasoningEffort ? { reasoning_effort: cfg.reasoningEffort } : {}),
         messages: [
           { role: "system", content: system },
           { role: "user", content: user },
@@ -167,8 +205,18 @@ async function callLlm(system: string, user: string): Promise<{ text: string; pr
     });
     const body = await response.text();
     if (!response.ok) throw new Error(`${cfg.provider} ${response.status}: ${body.slice(0, 200)}`);
-    const json = JSON.parse(body) as { choices?: { message?: { content?: string } }[] };
-    return { text: json.choices?.[0]?.message?.content ?? "", provider: cfg.provider, model: cfg.model };
+    const json = JSON.parse(body) as {
+      choices?: { message?: { content?: string } }[];
+      usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
+    };
+    const usage = json.usage
+      ? {
+          promptTokens: json.usage.prompt_tokens,
+          completionTokens: json.usage.completion_tokens,
+          totalTokens: json.usage.total_tokens,
+        }
+      : undefined;
+    return { text: json.choices?.[0]?.message?.content ?? "", provider: cfg.provider, model: cfg.model, usage };
   } finally {
     clearTimeout(timer);
   }
@@ -218,7 +266,7 @@ function shortReason(c: Candidate): string {
   return `Rules pick: ${boosts.join(", ") || "top actionable score"}${pens.length ? `; watch: ${pens.join(", ")}` : ""}.`;
 }
 
-async function gatherCandidates(): Promise<{
+export async function gatherCandidates(): Promise<{
   cands: Candidate[];
   source: AiPicksResponse["source"];
   fetchedAt: string;
@@ -263,14 +311,30 @@ async function gatherCandidates(): Promise<{
   };
 }
 
-async function compute(opts: { rerun?: boolean }): Promise<AiPicksResponse> {
-  const { cands, source, fetchedAt, quotaBlocked, warning } = await gatherCandidates();
+async function compute(opts: { force?: boolean }): Promise<AiPicksResponse> {
+  const gathered = await gatherCandidates();
   const regime = await loadRegimeSafe();
+  return reviewCandidates(gathered, regime, opts);
+}
+
+/**
+ * Core review: regime + candidates -> LLM (throttled) or deterministic fallback.
+ * `force` bypasses the throttle (admin-only, see route). `persist: false` skips the shared state (tests).
+ */
+export async function reviewCandidates(
+  gathered: Awaited<ReturnType<typeof gatherCandidates>>,
+  regime: RegimeSnapshot | null,
+  opts: { force?: boolean; persist?: boolean } = {},
+): Promise<AiPicksResponse> {
+  const { cands, source, fetchedAt, quotaBlocked, warning } = gathered;
+  const persistState = opts.persist !== false;
   const risky = Boolean(regime?.rules.active);
   const maxPicks = risky ? 3 : 5;
   const caps = regimeCaps(regime);
-  const key = `${fetchedAt}|${regime?.label ?? "na"}|${cands.map((c) => contractKey(c)).join(",")}`;
-  if (!opts.rerun && cache && cache.key === key && Date.now() - cache.at < CACHE_MS) return cache.value;
+  const day = tradingDateET();
+  // Fingerprint ignores fetchedAt: a tape refresh with the same candidates must not re-bill the LLM.
+  const key = `${day}|${regime?.label ?? "na"}|${cands.map((c) => contractKey(c)).sort().join(",")}`;
+  if (!opts.force && persistState && cache && cache.key === key && Date.now() - cache.at < CACHE_MS) return cache.value;
 
   const base = {
     source,
@@ -347,13 +411,51 @@ async function compute(opts: { rerun?: boolean }): Promise<AiPicksResponse> {
     return value;
   }
 
+  // ---- Cost guard (shared across instances via Blob) ----
+  const now = Date.now();
+  const state: AiPicksState | null = persistState ? await loadAiPicksState() : null;
+  const sameDay = state?.day === day;
+  if (!opts.force && persistState && sameDay && state) {
+    if (state.value && state.valueKey === key) {
+      // Same candidates as the last LLM answer today: never re-bill.
+      const value = { ...state.value, llmCachedAt: new Date(state.valueAt).toISOString() };
+      cache = { key, at: now, value };
+      return value;
+    }
+    const lastFailed = Boolean(state.lastError) && (!state.value || state.attemptAt > state.valueAt);
+    const wait = lastFailed ? LLM_ERROR_BACKOFF_MS : LLM_MIN_INTERVAL_MS;
+    if (now - state.attemptAt < wait) {
+      const nextLlmAt = new Date(state.attemptAt + wait).toISOString();
+      if (state.value) {
+        // Candidates changed but the model ran recently: serve the last AI answer, flagged.
+        const value: AiPicksResponse = {
+          ...state.value,
+          llmCachedAt: new Date(state.valueAt).toISOString(),
+          nextLlmAt,
+          candidatesChanged: true,
+        };
+        cache = { key, at: now, value };
+        return value;
+      }
+      const value = { ...fallback("throttled", state.lastError), llmProvider: cfg.provider, llmModel: cfg.model, nextLlmAt };
+      cache = { key, at: now, value };
+      return value;
+    }
+  }
+  // Claim the slot before calling so concurrent instances back off.
+  const base0: AiPicksState = sameDay && state
+    ? { ...state, candKey: key, attemptAt: now }
+    : { day, candKey: key, attemptAt: now, value: null, valueKey: "", valueAt: 0 };
+  if (persistState) await saveAiPicksState(base0);
+
   try {
     const { system, user } = buildPrompt(cands, regime, maxPicks);
-    const { text, provider, model } = await callLlm(system, user);
+    const { text, provider, model, usage } = await callLlm(system, user);
     const decision = parseDecision(text);
     if (!decision) {
-      const value = { ...fallback("invalid-output", "LLM returned non-JSON output"), llmProvider: provider, llmModel: model };
+      const value = { ...fallback("invalid-output", "LLM returned non-JSON output"), llmProvider: provider, llmModel: model, llmUsage: usage };
       cache = { key, at: Date.now(), value };
+      if (persistState) await saveAiPicksState({ ...base0, lastError: "invalid-output" });
       return value;
     }
     const byKey = new Map(cands.map((c) => [contractKey(c), c]));
@@ -385,24 +487,29 @@ async function compute(opts: { rerun?: boolean }): Promise<AiPicksResponse> {
       llmStatus: "ok",
       llmProvider: provider,
       llmModel: model,
+      llmUsage: usage,
       picks,
       skips,
       warning,
     };
     cache = { key, at: Date.now(), value };
+    if (persistState) {
+      await saveAiPicksState({ ...base0, value, valueKey: key, valueAt: Date.now(), lastError: undefined });
+    }
     return value;
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
-    // Never cache an LLM error for long — retry on the next poll after 2 min.
+    // Error backoff is enforced by the shared state (LLM_ERROR_BACKOFF_MS); short local cache only.
     const value = { ...fallback("error", msg.slice(0, 200)), llmProvider: cfg.provider, llmModel: cfg.model };
     cache = { key, at: Date.now() - CACHE_MS + 2 * 60_000, value };
+    if (persistState) await saveAiPicksState({ ...base0, lastError: msg.slice(0, 200) });
     return value;
   }
 }
 
 /** AI review of the top actionable candidates. Zero extra UW calls: re-uses the shared tape lists. */
-export async function loadAiPicks(opts: { rerun?: boolean } = {}): Promise<AiPicksResponse> {
-  const k = opts.rerun ? "rerun" : "normal";
+export async function loadAiPicks(opts: { force?: boolean } = {}): Promise<AiPicksResponse> {
+  const k = opts.force ? "force" : "normal";
   if (inflight?.key === k) return inflight.promise;
   const promise = compute(opts).finally(() => {
     if (inflight?.promise === promise) inflight = null;
