@@ -195,6 +195,43 @@ function writeDataset(all: Outcome[]) {
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
+async function finalize(today: string, t0: number, holidays: Set<string>, report: Record<string, unknown>) {
+  const all = await scoreAll(today);
+  const summary = summarize(all);
+  writeDataset(all);
+  const days = fs.readdirSync(p("replay")).filter((f) => f.endsWith(".json")).map((f) => f.slice(0, 10)).sort();
+  const flowDays = fs.readdirSync(p("flow")).filter((f) => f.endsWith(".json.gz")).length;
+  const doc = {
+    generatedAt: new Date().toISOString(),
+    coverage: { replayedDays: days.length, from: days[0] ?? null, to: days[days.length - 1] ?? null, flowDays, holidays: holidays.size },
+    uw: { tokenCountAtEnd: budget.tokenCountToday, callsThisRun: budget.runCalls, stopAt: STOP_AT, stopped: budget.stopped || null },
+    run: { ...report, minutes: Math.round((Date.now() - t0) / 600) / 100 },
+    rules: "Current live rules replayed at 10:00/10:30/11:00/12:00/13:00/13:55/15:45 ET. Lanes/puts/picks/premove: winner = option high ≥ +40% before low ≤ −25% within the time stop (lanes per definition, puts/picks/premove 3 sessions); flat otherwise. Lottery: winner = +100% before expiry. Entry = flow print price. Yields/econ calendar unavailable in replay. Study only — not financial advice.",
+    lanes: summary,
+    shadowSignals: signalStats(all),
+  };
+  writeJson(p("backtest-summary.json"), doc);
+  const md = [
+    `# FlowGuard history backtest (study only — not financial advice)`,
+    ``,
+    `Generated ${doc.generatedAt}. Replayed ${days.length} sessions (${doc.coverage.from} → ${doc.coverage.to}).`,
+    ``,
+    `| Lane | n | W | L | Flat | Open | No data | Win % (decided) | Avg T+1 | Avg T+3 | Avg max gain | OI↑ next day: n / win % |`,
+    `|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|`,
+    ...summary.map((r) => `| ${r.lane} | ${r.n} | ${r.winners} | ${r.losers} | ${r.flat} | ${r.open} | ${r.noData} | ${r.winRate ?? "—"} | ${r.avgT1 ?? "—"} | ${r.avgT3 ?? "—"} | ${r.avgMaxGain ?? "—"} | ${r.oiUpNextDay.n} / ${r.oiUpNextDay.winRate ?? "—"} |`),
+    ``,
+    `## Shadow signals (logged entries, decided only)`,
+    ``,
+    `| Signal | Verdict | n | W | L | Win % |`,
+    `|---|---|---:|---:|---:|---:|`,
+    ...Object.entries(doc.shadowSignals).flatMap(([k, m]) => Object.entries(m).map(([v, b]) => `| ${k} | ${v} | ${b.n} | ${b.winners} | ${b.losers} | ${b.winRate ?? "—"} |`)),
+    ``,
+    doc.rules,
+  ].join("\n");
+  fs.writeFileSync(p("backtest-summary.md"), md);
+  writeJson(p("logs", `run-${new Date().toISOString().replace(/[:.]/g, "-")}.json`), doc);
+}
+
 async function main() {
   ensureDirs();
   const today = etToday();
@@ -244,6 +281,8 @@ async function main() {
           child.on("exit", (c) => resolve(c ?? 1));
         });
         const done = ready.filter((d) => fs.existsSync(replayFile(d)));
+        // Score outcomes progressively (newest first) so coverage of outcomes tracks coverage of days.
+        if (code !== 3) await finalize(today, t0, holidays, report).catch((e) => log("finalize error", (e as Error).message));
         report.daysReplayed += done.length;
         n += done.length;
         if (code === 3) {
@@ -258,40 +297,7 @@ async function main() {
     }
   }
 
-  const all = await scoreAll(today);
-  const summary = summarize(all);
-  writeDataset(all);
-  const days = fs.readdirSync(p("replay")).filter((f) => f.endsWith(".json")).map((f) => f.slice(0, 10)).sort();
-  const flowDays = fs.readdirSync(p("flow")).filter((f) => f.endsWith(".json.gz")).length;
-  const doc = {
-    generatedAt: new Date().toISOString(),
-    coverage: { replayedDays: days.length, from: days[0] ?? null, to: days[days.length - 1] ?? null, flowDays, holidays: holidays.size },
-    uw: { tokenCountAtEnd: budget.tokenCountToday, callsThisRun: budget.runCalls, stopAt: STOP_AT, stopped: budget.stopped || null },
-    run: { ...report, minutes: Math.round((Date.now() - t0) / 600) / 100 },
-    rules: "Current live rules replayed at 10:00/10:30/11:00/12:00/13:00/13:55/15:45 ET. Lanes/puts/picks/premove: winner = option high ≥ +40% before low ≤ −25% within the time stop (lanes per definition, puts/picks/premove 3 sessions); flat otherwise. Lottery: winner = +100% before expiry. Entry = flow print price. Yields/econ calendar unavailable in replay. Study only — not financial advice.",
-    lanes: summary,
-    shadowSignals: signalStats(all),
-  };
-  writeJson(p("backtest-summary.json"), doc);
-  const md = [
-    `# FlowGuard history backtest (study only — not financial advice)`,
-    ``,
-    `Generated ${doc.generatedAt}. Replayed ${days.length} sessions (${doc.coverage.from} → ${doc.coverage.to}).`,
-    ``,
-    `| Lane | n | W | L | Flat | Open | No data | Win % (decided) | Avg T+1 | Avg T+3 | Avg max gain | OI↑ next day: n / win % |`,
-    `|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|`,
-    ...summary.map((r) => `| ${r.lane} | ${r.n} | ${r.winners} | ${r.losers} | ${r.flat} | ${r.open} | ${r.noData} | ${r.winRate ?? "—"} | ${r.avgT1 ?? "—"} | ${r.avgT3 ?? "—"} | ${r.avgMaxGain ?? "—"} | ${r.oiUpNextDay.n} / ${r.oiUpNextDay.winRate ?? "—"} |`),
-    ``,
-    `## Shadow signals (logged entries, decided only)`,
-    ``,
-    `| Signal | Verdict | n | W | L | Win % |`,
-    `|---|---|---:|---:|---:|---:|`,
-    ...Object.entries(doc.shadowSignals).flatMap(([k, m]) => Object.entries(m).map(([v, b]) => `| ${k} | ${v} | ${b.n} | ${b.winners} | ${b.losers} | ${b.winRate ?? "—"} |`)),
-    ``,
-    doc.rules,
-  ].join("\n");
-  fs.writeFileSync(p("backtest-summary.md"), md);
-  writeJson(p("logs", `run-${new Date().toISOString().replace(/[:.]/g, "-")}.json`), doc);
+  await finalize(today, t0, holidays, report);
   log(`done: replayed=${report.daysReplayed} fetched=${report.daysFetched} uwCalls=${budget.runCalls} tokenCount=${budget.tokenCountToday} ${budget.stopped || ""}`);
 }
 
