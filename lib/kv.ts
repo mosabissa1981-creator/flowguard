@@ -83,6 +83,8 @@ type OpDay = { day: string; redisCmds: number; redisErrors: number; blobReads: n
 let ops: OpDay = { day: "", redisCmds: 0, redisErrors: 0, blobReads: 0, blobWrites: 0, blobSkipped: 0, reported: 0 };
 let redisFailUntil = 0;
 let lastRedisError = "";
+let lastRedisErrorAt = 0;
+let redisConsecutiveErrors = 0;
 let blobDownUntil = 0;
 let lastBlobError = "";
 
@@ -122,6 +124,7 @@ export function kvStats() {
     instanceOpsToday: { ...o, reported: undefined },
     caps: { blobWritesPerDay: blobWriteCap(), blobReadsPerDay: blobReadCap(), redisCmdsPerInstanceDay: redisCmdCap() },
     redisError: Date.now() < redisFailUntil ? lastRedisError : null,
+    lastRedisError: lastRedisError ? { message: lastRedisError, at: new Date(lastRedisErrorAt).toISOString(), consecutive: redisConsecutiveErrors } : null,
     blobError: lastBlobError || null,
     blobDown: Date.now() < blobDownUntil,
   };
@@ -146,24 +149,33 @@ async function redis(commands: (string | number)[][]): Promise<unknown[] | null>
   const sample = Math.floor(o.redisCmds / 100) > o.reported;
   const batch = sample ? [...commands, ["INCRBY", `flowguard/ops/redis-${o.day}`, 100], ["EXPIRE", `flowguard/ops/redis-${o.day}`, 3 * 86400]] : commands;
   if (sample) o.reported = Math.floor(o.redisCmds / 100);
+  const body = JSON.stringify(batch);
+  // Large tape buckets: allow more time than tiny GET/SET round trips.
+  const timeoutMs = Math.min(12_000, 4000 + Math.ceil(body.length / 100_000) * 1000);
   try {
     const res = await fetch(`${conf.url}/pipeline`, {
       method: "POST",
       headers: { Authorization: `Bearer ${conf.token}`, "Content-Type": "application/json" },
-      body: JSON.stringify(batch),
+      body,
       cache: "no-store",
-      signal: AbortSignal.timeout(4000),
+      signal: AbortSignal.timeout(timeoutMs),
     });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    if (!res.ok) throw Object.assign(new Error(`HTTP ${res.status}`), { status: res.status });
     const out = (await res.json()) as { result?: unknown; error?: string }[];
     const err = out.find((r) => r.error);
     if (err) throw new Error(String(err.error).slice(0, 160));
+    redisConsecutiveErrors = 0;
     return out.slice(0, commands.length).map((r) => r.result);
   } catch (e) {
     o.redisErrors += 1;
+    redisConsecutiveErrors += 1;
     lastRedisError = (e instanceof Error ? e.message : String(e)).slice(0, 200);
-    redisFailUntil = Date.now() + 30_000;
-    console.error(`[kv] redis error: ${lastRedisError}`);
+    lastRedisErrorAt = Date.now();
+    const status = (e as { status?: number }).status ?? 0;
+    // One slow/failed call (timeout, blip) must not flip the whole instance to "not durable" (which pauses
+    // LLM features); back off only on auth/rate-limit errors or a run of failures.
+    if (status === 401 || status === 403 || status === 429 || redisConsecutiveErrors >= 3) redisFailUntil = Date.now() + 30_000;
+    console.error(`[kv] redis error (${redisConsecutiveErrors} in a row, ${body.length}B, ${timeoutMs}ms timeout): ${lastRedisError}`);
     return null;
   }
 }
@@ -305,6 +317,34 @@ export async function kvGet<T>(key: string, opts: { maxAgeMs?: number; fresh?: b
     return keep(r.value, JSON.stringify(r.value));
   }
   return (hit?.value as T) ?? null;
+}
+
+/** Read many keys in pipelined batches (Redis); other backends fall back to kvGet. Always fresh. */
+export async function kvGetMany<T>(keys: string[], batchSize = 8): Promise<Array<T | null>> {
+  if (kvBackend() !== "redis") return Promise.all(keys.map((k) => kvGet<T>(k, { fresh: true })));
+  const out: Array<T | null> = new Array(keys.length).fill(null);
+  for (let i = 0; i < keys.length; i += batchSize) {
+    const slice = keys.slice(i, i + batchSize);
+    const res = await redis(slice.map((k) => ["GET", k]));
+    slice.forEach((k, j) => {
+      const now = Date.now();
+      const hit = mem.get(k);
+      const raw = res?.[j];
+      if (typeof raw === "string") {
+        try {
+          const value = decode(raw);
+          const json = JSON.stringify(value);
+          mem.set(k, { at: now, value, json, persistedJson: json, lastWriteAt: hit?.lastWriteAt ?? 0, lastReadAt: now });
+          out[i + j] = value as T;
+          return;
+        } catch {
+          /* fall through */
+        }
+      }
+      out[i + j] = (hit?.value as T) ?? null;
+    });
+  }
+  return out;
 }
 
 /**

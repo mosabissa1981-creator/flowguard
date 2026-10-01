@@ -2,7 +2,7 @@ import "server-only";
 
 import { after } from "next/server";
 
-import { kvDurable, kvGet, kvSet, kvDel, kvSetNx } from "@/lib/kv";
+import { kvDurable, kvGet, kvGetMany, kvSet, kvDel, kvSetNx } from "@/lib/kv";
 import { sessionOpenUtc, tradingDateET } from "@/lib/session";
 import type { FlowAlert } from "@/lib/types";
 import { fetchFlowAlertsPage } from "@/lib/uw";
@@ -117,12 +117,9 @@ async function hydrate(st: State, openMs: number): Promise<void> {
   const stored = await kvGet<TapeMeta>(metaKey(st.day), { maxAgeMs: META_MAX_AGE_MS });
   if (!stored || stored.day !== st.day) return;
   const want = Object.entries(stored.buckets).filter(([b, n]) => n > (st.localCounts[b] ?? 0));
-  await Promise.all(
-    want.map(async ([b]) => {
-      const rows = await kvGet<Row[]>(bucketKey(st.day, b), { fresh: true });
-      for (const r of rows ?? []) add(st, fromRow(r), openMs);
-    }),
-  );
+  // Pipelined batches instead of ~40 parallel REST calls on a cold instance (those timed out under load).
+  const got = await kvGetMany<Row[]>(want.map(([b]) => bucketKey(st.day, b)));
+  for (const rows of got) for (const r of rows ?? []) add(st, fromRow(r), openMs);
   // Adopt the more advanced shared coverage.
   if (stored.syncedAt >= st.meta.syncedAt) {
     st.meta = { ...stored, buckets: { ...stored.buckets }, total: st.byId.size };
