@@ -1,131 +1,36 @@
 import "server-only";
 
-import { list, put } from "@vercel/blob";
-import { promises as fs } from "node:fs";
-import path from "node:path";
+import { blobProbe, kvBackend, kvDurable, kvGet, kvHealth, kvSet } from "@/lib/kv";
 
 /**
- * Tiny JSON document store for shadow output: Vercel Blob (private) when BLOB_READ_WRITE_TOKEN is set,
- * a local directory when SHADOW_LOCAL_DIR is set (local tests), else per-instance memory.
- * Paths: flowguard/shadow/<kind>-YYYY-MM-DD.json
+ * Tiny JSON document store for shadow / test-lane output, on top of lib/kv (Upstash Redis when configured,
+ * Blob-lite or memory otherwise). Keys: flowguard/shadow/<kind>-<day>.json (same paths as the legacy Blob docs,
+ * which are copied in once on a Redis miss).
+ * Lane books (day = "book") are tier "rare" (written once per logged pick / tracking update); the rest are "hot".
  */
 
 const PREFIX = "flowguard/shadow/";
-const HYDRATE_MS = 20_000;
-
-const mem = new Map<string, { at: number; value: unknown }>();
-
-function blobToken(): string {
-  return process.env.BLOB_READ_WRITE_TOKEN?.trim() ?? "";
-}
-
-function localDir(): string {
-  return process.env.SHADOW_LOCAL_DIR?.trim() ?? "";
-}
+const HYDRATE_MS = 60_000;
 
 export function docPath(kind: string, day: string): string {
   return `${PREFIX}${kind}-${day}.json`;
 }
 
 export async function loadDoc<T>(kind: string, day: string, opts: { fresh?: boolean } = {}): Promise<T | null> {
-  const p = docPath(kind, day);
-  const hit = mem.get(p);
-  if (hit && !opts.fresh && Date.now() - hit.at < HYDRATE_MS) return hit.value as T;
-  const dir = localDir();
-  if (dir) {
-    try {
-      const text = await fs.readFile(path.join(dir, `${kind}-${day}.json`), "utf8");
-      const value = JSON.parse(text) as T;
-      mem.set(p, { at: Date.now(), value });
-      return value;
-    } catch {
-      return (hit?.value as T) ?? null;
-    }
-  }
-  const token = blobToken();
-  if (!token) return (hit?.value as T) ?? null;
-  try {
-    const { blobs } = await list({ prefix: p, limit: 2 });
-    const blob = blobs.find((b) => b.pathname === p);
-    if (!blob) return (hit?.value as T) ?? null;
-    const response = await fetch(blob.url, { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" });
-    if (!response.ok) return (hit?.value as T) ?? null;
-    const value = (await response.json()) as T;
-    mem.set(p, { at: Date.now(), value });
-    return value;
-  } catch (e) {
-    console.error(`[shadow/store] blob read failed for ${p}:`, e instanceof Error ? e.message : e);
-    return (hit?.value as T) ?? null;
-  }
+  return kvGet<T>(docPath(kind, day), { maxAgeMs: opts.fresh ? 3_000 : HYDRATE_MS, blobFallback: day === "book" });
 }
 
 export async function saveDoc(kind: string, day: string, value: unknown): Promise<void> {
-  const p = docPath(kind, day);
-  mem.set(p, { at: Date.now(), value });
-  const dir = localDir();
-  if (dir) {
-    try {
-      await fs.mkdir(dir, { recursive: true });
-      await fs.writeFile(path.join(dir, `${kind}-${day}.json`), JSON.stringify(value, null, 2));
-    } catch {
-      // memory copy still serves this process
-    }
-    return;
-  }
-  if (!blobToken()) return;
-  try {
-    await put(p, JSON.stringify(value), {
-      access: "private",
-      contentType: "application/json",
-      addRandomSuffix: false,
-      allowOverwrite: true,
-      cacheControlMaxAge: 0,
-    });
-  } catch (e) {
-    // Blob suspended / over quota — memory still guards warm instances.
-    console.error(`[shadow/store] blob write failed for ${p}:`, e instanceof Error ? e.message : e);
-  }
+  const rare = day === "book";
+  await kvSet(docPath(kind, day), value, { tier: rare ? "rare" : "hot", ttlSec: rare ? undefined : 45 * 86400 });
 }
 
-export function persistenceMode(): "local" | "blob" | "memory" {
-  if (localDir()) return "local";
-  if (blobToken()) return "blob";
-  return "memory";
+export function persistenceMode(): string {
+  const b = kvBackend();
+  return kvDurable() ? b : `${b} (not durable)`;
 }
 
-/** Admin diagnostic: write + fresh read of a tiny doc. Returns error messages only (no secrets). */
-export async function storeHealth(): Promise<{ mode: string; write: string; read: string; ms: number }> {
-  const t0 = Date.now();
-  const mode = persistenceMode();
-  const stamp = new Date().toISOString();
-  const p = docPath("health", "check");
-  let write = "skipped";
-  let read = "skipped";
-  if (mode === "blob") {
-    try {
-      await put(p, JSON.stringify({ stamp }), {
-        access: "private",
-        contentType: "application/json",
-        addRandomSuffix: false,
-        allowOverwrite: true,
-        cacheControlMaxAge: 0,
-      });
-      write = "ok";
-    } catch (e) {
-      write = `error: ${(e instanceof Error ? e.message : String(e)).slice(0, 200)}`;
-    }
-    try {
-      const { blobs } = await list({ prefix: p, limit: 2 });
-      const blob = blobs.find((b) => b.pathname === p);
-      if (!blob) read = "error: not listed";
-      else {
-        const r = await fetch(blob.url, { headers: { Authorization: `Bearer ${blobToken()}` }, cache: "no-store" });
-        const v = r.ok ? ((await r.json()) as { stamp?: string }) : null;
-        read = !r.ok ? `error: HTTP ${r.status}` : v?.stamp === stamp ? "ok (fresh)" : `stale (got ${v?.stamp ?? "?"})`;
-      }
-    } catch (e) {
-      read = `error: ${(e instanceof Error ? e.message : String(e)).slice(0, 200)}`;
-    }
-  }
-  return { mode, write, read, ms: Date.now() - t0 };
+/** Admin diagnostic: active backend round trip + legacy Blob probe (one GET; optional one put). */
+export async function storeHealth(opts: { blobWrite?: boolean } = {}) {
+  return { kv: await kvHealth(), legacyBlob: await blobProbe({ write: opts.blobWrite }) };
 }

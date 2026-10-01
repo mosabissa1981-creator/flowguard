@@ -1,5 +1,6 @@
 import "server-only";
 
+import { ledgerSpend } from "@/lib/llm-ledger";
 import { dailyBudgetUsd } from "@/lib/shadow/llm";
 import { loadDoc } from "@/lib/shadow/store";
 import type { BriefDoc, ReleaseReadDoc, ShadowDay } from "@/lib/shadow/types";
@@ -17,6 +18,8 @@ export async function daySpendUsd(day: string): Promise<number> {
   // Lane-debate shadow module (TEST-lane picks) shares the same daily budget.
   const laneDebate = await loadDoc<{ llm?: { spendUsd?: number } }>("lanedebate", day);
   total += laneDebate?.llm?.spendUsd ?? 0;
+  // Global ledger (Redis INCRBYFLOAT) is authoritative across instances; docs are a fallback.
+  total = Math.max(total, await ledgerSpend("shadow", day).catch(() => 0));
   return Math.round(total * 10000) / 10000;
 }
 

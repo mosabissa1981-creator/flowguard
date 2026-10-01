@@ -13,7 +13,8 @@ export const maxDuration = 120;
  *  - GET /api/shadow/lanes               → today; lazily judges newly logged picks (one batched call, ≥30 min apart, budgeted).
  *  - GET /api/shadow/lanes?day=YYYY-MM-DD → stored day (read-only). Study routine saves it as study/lane-debate-<day>.json.
  *  - ?refresh=1&key=<AI_PICKS_ADMIN_SECRET> → bypass throttle / hours (budget still applies).
- *  - ?diag=1&key=<admin> → Blob write/read round-trip check.
+ *  - ?diag=1&key=<admin> → persistence health (active backend round trip, op counters, legacy Blob GET probe;
+ *    &blobWrite=1 also tries one Blob put).
  *  - POST ?key=<admin> {picks:[...]} → sample debate on hand-supplied picks (stored under `samples`, not scored).
  */
 export async function GET(request: NextRequest) {
@@ -23,7 +24,7 @@ export async function GET(request: NextRequest) {
   if (day && !/^\d{4}-\d{2}-\d{2}$/.test(day)) return Response.json({ error: "day must be YYYY-MM-DD" }, { status: 400 });
   if (params.get("diag") === "1") {
     if (!adminOk(params.get("key"))) return Response.json({ error: "unauthorized" }, { status: 401 });
-    return Response.json(await storeHealth(), { headers: { "Cache-Control": "no-store" } });
+    return Response.json(await storeHealth({ blobWrite: params.get("blobWrite") === "1" }), { headers: { "Cache-Control": "no-store" } });
   }
   try {
     if (day && day !== today) {

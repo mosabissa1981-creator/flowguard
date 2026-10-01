@@ -10,6 +10,7 @@ import { buildExitPlan } from "@/lib/exit-plan";
 import { loadStudySummary, studyBrief } from "@/lib/study-summary";
 import { askShare, toNumber } from "@/lib/numbers";
 import { tradingDateET } from "@/lib/session";
+import { ledgerAdd, ledgerSpend, llmPersistenceGate } from "@/lib/llm-ledger";
 import { loadAiPicksState, saveAiPicksState, type AiPicksState } from "@/lib/ai-picks-state";
 import { clamp } from "@/lib/numbers";
 import { estimateCost } from "@/lib/shadow/llm";
@@ -520,7 +521,8 @@ export async function reviewCandidates(
   const now = Date.now();
   const state: AiPicksState | null = persistState ? await loadAiPicksState() : null;
   const sameDay = state?.day === day;
-  const spentToday = sameDay ? (state?.spendUsd ?? 0) : 0;
+  const ledger = await ledgerSpend("ai-picks", day).catch(() => 0);
+  const spentToday = Math.max(sameDay ? (state?.spendUsd ?? 0) : 0, ledger);
   const budget = dailyBudgetUsd();
   const spendInfo = { llmSpendTodayUsd: Math.round(spentToday * 10000) / 10000, llmBudgetUsd: budget };
   if (persistState && spentToday >= budget) {
@@ -561,6 +563,16 @@ export async function reviewCandidates(
       return value;
     }
   }
+  // No durable store → the $/day cap cannot be enforced across instances: pause the LLM, serve the fallback.
+  const gate = llmPersistenceGate("ai-picks", day);
+  if (!gate.ok) {
+    const value: AiPicksResponse =
+      state?.value && sameDay
+        ? { ...state.value, ...spendInfo, llmCachedAt: new Date(state.valueAt).toISOString(), candidatesChanged: state.valueKey !== key }
+        : { ...fallback("throttled", `AI review paused: ${gate.reason}.`), ...spendInfo, llmProvider: cfg.provider, llmModel: cfg.model };
+    cache = { key, at: now, value };
+    return value;
+  }
   // Claim the slot before calling so concurrent instances back off.
   const base0: AiPicksState = sameDay && state
     ? { ...state, candKey: key, attemptAt: now, spendUsd: spentToday }
@@ -571,7 +583,8 @@ export async function reviewCandidates(
     const { system, user } = buildPrompt(cands, premoveCands, regime, maxPicks, maxPremovePicks, opts.brief);
     const { text, provider, model, usage } = await callLlm(system, user);
     // Count the spend whether or not the output parses.
-    base0.spendUsd = Math.round((spentToday + (usage?.costUsd ?? 0)) * 10000) / 10000;
+    const ledgerAfter = await ledgerAdd("ai-picks", day, usage?.costUsd ?? 0).catch(() => 0);
+    base0.spendUsd = Math.round(Math.max(spentToday + (usage?.costUsd ?? 0), ledgerAfter) * 10000) / 10000;
     const spendAfter = { llmSpendTodayUsd: base0.spendUsd, llmBudgetUsd: budget };
     const decision = parseDecision(text);
     if (!decision) {
