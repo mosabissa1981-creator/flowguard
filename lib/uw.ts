@@ -306,10 +306,10 @@ export async function fetchMarketTide(skipCache = false): Promise<TideSnapshot |
   );
 }
 
-export async function fetchNetPremTicks(ticker: string): Promise<NetPremTick[]> {
+export async function fetchNetPremTicks(ticker: string, date?: string): Promise<NetPremTick[]> {
   const payload = await uwGet<{ data?: Array<Record<string, unknown>> }>(
     `/api/stock/${encodeURIComponent(ticker.toUpperCase())}/net-prem-ticks`,
-    undefined,
+    date ? { date } : undefined,
     NET_PREM_TTL_MS,
   );
 
@@ -503,6 +503,7 @@ export function parseHistoricBar(raw: Record<string, unknown>): HistoricBar {
     lastTapeTime: asString(raw.last_tape_time) || null,
     nbboBid: firstPositive(raw.nbbo_bid, raw.bid),
     nbboAsk: firstPositive(raw.nbbo_ask, raw.ask),
+    flexOiTransfer: Math.round(toNumber(raw.flex_oi_transfer)) || null,
   };
 }
 
@@ -797,6 +798,17 @@ export async function fetchGexByStrike(ticker: string, day: string): Promise<Rec
   const payload = await uwGet<{ data?: Record<string, unknown>[] }>(
     `/api/stock/${encodeURIComponent(ticker.toUpperCase())}/greek-exposure/strike`,
     { date: day },
+    DAY_TTL_MS,
+  );
+  return payload.data ?? [];
+}
+
+/** Shadow signals: insider (Form 4) transactions for one ticker, newest first. GET /api/insider/transactions. Cached 12h. */
+export async function fetchInsiderTransactions(ticker: string): Promise<Record<string, unknown>[]> {
+  if (await isUwBlocked()) return [];
+  const payload = await uwGet<{ data?: Record<string, unknown>[] }>(
+    "/api/insider/transactions",
+    { ticker_symbol: ticker.toUpperCase(), limit: 500 },
     DAY_TTL_MS,
   );
   return payload.data ?? [];
