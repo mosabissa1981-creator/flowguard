@@ -242,7 +242,9 @@ export function classifyRegime(input: {
     .sort((a, b) => a.date.localeCompare(b.date));
   const isKey = (e: EconEvent) => e.impact === "High" || (e.impact === "Medium" && KEY_EVENT.test(e.title) && !/Speaks/i.test(e.title));
   const todayEvents = events.filter((e) => etDateOf(e.date) === input.today && (isKey(e) || e.impact === "Medium"));
-  const todayHigh = todayEvents.filter((e) => e.impact === "High" || /FOMC|Federal Funds/i.test(e.title));
+  const todayHigh = todayEvents.filter(
+    (e) => !/Speaks|speech/i.test(e.title) && (e.impact === "High" || /FOMC Statement|Federal Funds|Rate Decision/i.test(e.title)),
+  );
   const upcoming = events
     .filter((e) => etDateOf(e.date) > input.today && e.impact === "High")
     .sort((a, b) => a.date.localeCompare(b.date))
