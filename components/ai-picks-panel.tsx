@@ -15,7 +15,14 @@ function money(n: number): string {
   return `$${Number(n ?? 0).toFixed(2)}`;
 }
 
-export function AiPicksPanel({ onSelect }: { onSelect: (id: string) => void }) {
+export function AiPicksPanel({
+  onSelect,
+  onData,
+}: {
+  onSelect: (id: string) => void;
+  /** Shares each response (and loading state) with the Premove AI review next to the Premove lane. */
+  onData?: (data: AiPicksResponse | null, loading: boolean, error: string | null) => void;
+}) {
   const [data, setData] = useState<AiPicksResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -33,6 +40,10 @@ export function AiPicksPanel({ onSelect }: { onSelect: (id: string) => void }) {
       setLoading(false);
     }
   }, []);
+
+  useEffect(() => {
+    onData?.(data, loading, error);
+  }, [data, loading, error, onData]);
 
   useEffect(() => {
     const first = window.setTimeout(() => void load(false), 0);
@@ -165,6 +176,10 @@ export function AiPicksPanel({ onSelect }: { onSelect: (id: string) => void }) {
         <p className="mt-2 text-[10px] text-muted-foreground">
           Study book {data.study.since}→{data.study.through}: {data.study.totals.w}W / {data.study.totals.l}L /{" "}
           {data.study.totals.flat} flat.
+          {typeof data.llmUsage?.costUsd === "number" ? ` · last AI call $${data.llmUsage.costUsd.toFixed(3)}` : ""}
+          {typeof data.llmSpendTodayUsd === "number"
+            ? ` · AI spend today $${data.llmSpendTodayUsd.toFixed(2)} / $${(data.llmBudgetUsd ?? 1).toFixed(2)}`
+            : ""}
         </p>
       ) : null}
     </section>

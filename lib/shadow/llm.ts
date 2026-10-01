@@ -69,7 +69,7 @@ export function shadowLlmConfig(): ShadowLlmConfig | null {
 
 export type LlmResult = { text: string; sources: string[]; usage: LlmUsageRecord };
 
-function estimateCost(model: string, inTok: number, cached: number, outTok: number, web: number, posts: number): number {
+export function estimateCost(model: string, inTok: number, cached: number, outTok: number, web: number, posts: number): number {
   const p = PRICES[model] ?? PRICES["grok-4.7"];
   return ((inTok - cached) * p.input + cached * p.cached + outTok * p.output) / 1e6 + web * WEB_SEARCH_USD + posts * X_POST_USD;
 }

@@ -14,6 +14,7 @@ import { MorningPanel } from "@/components/morning-panel";
 import { AiPicksPanel } from "@/components/ai-picks-panel";
 import { ShadowPanel } from "@/components/shadow-panel";
 import { PanelBoundary } from "@/components/panel-boundary";
+import { PremoveAiPanel } from "@/components/premove-ai-panel";
 import { PremovePanel } from "@/components/premove-panel";
 import { PicksPanel } from "@/components/picks-panel";
 import { PriceWatchesPanel } from "@/components/price-watches-panel";
@@ -21,6 +22,7 @@ import { WatchlistBar } from "@/components/watchlist-bar";
 import { UwKeyForm, UwKeyIcon } from "@/components/uw-key-form";
 import { DEFAULT_FILTERS } from "@/lib/filters";
 import type {
+  AiPicksResponse,
   DailyPick,
   EvaluatedWatch,
   FlowFilters,
@@ -114,6 +116,15 @@ export function Screener({
   const [picksData, setPicksData] = useState<PicksResponse | null>(initialPicks ?? null);
   const [picksLoading, setPicksLoading] = useState(!initialPicks);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [aiState, setAiState] = useState<{ data: AiPicksResponse | null; loading: boolean; error: string | null }>({
+    data: null,
+    loading: true,
+    error: null,
+  });
+  const handleAiData = useCallback(
+    (data: AiPicksResponse | null, loading: boolean, error: string | null) => setAiState({ data, loading, error }),
+    [],
+  );
   const [secondsLeft, setSecondsLeft] = useState(BOARD_REFRESH_MS / 1000);
   const [watchlistOnly, setWatchlistOnly] = useState(false);
 
@@ -614,7 +625,7 @@ export function Screener({
       </header>
 
       <PanelBoundary name="AI picks">
-        <AiPicksPanel onSelect={setSelectedId} />
+        <AiPicksPanel onSelect={setSelectedId} onData={handleAiData} />
       </PanelBoundary>
 
       <PanelBoundary name="Shadow signals">
@@ -662,6 +673,10 @@ export function Screener({
         priceWatches={priceWatches}
         onSavePriceWatch={savePriceWatch}
       />
+
+      <PanelBoundary name="Premove AI review">
+        <PremoveAiPanel data={aiState.data} loading={aiState.loading} error={aiState.error} onSelect={setSelectedId} />
+      </PanelBoundary>
 
       <PicksPanel
         picks={shownPicks}
