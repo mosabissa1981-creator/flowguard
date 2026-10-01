@@ -295,7 +295,8 @@ async function compute(): Promise<PutsResponse> {
     if (!putsEligible(row)) continue;
     const k = contractKey(row);
     const cur = byChain.get(k);
-    if (!cur || toNumber(row.alert.total_premium) > toNumber(cur.alert.total_premium)) byChain.set(k, row);
+    // Earliest qualifying print per chain (full-session tape) is the entry; later re-prints never move it.
+    if (!cur || (Date.parse(row.alert.created_at) < Date.parse(cur.alert.created_at))) byChain.set(k, row);
   }
   const eligible = [...byChain.values()];
   // Pre-rank without spot data to decide which tickers get stock-state / earnings lookups.

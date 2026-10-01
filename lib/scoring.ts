@@ -563,12 +563,20 @@ export function rankAlerts(
     chainFades?: Record<string, ChainFadeSignal>;
   } = {},
 ): RankedFlow[] {
+  // Every peer signal (session ask confirmation, later-print fade, follow-through) only looks at the same
+  // ticker/chain, so pass same-ticker peers: O(n) on the full-session tape instead of O(n²).
+  const byTicker = new Map<string, FlowAlert[]>();
+  for (const a of alerts) {
+    const list = byTicker.get(a.ticker);
+    if (list) list.push(a);
+    else byTicker.set(a.ticker, [a]);
+  }
   const scored = alerts.map((alert) =>
     scoreAlert(alert, {
       marketTide: context.marketTide,
       tickerTide: context.tickerTides?.[alert.ticker] ?? null,
       now: context.now,
-      peers: alerts,
+      peers: byTicker.get(alert.ticker) ?? [alert],
       chainFade: context.chainFades?.[alert.id] ?? null,
     }),
   );

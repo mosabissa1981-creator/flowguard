@@ -259,6 +259,30 @@ export async function fetchFlowAlerts(params: {
   }, Boolean(params.skipCache));
 }
 
+/**
+ * One uncached flow-alerts page (newest first). Used by the session accumulator (lib/session-tape.ts),
+ * which does its own incremental paging and dedupe.
+ */
+export async function fetchFlowAlertsPage(params: {
+  minPremium: number;
+  newerThan?: string;
+  olderThan?: string;
+  limit?: number;
+}): Promise<FlowAlert[]> {
+  const payload = await uwGet<{ data?: Record<string, unknown>[] }>(
+    "/api/option-trades/flow-alerts",
+    {
+      limit: Math.min(params.limit ?? 200, 200),
+      min_premium: params.minPremium > 0 ? params.minPremium : undefined,
+      newer_than: params.newerThan,
+      older_than: params.olderThan,
+    },
+    0,
+    true,
+  );
+  return (payload.data ?? []).map(normalizeFlowAlert);
+}
+
 export async function fetchMarketTide(skipCache = false): Promise<TideSnapshot | null> {
   const payload = await uwGet<{
     data?: Array<{

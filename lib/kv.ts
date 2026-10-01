@@ -348,6 +348,14 @@ export async function kvGetNumber(key: string, maxAgeMs = 10_000): Promise<numbe
   return Number.isFinite(n) ? n : 0;
 }
 
+/** SET NX EX lock (Redis). Without Redis there is no cross-instance lock: returns true. */
+export async function kvSetNx(key: string, value: string, ttlSec: number): Promise<boolean> {
+  if (kvBackend() !== "redis") return true;
+  const out = await redis([["SET", key, value, "NX", "EX", Math.max(1, Math.round(ttlSec))]]);
+  if (!out) return true; // Redis down: do not block work (each instance falls back to memory)
+  return out[0] === "OK";
+}
+
 export async function kvDel(key: string): Promise<void> {
   mem.delete(key);
   if (kvBackend() === "redis") await redis([["DEL", key]]);
