@@ -1,15 +1,15 @@
 {
- "generatedAt": "2026-10-01T02:33:32.561Z",
+ "generatedAt": "2026-10-01T20:14:55.562Z",
  "note": "Per study day: regime features + outcome counts by pick type (side|dteBand|bucket). Built by scripts/build-study-summary.mjs.",
  "days": [
   {
    "day": "2026-09-04",
    "label": null,
    "tide": null,
-   "us10yChangeBp": 1,
-   "us30yChangeBp": -1,
-   "calendarType": "report",
-   "calendarNote": "NFP (August) — first Friday; assumed, verify",
+   "us10yChangeBp": null,
+   "us30yChangeBp": null,
+   "calendarType": "normal",
+   "calendarNote": null,
    "types": {
     "put|dte11-30|morning": {
      "w": 0,
@@ -67,8 +67,8 @@
    "day": "2026-09-08",
    "label": null,
    "tide": null,
-   "us10yChangeBp": 2,
-   "us30yChangeBp": 1,
+   "us10yChangeBp": null,
+   "us30yChangeBp": null,
    "calendarType": "normal",
    "calendarNote": null,
    "types": {
@@ -98,8 +98,8 @@
    "day": "2026-09-09",
    "label": null,
    "tide": "bearish",
-   "us10yChangeBp": 3,
-   "us30yChangeBp": 3,
+   "us10yChangeBp": null,
+   "us30yChangeBp": null,
    "calendarType": "normal",
    "calendarNote": null,
    "types": {
@@ -134,8 +134,8 @@
    "day": "2026-09-10",
    "label": null,
    "tide": "bearish",
-   "us10yChangeBp": 12,
-   "us30yChangeBp": 9,
+   "us10yChangeBp": null,
+   "us30yChangeBp": null,
    "calendarType": "normal",
    "calendarNote": null,
    "types": {
@@ -185,8 +185,8 @@
    "day": "2026-09-11",
    "label": null,
    "tide": "bullish",
-   "us10yChangeBp": 1,
-   "us30yChangeBp": -2,
+   "us10yChangeBp": null,
+   "us30yChangeBp": null,
    "calendarType": "normal",
    "calendarNote": null,
    "types": {
@@ -216,8 +216,8 @@
    "day": "2026-09-14",
    "label": null,
    "tide": "bearish",
-   "us10yChangeBp": 1,
-   "us30yChangeBp": -1,
+   "us10yChangeBp": null,
+   "us30yChangeBp": null,
    "calendarType": "normal",
    "calendarNote": null,
    "types": {
@@ -252,8 +252,8 @@
    "day": "2026-09-15",
    "label": null,
    "tide": "bearish",
-   "us10yChangeBp": 3,
-   "us30yChangeBp": 2,
+   "us10yChangeBp": null,
+   "us30yChangeBp": null,
    "calendarType": "normal",
    "calendarNote": null,
    "types": {
@@ -303,8 +303,8 @@
    "day": "2026-09-17",
    "label": null,
    "tide": "bullish",
-   "us10yChangeBp": -7,
-   "us30yChangeBp": -6,
+   "us10yChangeBp": null,
+   "us30yChangeBp": null,
    "calendarType": "normal",
    "calendarNote": null,
    "types": {
@@ -334,8 +334,8 @@
    "day": "2026-09-18",
    "label": null,
    "tide": "bullish",
-   "us10yChangeBp": 7,
-   "us30yChangeBp": 5,
+   "us10yChangeBp": null,
+   "us30yChangeBp": null,
    "calendarType": "normal",
    "calendarNote": null,
    "types": {
@@ -360,8 +360,8 @@
    "day": "2026-09-21",
    "label": null,
    "tide": "bullish",
-   "us10yChangeBp": -5,
-   "us30yChangeBp": -5,
+   "us10yChangeBp": null,
+   "us30yChangeBp": null,
    "calendarType": "normal",
    "calendarNote": null,
    "types": {
@@ -386,8 +386,8 @@
    "day": "2026-09-22",
    "label": null,
    "tide": "bullish",
-   "us10yChangeBp": 0,
-   "us30yChangeBp": 0,
+   "us10yChangeBp": null,
+   "us30yChangeBp": null,
    "calendarType": "normal",
    "calendarNote": null,
    "types": {
@@ -432,8 +432,8 @@
    "day": "2026-09-23",
    "label": null,
    "tide": "bearish",
-   "us10yChangeBp": 15,
-   "us30yChangeBp": 11,
+   "us10yChangeBp": null,
+   "us30yChangeBp": null,
    "calendarType": "normal",
    "calendarNote": null,
    "types": {
@@ -473,8 +473,8 @@
    "day": "2026-09-24",
    "label": null,
    "tide": "neutral",
-   "us10yChangeBp": 7,
-   "us30yChangeBp": 7,
+   "us10yChangeBp": null,
+   "us30yChangeBp": null,
    "calendarType": "normal",
    "calendarNote": null,
    "types": {
@@ -524,8 +524,8 @@
    "day": "2026-09-25",
    "label": null,
    "tide": "bearish",
-   "us10yChangeBp": -1,
-   "us30yChangeBp": 2,
+   "us10yChangeBp": null,
+   "us30yChangeBp": null,
    "calendarType": "normal",
    "calendarNote": null,
    "types": {
@@ -560,8 +560,8 @@
    "day": "2026-09-28",
    "label": null,
    "tide": "bearish",
-   "us10yChangeBp": 7,
-   "us30yChangeBp": 7,
+   "us10yChangeBp": null,
+   "us30yChangeBp": null,
    "calendarType": "normal",
    "calendarNote": null,
    "types": {
@@ -591,8 +591,8 @@
    "day": "2026-09-29",
    "label": null,
    "tide": "bullish",
-   "us10yChangeBp": 2,
-   "us30yChangeBp": 3,
+   "us10yChangeBp": null,
+   "us30yChangeBp": null,
    "calendarType": "normal",
    "calendarNote": null,
    "types": {
@@ -627,10 +627,10 @@
    "day": "2026-09-30",
    "label": null,
    "tide": "bullish",
-   "us10yChangeBp": 3,
-   "us30yChangeBp": 5,
-   "calendarType": "report",
-   "calendarNote": "PCE (cool) — study/macro-week-2026-10-01.md",
+   "us10yChangeBp": null,
+   "us30yChangeBp": null,
+   "calendarType": "normal",
+   "calendarNote": null,
    "types": {
     "call|dte11-30|morning": {
      "w": 1,
@@ -651,6 +651,22 @@
      "w": 0,
      "l": 0,
      "flat": 1
+    }
+   }
+  },
+  {
+   "day": "2026-10-01",
+   "label": null,
+   "tide": "bearish",
+   "us10yChangeBp": null,
+   "us30yChangeBp": null,
+   "calendarType": "normal",
+   "calendarNote": null,
+   "types": {
+    "put|dte11-30|morning": {
+     "w": 0,
+     "l": 1,
+     "flat": 0
     }
    }
   }

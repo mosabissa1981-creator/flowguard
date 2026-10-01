@@ -1,18 +1,18 @@
 {
-  "generatedAt": "2026-10-01T02:33:32.543Z",
+  "generatedAt": "2026-10-01T20:14:55.543Z",
   "since": "2026-09-24",
-  "through": "2026-09-30",
-  "days": 5,
-  "definition": "winner ≥ +15% option premium by EOD check, loser ≤ −15%, else expired_flat. Entry = flow print.",
+  "through": "2026-10-01",
+  "days": 6,
+  "definition": "winner \u2265 +15% option premium by EOD check, loser \u2264 \u221215%, else expired_flat. Entry = flow print.",
   "totals": {
     "w": 9,
-    "l": 10,
+    "l": 11,
     "flat": 63
   },
   "buckets": {
     "morning": {
       "w": 9,
-      "l": 10,
+      "l": 11,
       "flat": 19
     },
     "late": {
@@ -32,12 +32,12 @@
     },
     "quietUnderlying": {
       "w": 6,
-      "l": 2,
+      "l": 3,
       "flat": 30
     },
     "dte11to30": {
       "w": 7,
-      "l": 10,
+      "l": 11,
       "flat": 43
     },
     "calls": {
@@ -47,7 +47,7 @@
     },
     "puts": {
       "w": 0,
-      "l": 0,
+      "l": 1,
       "flat": 22
     }
   },
@@ -68,10 +68,10 @@
     }
   ],
   "lessons": [
-    "All decided trades came from the morning shortlist; late prints (≥14:00 ET) were all flat.",
+    "All decided trades came from the morning shortlist; late prints (\u226514:00 ET) were all flat.",
     "Both-lane score-100 is not an edge (ties at the clamp); do not treat overlap as confirmation.",
-    "Same-issuer clusters (GOOG/GOOGL 9/30, APP 9/24) lose together — one bet, not several.",
-    "Quiet underlying + morning ask-side in 11–30 DTE produced the cleanest winners (INTC 130C +33%, META 800C +42%).",
+    "Same-issuer clusters (GOOG/GOOGL 9/30, APP 9/24) lose together \u2014 one bet, not several.",
+    "Quiet underlying + morning ask-side in 11\u201330 DTE produced the cleanest winners (INTC 130C +33%, META 800C +42%).",
     "Rising long yields into reports hurt long-duration tech calls."
   ],
   "recentDecided": [
@@ -522,13 +522,598 @@
         "both lanes"
       ],
       "quiet": false
+    },
+    {
+      "day": "2026-10-01",
+      "contract": "MU261030P00955000",
+      "ticker": "MU",
+      "type": "put",
+      "dte": 29,
+      "score": 73,
+      "lane": "Picks-only",
+      "bucket": "morning",
+      "outcome": "loser",
+      "pct": -34.1,
+      "entry": 24.68,
+      "tags": [
+        "sweet-spot DTE",
+        "modest OTM",
+        "single-leg",
+        "fresh",
+        "follow-through",
+        "quiet underlying"
+      ],
+      "quiet": true
     }
   ],
   "shadowAccuracy": {
-    "days": [],
+    "days": [
+      "2026-10-01"
+    ],
     "joinedCandidates": 0,
     "unmatchedCandidates": 0,
     "definition": "Per module: outcome mix (winner/loser/flat per the book definition) of candidates the module flagged vs passed vs boosted. A useful flag has a lower win rate / higher loss rate than pass; a useful boost has a higher win rate.",
     "modules": {}
+  },
+  "puts": {
+    "mode": "test",
+    "files": 1,
+    "days": [
+      "2026-10-01"
+    ],
+    "definition": "Separate from the same-day \u00b115% book. Entry = flow print. Within a 3-session time stop: winner = option high \u2265 +40% first, loser = low \u2264 \u221225% first (same session both = loser), flat = neither. T+1..T+5 = closes vs entry.",
+    "overall": {
+      "n": 3,
+      "w": 0,
+      "l": 0,
+      "flat": 0,
+      "open": 3,
+      "winRate": null,
+      "lossRate": null,
+      "avgT1": null,
+      "avgT3": null,
+      "avgT5": null
+    },
+    "byRegime": {
+      "unknown": {
+        "n": 3,
+        "w": 0,
+        "l": 0,
+        "flat": 0,
+        "open": 3,
+        "winRate": null,
+        "lossRate": null,
+        "avgT1": null,
+        "avgT3": null,
+        "avgT5": null
+      }
+    },
+    "byMarketTide": {
+      "unknown": {
+        "n": 3,
+        "w": 0,
+        "l": 0,
+        "flat": 0,
+        "open": 3,
+        "winRate": null,
+        "lossRate": null,
+        "avgT1": null,
+        "avgT3": null,
+        "avgT5": null
+      }
+    },
+    "byTickerTide": {
+      "unknown": {
+        "n": 3,
+        "w": 0,
+        "l": 0,
+        "flat": 0,
+        "open": 3,
+        "winRate": null,
+        "lossRate": null,
+        "avgT1": null,
+        "avgT3": null,
+        "avgT5": null
+      }
+    },
+    "byConfirmation": {
+      "market-tide-bearish+ticker-tide-bearish": {
+        "n": 3,
+        "w": 0,
+        "l": 0,
+        "flat": 0,
+        "open": 3,
+        "winRate": null,
+        "lossRate": null,
+        "avgT1": null,
+        "avgT3": null,
+        "avgT5": null
+      }
+    },
+    "byYields": {
+      "unknown": {
+        "n": 3,
+        "w": 0,
+        "l": 0,
+        "flat": 0,
+        "open": 3,
+        "winRate": null,
+        "lossRate": null,
+        "avgT1": null,
+        "avgT3": null,
+        "avgT5": null
+      }
+    },
+    "entries": [
+      {
+        "day": "2026-10-01",
+        "contract": "IWM261014P00271000",
+        "entry": 2.16,
+        "regime": null,
+        "tide": "?/?",
+        "confirmations": [
+          "market-tide-bearish",
+          "ticker-tide-bearish"
+        ],
+        "outcome": "open",
+        "returns": null,
+        "maxGainPct": null
+      },
+      {
+        "day": "2026-10-01",
+        "contract": "PEP261016P00127000",
+        "entry": 3.1,
+        "regime": null,
+        "tide": "?/?",
+        "confirmations": [
+          "market-tide-bearish",
+          "ticker-tide-bearish"
+        ],
+        "outcome": "open",
+        "returns": null,
+        "maxGainPct": null
+      },
+      {
+        "day": "2026-10-01",
+        "contract": "SLV261012P00054000",
+        "entry": 0.7,
+        "regime": null,
+        "tide": "?/?",
+        "confirmations": [
+          "market-tide-bearish",
+          "ticker-tide-bearish"
+        ],
+        "outcome": "open",
+        "returns": null,
+        "maxGainPct": null
+      }
+    ]
+  },
+  "lanes": {
+    "mode": "test",
+    "files": 1,
+    "definition": "Separate from the same-day \u00b115% book. Entry = flow print. Within each lane's time stop (earnings lanes 5 sessions, capped to exit before the report; others 3): winner = option high \u2265 +40% first, loser = low \u2264 \u221225% first (same session both = loser), flat = neither. T+1..T+5 = closes vs entry.",
+    "byLane": {
+      "calls-earnings-runup": {
+        "n": 0,
+        "w": 0,
+        "l": 0,
+        "flat": 0,
+        "open": 0,
+        "winRate": null,
+        "lossRate": null,
+        "avgT1": null,
+        "avgT3": null,
+        "avgT5": null,
+        "days": [],
+        "byRegime": {},
+        "recent": []
+      },
+      "calls-breakout": {
+        "n": 0,
+        "w": 0,
+        "l": 0,
+        "flat": 0,
+        "open": 0,
+        "winRate": null,
+        "lossRate": null,
+        "avgT1": null,
+        "avgT3": null,
+        "avgT5": null,
+        "days": [],
+        "byRegime": {},
+        "recent": []
+      },
+      "calls-sector-wave": {
+        "n": 2,
+        "w": 0,
+        "l": 0,
+        "flat": 0,
+        "open": 2,
+        "winRate": null,
+        "lossRate": null,
+        "avgT1": null,
+        "avgT3": null,
+        "avgT5": null,
+        "days": [
+          "2026-10-01"
+        ],
+        "byRegime": {
+          "unknown": {
+            "n": 2,
+            "w": 0,
+            "l": 0,
+            "flat": 0,
+            "open": 2,
+            "winRate": null,
+            "lossRate": null,
+            "avgT1": null,
+            "avgT3": null,
+            "avgT5": null
+          }
+        },
+        "recent": [
+          {
+            "day": "2026-10-01",
+            "contract": "MS261009C00192500",
+            "entry": 1.35,
+            "outcome": "open",
+            "t1": null,
+            "t3": null
+          },
+          {
+            "day": "2026-10-01",
+            "contract": "V261009C00360000",
+            "entry": 3.25,
+            "outcome": "open",
+            "t1": null,
+            "t3": null
+          }
+        ]
+      },
+      "puts-earnings-rundown": {
+        "n": 1,
+        "w": 0,
+        "l": 0,
+        "flat": 0,
+        "open": 1,
+        "winRate": null,
+        "lossRate": null,
+        "avgT1": null,
+        "avgT3": null,
+        "avgT5": null,
+        "days": [
+          "2026-10-01"
+        ],
+        "byRegime": {
+          "unknown": {
+            "n": 1,
+            "w": 0,
+            "l": 0,
+            "flat": 0,
+            "open": 1,
+            "winRate": null,
+            "lossRate": null,
+            "avgT1": null,
+            "avgT3": null,
+            "avgT5": null
+          }
+        },
+        "recent": [
+          {
+            "day": "2026-10-01",
+            "contract": "PEP261016P00127000",
+            "entry": 3.1,
+            "outcome": "open",
+            "t1": null,
+            "t3": null
+          }
+        ]
+      },
+      "puts-breakdown": {
+        "n": 3,
+        "w": 0,
+        "l": 0,
+        "flat": 0,
+        "open": 3,
+        "winRate": null,
+        "lossRate": null,
+        "avgT1": null,
+        "avgT3": null,
+        "avgT5": null,
+        "days": [
+          "2026-10-01"
+        ],
+        "byRegime": {
+          "unknown": {
+            "n": 3,
+            "w": 0,
+            "l": 0,
+            "flat": 0,
+            "open": 3,
+            "winRate": null,
+            "lossRate": null,
+            "avgT1": null,
+            "avgT3": null,
+            "avgT5": null
+          }
+        },
+        "recent": [
+          {
+            "day": "2026-10-01",
+            "contract": "KRE261023P00068000",
+            "entry": 1.55,
+            "outcome": "open",
+            "t1": null,
+            "t3": null
+          },
+          {
+            "day": "2026-10-01",
+            "contract": "PEP261016P00127000",
+            "entry": 3.1,
+            "outcome": "open",
+            "t1": null,
+            "t3": null
+          },
+          {
+            "day": "2026-10-01",
+            "contract": "SLV261012P00054000",
+            "entry": 0.7,
+            "outcome": "open",
+            "t1": null,
+            "t3": null
+          }
+        ]
+      },
+      "puts-sector-selloff": {
+        "n": 2,
+        "w": 0,
+        "l": 0,
+        "flat": 0,
+        "open": 2,
+        "winRate": null,
+        "lossRate": null,
+        "avgT1": null,
+        "avgT3": null,
+        "avgT5": null,
+        "days": [
+          "2026-10-01"
+        ],
+        "byRegime": {
+          "unknown": {
+            "n": 2,
+            "w": 0,
+            "l": 0,
+            "flat": 0,
+            "open": 2,
+            "winRate": null,
+            "lossRate": null,
+            "avgT1": null,
+            "avgT3": null,
+            "avgT5": null
+          }
+        },
+        "recent": [
+          {
+            "day": "2026-10-01",
+            "contract": "AVGO261012P00325000",
+            "entry": 1.04,
+            "outcome": "open",
+            "t1": null,
+            "t3": null
+          },
+          {
+            "day": "2026-10-01",
+            "contract": "NVDA261009P00227500",
+            "entry": 3.05,
+            "outcome": "open",
+            "t1": null,
+            "t3": null
+          }
+        ]
+      }
+    }
+  },
+  "laneDebate": {
+    "mode": "shadow",
+    "files": 0,
+    "verdicts": 0,
+    "spendUsd": 0,
+    "definition": "Direction-aware bull/bear/macro debate \u2192 TAKE/SKIP per TEST-lane pick (never changes picks). Outcomes from the lane trackers (+40% / -25% within the lane time stop). A useful debate has take win rate > skip win rate.",
+    "byLane": {},
+    "bySide": {
+      "call": {
+        "take": {
+          "w": 0,
+          "l": 0,
+          "flat": 0,
+          "open": 0,
+          "decided": 0,
+          "winRate": null,
+          "lossRate": null
+        },
+        "skip": {
+          "w": 0,
+          "l": 0,
+          "flat": 0,
+          "open": 0,
+          "decided": 0,
+          "winRate": null,
+          "lossRate": null
+        },
+        "edge": null
+      },
+      "put": {
+        "take": {
+          "w": 0,
+          "l": 0,
+          "flat": 0,
+          "open": 0,
+          "decided": 0,
+          "winRate": null,
+          "lossRate": null
+        },
+        "skip": {
+          "w": 0,
+          "l": 0,
+          "flat": 0,
+          "open": 0,
+          "decided": 0,
+          "winRate": null,
+          "lossRate": null
+        },
+        "edge": null
+      }
+    }
+  },
+  "lottery": {
+    "mode": "test",
+    "files": 1,
+    "days": [
+      "2026-10-01"
+    ],
+    "definition": "Multi-day horizon, not same-day W/L. Entry = flow print. maxGainPct = best daily high after the entry day vs entry; hit100/300/1000 = reached +100/+300/+1000% at any point before expiry; expiredWorthless = expired with last <= max($0.05, 10% of entry). Rates over tracked (hits) / final (worthless) entries.",
+    "overall": {
+      "n": 3,
+      "tracked": 0,
+      "final": 0,
+      "hit100": 0,
+      "hit300": 0,
+      "hit1000": 0,
+      "hit100Rate": null,
+      "hit300Rate": null,
+      "hit1000Rate": null,
+      "expiredWorthless": 0,
+      "expiredWorthlessRate": null,
+      "medianMaxGainPct": null
+    },
+    "byCatalyst": {
+      "macro": {
+        "n": 3,
+        "tracked": 0,
+        "final": 0,
+        "hit100": 0,
+        "hit300": 0,
+        "hit1000": 0,
+        "hit100Rate": null,
+        "hit300Rate": null,
+        "hit1000Rate": null,
+        "expiredWorthless": 0,
+        "expiredWorthlessRate": null,
+        "medianMaxGainPct": null
+      }
+    },
+    "bySide": {
+      "call": {
+        "n": 2,
+        "tracked": 0,
+        "final": 0,
+        "hit100": 0,
+        "hit300": 0,
+        "hit1000": 0,
+        "hit100Rate": null,
+        "hit300Rate": null,
+        "hit1000Rate": null,
+        "expiredWorthless": 0,
+        "expiredWorthlessRate": null,
+        "medianMaxGainPct": null
+      },
+      "put": {
+        "n": 1,
+        "tracked": 0,
+        "final": 0,
+        "hit100": 0,
+        "hit300": 0,
+        "hit1000": 0,
+        "hit100Rate": null,
+        "hit300Rate": null,
+        "hit1000Rate": null,
+        "expiredWorthless": 0,
+        "expiredWorthlessRate": null,
+        "medianMaxGainPct": null
+      }
+    },
+    "byPriceBand": {
+      "0.10-0.60": {
+        "n": 3,
+        "tracked": 0,
+        "final": 0,
+        "hit100": 0,
+        "hit300": 0,
+        "hit1000": 0,
+        "hit100Rate": null,
+        "hit300Rate": null,
+        "hit1000Rate": null,
+        "expiredWorthless": 0,
+        "expiredWorthlessRate": null,
+        "medianMaxGainPct": null
+      }
+    },
+    "byDte": {
+      "11-20": {
+        "n": 2,
+        "tracked": 0,
+        "final": 0,
+        "hit100": 0,
+        "hit300": 0,
+        "hit1000": 0,
+        "hit100Rate": null,
+        "hit300Rate": null,
+        "hit1000Rate": null,
+        "expiredWorthless": 0,
+        "expiredWorthlessRate": null,
+        "medianMaxGainPct": null
+      },
+      "5-10": {
+        "n": 1,
+        "tracked": 0,
+        "final": 0,
+        "hit100": 0,
+        "hit300": 0,
+        "hit1000": 0,
+        "hit100Rate": null,
+        "hit300Rate": null,
+        "hit1000Rate": null,
+        "expiredWorthless": 0,
+        "expiredWorthlessRate": null,
+        "medianMaxGainPct": null
+      }
+    },
+    "topRunners": [],
+    "entries": [
+      {
+        "day": "2026-10-01",
+        "contract": "CART261016C00049000",
+        "entry": 0.23,
+        "dte": 15,
+        "catalyst": "macro 2026-10-02",
+        "maxGainPct": null,
+        "last": null,
+        "final": false,
+        "expiredWorthless": null
+      },
+      {
+        "day": "2026-10-01",
+        "contract": "HBAN261016C00015000",
+        "entry": 0.4,
+        "dte": 15,
+        "catalyst": "macro 2026-10-02",
+        "maxGainPct": null,
+        "last": null,
+        "final": false,
+        "expiredWorthless": null
+      },
+      {
+        "day": "2026-10-01",
+        "contract": "IYR261009P00093000",
+        "entry": 0.6,
+        "dte": 8,
+        "catalyst": "macro 2026-10-02",
+        "maxGainPct": null,
+        "last": null,
+        "final": false,
+        "expiredWorthless": null
+      }
+    ]
   }
 }
