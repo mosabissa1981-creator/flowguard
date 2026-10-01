@@ -6,6 +6,8 @@
  * Also: shadowAccuracy (from study/shadow-*.json), study/regime-days.json, study/candidate-history.json.
  * Lottery (test mode): study/lottery-YYYY-MM-DD.json (saved daily from /api/lottery/track) -> summary.lottery,
  *   scored over multi-day horizons (max gain reached, +100/+300/+1000% hits, expired-worthless rate). Kept out of totals.
+ * Puts (test mode): study/puts-YYYY-MM-DD.json (saved daily from /api/puts/track) -> summary.puts,
+ *   win/loss/flat at +40% target / -25% stop within 3 sessions, T+1..T+5 returns, by regime label and tide. Kept out of totals.
  * `--yields` refreshes study/treasury-yields.json from the Treasury par-yield CSV (otherwise the cached file is used).
  */
 import fs from "node:fs";
@@ -193,6 +195,69 @@ const shadowAccuracy = {
 summary.shadowAccuracy = shadowAccuracy;
 
 // ---------------------------------------------------------------------------
+// Puts lane (TEST mode). Each daily file is the full cumulative /api/puts/track snapshot; newest tracking wins.
+// ---------------------------------------------------------------------------
+const putsFiles = fs.readdirSync(studyDir).filter((f) => /^puts-\d{4}-\d{2}-\d{2}\.json$/.test(f)).sort();
+const putsByKey = new Map();
+for (const f of putsFiles) {
+  let doc;
+  try {
+    doc = JSON.parse(fs.readFileSync(path.join(studyDir, f), "utf8"));
+  } catch {
+    continue;
+  }
+  for (const e of doc.entries || []) {
+    if (!e || !e.contract || !e.day) continue;
+    const k = `${e.day}|${e.contract}`;
+    const prev = putsByKey.get(k);
+    if (!prev || !prev.tracking || (e.tracking && String(e.tracking.asOf) >= String(prev.tracking.asOf))) putsByKey.set(k, e);
+  }
+}
+const putsEntries = [...putsByKey.values()].sort((a, b) => (a.day + a.contract).localeCompare(b.day + b.contract));
+const putStats = (list) => {
+  const t = list.map((e) => e.tracking).filter(Boolean);
+  const c = (o) => t.filter((x) => x.outcome === o).length;
+  const w = c("winner");
+  const l = c("loser");
+  const fl = c("flat");
+  const avg = (k) => {
+    const v = t.map((x) => x.returns?.[k]).filter((n) => typeof n === "number");
+    return v.length ? Math.round((v.reduce((a, b) => a + b, 0) / v.length) * 10) / 10 : null;
+  };
+  const n = w + l + fl;
+  return { n: list.length, w, l, flat: fl, open: list.length - n, winRate: n ? Math.round((w / n) * 1000) / 10 : null, lossRate: n ? Math.round((l / n) * 1000) / 10 : null, avgT1: avg("t1"), avgT3: avg("t3"), avgT5: avg("t5") };
+};
+const putGroup = (keyFn) => {
+  const m = {};
+  for (const e of putsEntries) (m[keyFn(e)] ||= []).push(e);
+  return Object.fromEntries(Object.entries(m).map(([k, v]) => [k, putStats(v)]));
+};
+summary.puts = {
+  mode: "test",
+  files: putsFiles.length,
+  days: [...new Set(putsEntries.map((e) => e.day))],
+  definition:
+    "Separate from the same-day ±15% book. Entry = flow print. Within a 3-session time stop: winner = option high ≥ +40% first, loser = low ≤ −25% first (same session both = loser), flat = neither. T+1..T+5 = closes vs entry.",
+  overall: putStats(putsEntries),
+  byRegime: putGroup((e) => e.regimeLabel ?? "unknown"),
+  byMarketTide: putGroup((e) => e.marketTide ?? "unknown"),
+  byTickerTide: putGroup((e) => e.tickerTide ?? "unknown"),
+  byConfirmation: putGroup((e) => (e.confirmations || []).slice().sort().join("+") || "none"),
+  byYields: putGroup((e) => (e.yieldsRising == null ? "unknown" : e.yieldsRising ? "rising" : "not-rising")),
+  entries: putsEntries.slice(-40).map((e) => ({
+    day: e.day,
+    contract: e.contract,
+    entry: e.entry ?? e.price,
+    regime: e.regimeLabel ?? null,
+    tide: `${e.marketTide ?? "?"}/${e.tickerTide ?? "?"}`,
+    confirmations: e.confirmations || [],
+    outcome: e.tracking?.outcome ?? "open",
+    returns: e.tracking?.returns ?? null,
+    maxGainPct: e.tracking?.maxGainPct ?? null,
+  })),
+};
+
+// ---------------------------------------------------------------------------
 // Lottery lane (TEST mode). Separate from the +/-15% same-day book: each daily file is the full
 // cumulative /api/lottery/track snapshot, so the newest tracking per (day, contract) wins.
 // ---------------------------------------------------------------------------
@@ -272,6 +337,7 @@ summary.lottery = {
 fs.mkdirSync(path.dirname(out), { recursive: true });
 fs.writeFileSync(out, JSON.stringify(summary, null, 2) + "\n");
 console.log(`wrote ${out}: ${rows.length} rows, ${decided.length} decided, ${clusters.length} clusters`);
+console.log(`puts (test): ${putsFiles.length} file(s), ${putsEntries.length} logged, W/L/F ${summary.puts.overall.w}/${summary.puts.overall.l}/${summary.puts.overall.flat}`);
 console.log(`lottery (test): ${lotteryFiles.length} file(s), ${lotteryEntries.length} logged picks, ${summary.lottery.overall.final} final`);
 console.log(`shadow accuracy: ${shadowDays.length} shadow day(s), ${shadowJoined} candidates joined to book outcomes, ${shadowUnmatched} unmatched`);
 
