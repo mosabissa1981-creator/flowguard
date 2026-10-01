@@ -143,7 +143,8 @@ export function FlowList({
                   <td className="max-w-72 px-3 py-3">
                     <ScoreChips chips={row.chips} limit={3} compact />
                   </td>
-                  <td className="px-3 py-3 font-mono text-[11px] text-muted-foreground">
+                  {/* Relative age differs between server render and hydration by a few seconds; not a real mismatch. */}
+                  <td className="px-3 py-3 font-mono text-[11px] text-muted-foreground" suppressHydrationWarning>
                     {formatRelativeTime(row.alert.created_at)}
                   </td>
                   <td className="px-2 py-3" onClick={(event) => event.stopPropagation()}>
