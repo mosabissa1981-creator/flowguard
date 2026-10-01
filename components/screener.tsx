@@ -9,6 +9,7 @@ import { FilterBar } from "@/components/filter-bar";
 import { FlowList, FlowListSkeleton } from "@/components/flow-list";
 import { DetailDrawer } from "@/components/detail-drawer";
 import { TideBar } from "@/components/tide-bar";
+import { RegimeBanner } from "@/components/regime-banner";
 import { MorningPanel } from "@/components/morning-panel";
 import { PremovePanel } from "@/components/premove-panel";
 import { PicksPanel } from "@/components/picks-panel";
@@ -566,6 +567,7 @@ export function Screener({
           </div>
         </div>
         <TideBar tide={rejectMock ? null : (data?.tide ?? null)} />
+        <RegimeBanner />
         <UwKeyForm
           configured={uwConfigured}
           open={uwKeyOpen}

@@ -653,3 +653,29 @@ export async function fetchStockStates(tickers: string[], limit = 6): Promise<Re
   return out;
 }
 
+
+export type UwEconEvent = {
+  type: string;
+  time: string;
+  event: string;
+  prev: string | null;
+  forecast: string | null;
+  reported_period: string | null;
+};
+
+/** Economic calendar fallback for the regime. 24h in-process cache — ~1 UW call per instance per day. */
+export async function fetchEconomicCalendar(): Promise<UwEconEvent[]> {
+  const payload = await uwGet<{ data?: Array<Record<string, unknown>> }>(
+    "/api/market/economic-calendar",
+    undefined,
+    24 * 3600_000,
+  );
+  return (payload.data ?? []).map((row) => ({
+    type: asString(row.type),
+    time: asString(row.time),
+    event: asString(row.event),
+    prev: row.prev == null ? null : asString(row.prev),
+    forecast: row.forecast == null ? null : asString(row.forecast),
+    reported_period: row.reported_period == null ? null : asString(row.reported_period),
+  }));
+}

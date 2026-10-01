@@ -112,3 +112,18 @@ Each chip shows the point delta and a short reason.
 ## Stack
 
 Next.js App Router, TypeScript, Tailwind CSS, shadcn/ui.
+
+## Macro regime + concentration caps (Phase A, Oct 2026)
+
+- `GET /api/regime` — `calm` / `risky` / `report-day` from the US economic calendar
+  (Forex Factory weekly JSON, cached per ET day; falls back to UW `economic-calendar`, 24h cache),
+  US10Y/US30Y change vs prior close (Yahoo `^TNX`/`^TYX`, 15-min cache; Treasury daily CSV fallback),
+  and the UW market tide (re-uses the shared tape cache — no new per-poll UW calls).
+- Risky / report-day: morning, picks and premove lists capped at 3, DTE < 14 dropped,
+  calls on long-duration tech docked −15 when long yields are rising (−6 on calm days), and caps tighten
+  to 1 per issuer / 2 per sector.
+- Always: max 2 contracts per issuer (GOOG + GOOGL = one; QQQ/TQQQ = NDX, etc.), max 3 per sector.
+- Scoring: both-lane bonus removed (chip is informational, delta 0); late prints (≥14:00 ET) excluded
+  from actionable lists; +8 morning ask-side (9:30–11:00 ET, ≥70% ask), +4 extra for 11–30 DTE,
+  +10 quiet underlying / −10 extended (re-uses Premove's stock-state spots). Ties at the 100 clamp are
+  broken by the unclamped `rawScore`.

@@ -4,7 +4,9 @@ import { loadRankedFlow } from "@/lib/flow-service";
 import { buildPickCopy } from "@/lib/thesis";
 import { PICKS_FILTERS } from "@/lib/filters";
 import { MAX_PICKS } from "@/lib/picks";
-import { loadPremoveContractKeys } from "@/lib/premove";
+import { loadPremoveContext } from "@/lib/premove";
+import { applyConcentrationCaps } from "@/lib/issuers";
+import { loadRegimeSafe, regimeBrief, regimeCaps, regimeListCap, toActionableRegime } from "@/lib/regime";
 import { compareActionable, withActionableAdjustments } from "@/lib/scoring";
 import type { MorningShortlistResponse } from "@/lib/types";
 import {
@@ -45,14 +47,21 @@ export async function loadMorningShortlist(): Promise<MorningShortlistResponse> 
     strictAntiFade: true,
   });
 
-  const premoveKeys = await loadPremoveContractKeys();
+  const [premove, regime] = await Promise.all([loadPremoveContext(), loadRegimeSafe(ranked.tide)]);
   const morningAlerts = withActionableAdjustments(
     ranked.items.filter((row) => isInMorningWindow(row.alert.created_at)),
-    premoveKeys,
+    premove.keys,
+    undefined,
+    { spots: premove.spots, regime: toActionableRegime(regime) },
   );
   morningAlerts.sort(compareActionable);
 
-  const picks = morningAlerts.slice(0, Math.min(MAX_PICKS, MAX_MORNING)).map((row, index) => {
+  const { kept, dropped } = applyConcentrationCaps(
+    morningAlerts,
+    regimeListCap(regime, Math.min(MAX_PICKS, MAX_MORNING)),
+    regimeCaps(regime),
+  );
+  const picks = kept.map((row, index) => {
     const copy = buildPickCopy(row);
     return { ...row, rank: index + 1, ...copy };
   });
@@ -67,6 +76,8 @@ export async function loadMorningShortlist(): Promise<MorningShortlistResponse> 
     tide: ranked.tide,
     quotaBlocked: ranked.quotaBlocked,
     authFailed: ranked.authFailed,
+    regime: regimeBrief(regime),
+    capDrops: dropped,
     warning:
       ranked.quotaBlocked
         ? ranked.warning
@@ -77,7 +88,9 @@ export async function loadMorningShortlist(): Promise<MorningShortlistResponse> 
           : ranked.warning,
   };
 
-  if (morningWindowClosed() && result.source !== "mock" && !result.quotaBlocked) {
+  // Save after the window closes, and also during the window when there is a list, so a
+  // hit at ~9:50 ET still freezes something (afternoon re-scoring ages these prints out).
+  if (result.source !== "mock" && !result.quotaBlocked && (morningWindowClosed() || picks.length > 0)) {
     void saveMorningSnapshot(today, result);
   }
 

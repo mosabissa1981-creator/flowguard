@@ -7,6 +7,8 @@ import { applyPremoveOverlay, hasPremoveAccumulation } from "@/lib/premove-score
 import { fetchStockStates, hasUnusualWhalesKey, type StockState } from "@/lib/uw";
 import { isUwBlocked } from "@/lib/uw-quota";
 import { toNumber } from "@/lib/numbers";
+import { applyConcentrationCaps } from "@/lib/issuers";
+import { loadRegimeSafe, regimeBrief, regimeCaps, regimeListCap, toActionableRegime } from "@/lib/regime";
 import {
   contractKey,
   dtePreference,
@@ -68,6 +70,7 @@ export function selectPremoveRows(
 type PremoveQualifying = {
   ranked: FlowResponse;
   rows: RankedFlow[];
+  spots: Record<string, StockState | null>;
 };
 
 let qualifyingInflight: { key: string; promise: Promise<PremoveQualifying> } | null = null;
@@ -105,6 +108,7 @@ async function computePremoveQualifying(opts?: { forceFresh?: boolean }): Promis
   return {
     ranked,
     rows: selectPremoveRows(ranked.items, peers, spots),
+    spots,
   };
 }
 
@@ -124,6 +128,14 @@ export async function loadPremoveContractKeys(opts?: { forceFresh?: boolean }): 
   return new Set(rows.map((row) => contractKey(row)));
 }
 
+/** Premove overlap keys + the stock-state spots it already fetched (no extra UW calls). */
+export async function loadPremoveContext(
+  opts?: { forceFresh?: boolean },
+): Promise<{ keys: Set<string>; spots: Record<string, StockState | null> }> {
+  const { rows, spots } = await loadPremoveQualifying(opts);
+  return { keys: new Set(rows.map((row) => contractKey(row))), spots };
+}
+
 async function loadPickContractKeys(opts?: { forceFresh?: boolean }): Promise<Set<string>> {
   const ranked = await loadRankedFlow(PICKS_FILTERS, opts);
   return new Set(
@@ -136,6 +148,8 @@ function comparePremove(a: RankedFlow, b: RankedFlow): number {
   const lateB = hasScoreChip(b, "late-print") ? 1 : 0;
   if (lateA !== lateB) return lateA - lateB;
   if (b.score !== a.score) return b.score - a.score;
+  const rawDelta = (b.rawScore ?? b.score) - (a.rawScore ?? a.score);
+  if (rawDelta !== 0) return rawDelta;
   const dteDelta = dtePreference(a.dte) - dtePreference(b.dte);
   if (dteDelta !== 0) return dteDelta;
   const buildScore = (row: RankedFlow) =>
@@ -149,27 +163,24 @@ function comparePremove(a: RankedFlow, b: RankedFlow): number {
 }
 
 export async function loadPremoveShortlist(opts?: { forceFresh?: boolean }): Promise<PicksResponse> {
-  const [{ ranked, rows }, pickKeys] = await Promise.all([
+  const [{ ranked, rows, spots }, pickKeys] = await Promise.all([
     loadPremoveQualifying(opts),
     loadPickContractKeys(opts),
   ]);
+  const regime = await loadRegimeSafe(ranked.tide);
 
-  const adjusted = withActionableAdjustments(rows, pickKeys);
+  const adjusted = withActionableAdjustments(rows, pickKeys, undefined, {
+    spots,
+    regime: toActionableRegime(regime),
+  });
   adjusted.sort(comparePremove);
 
-  const seenChains = new Set<string>();
-  const seenTickerCount = new Map<string, number>();
-  const unique: RankedFlow[] = [];
-  for (const row of adjusted) {
-    const chain = contractKey(row);
-    if (seenChains.has(chain)) continue;
-    const tickerN = seenTickerCount.get(row.alert.ticker) ?? 0;
-    if (tickerN >= 2) continue;
-    seenChains.add(chain);
-    seenTickerCount.set(row.alert.ticker, tickerN + 1);
-    unique.push(row);
-    if (unique.length >= MAX_PREMOVE) break;
-  }
+  // Issuer cap 2 (GOOG+GOOGL = one), sector cap 3, regime list cap.
+  const { kept: unique, dropped } = applyConcentrationCaps(
+    adjusted,
+    regimeListCap(regime, MAX_PREMOVE),
+    regimeCaps(regime),
+  );
 
   const picks = unique.map((row, index) => ({
     ...row,
@@ -191,5 +202,7 @@ export async function loadPremoveShortlist(opts?: { forceFresh?: boolean }): Pro
     warning,
     quotaBlocked: ranked.quotaBlocked,
     authFailed: ranked.authFailed,
+    regime: regimeBrief(regime),
+    capDrops: dropped,
   };
 }

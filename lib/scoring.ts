@@ -10,6 +10,7 @@ import {
 import { hoursSinceCreated, isLateSessionPrint, printAgeBand } from "@/lib/session";
 import { followThroughFromPeers } from "@/lib/follow-through";
 import { alertOtmPct, moneynessBand } from "@/lib/moneyness";
+import { isLongDurationTech } from "@/lib/issuers";
 
 const BASE_SCORE = 32;
 const STALE_CAP = 32;
@@ -536,6 +537,7 @@ export function scoreAlert(
 
   const scored = {
     score: Math.round(clamp(score, 0, 100)),
+    rawScore: Math.round(score),
     chips,
     fadeProne,
     stale,
@@ -605,21 +607,60 @@ export function dtePreference(dte: number): number {
   return 2;
 }
 
-const BOTH_LANE_DELTA = 8;
+/**
+ * Sep 23–30 2026 study: both-lane score-100 contracts went 3W / 5L, so the overlap is
+ * informational only now (delta 0). Late prints (≥14:00 ET) went 0W / 0L / 44 flat, so
+ * they are excluded from every actionable list instead of docked.
+ */
+const BOTH_LANE_DELTA = 0;
 const HIGH_SCORE_DELTA = 6;
 const HIGH_SCORE_MIN = 90;
-const LATE_PRINT_DELTA = -18;
+const LATE_PRINT_DELTA = -30;
+const QUIET_DELTA = 10;
+const EXTENDED_DELTA = -10;
+const MORNING_ASK_DELTA = 8;
+const DTE_SWEET_EXTRA = 4;
+/** 11:00 ET — "morning" for the ask-side boost (decided trades all came from the morning list). */
+const MORNING_ASK_CUTOFF_HOUR_ET = 11;
+
+export type SpotState = { pctFromClose: number | null } | null | undefined;
+
+export type ActionableRegime = {
+  label: string;
+  minDte: number;
+  rateTechPenalty: number;
+  yieldsRising: boolean;
+};
+
+function etHour(iso: string): number | null {
+  const d = new Date(iso);
+  if (!Number.isFinite(d.getTime())) return null;
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(d);
+  const [h, m] = parts.split(":").map(Number);
+  return h + m / 60;
+}
+
+export function isMorningAskPrint(row: Pick<RankedFlow, "alert" | "askShare">, now?: Date): boolean {
+  if (row.askShare < 0.7) return false;
+  if (isLateSessionPrint(row.alert.created_at, now)) return false;
+  const h = etHour(row.alert.created_at);
+  return h != null && h >= 9.5 && h < MORNING_ASK_CUTOFF_HOUR_ET;
+}
 
 /**
  * Picks / Premove / morning only. Does not change the live-board score from `scoreAlert`.
- * Overlap and ≥90 are boosts. Late-afternoon prints are docked and sorted behind earlier tape.
  */
 export function applyActionableOverlay(
   row: RankedFlow,
-  opts: { onBoth: boolean; now?: Date },
+  opts: { onBoth: boolean; now?: Date; spot?: SpotState; regime?: ActionableRegime | null },
 ): RankedFlow {
   const chips = [...row.chips];
-  let score = row.score;
+  let score = row.rawScore ?? row.score;
   const base = row.score;
 
   if (opts.onBoth && !hasScoreChip(row, "both")) {
@@ -630,7 +671,7 @@ export function applyActionableOverlay(
         "Both lanes",
         "boost",
         BOTH_LANE_DELTA,
-        "Qualifies for Picks and Premove. Sep 2026 backtest: the overlap was the set worth acting on.",
+        "Qualifies for Picks and Premove. Informational only — Sep 23–30 both-lane score-100 went 3W / 5L, so no bonus.",
       ),
     );
   }
@@ -648,6 +689,80 @@ export function applyActionableOverlay(
     );
   }
 
+  if (isMorningAskPrint(row, opts.now) && !hasScoreChip(row, "morning-ask")) {
+    score += MORNING_ASK_DELTA;
+    chips.push(
+      chip(
+        "morning-ask",
+        "Morning ask-side",
+        "boost",
+        MORNING_ASK_DELTA,
+        `${Math.round(row.askShare * 100)}% ask-side, printed 9:30–11:00 ET. Every decided trade since Sep 23 came from the morning list.`,
+      ),
+    );
+  }
+
+  if (row.dte >= 11 && row.dte <= 30 && !hasScoreChip(row, "dte-sweet-plus")) {
+    score += DTE_SWEET_EXTRA;
+    chips.push(
+      chip(
+        "dte-sweet-plus",
+        "11–30 DTE (actionable)",
+        "boost",
+        DTE_SWEET_EXTRA,
+        "Extra weight on the primary DTE band for the actionable lists.",
+      ),
+    );
+  }
+
+  const pct = opts.spot?.pctFromClose;
+  if (pct != null && Number.isFinite(pct) && !hasScoreChip(row, "quiet") && !hasScoreChip(row, "extended")) {
+    const aligned = (row.alert.type === "call" && pct > 0) || (row.alert.type === "put" && pct < 0);
+    if (Math.abs(pct) < 0.02) {
+      score += QUIET_DELTA;
+      chips.push(
+        chip(
+          "quiet",
+          "Quiet underlying",
+          "boost",
+          QUIET_DELTA,
+          `Spot ${Math.round(pct * 1000) / 10}% vs prior close. Flow building while the stock is still quiet (Sep 30: INTC 130C +33%).`,
+        ),
+      );
+    } else if (aligned && Math.abs(pct) >= 0.03) {
+      score += EXTENDED_DELTA;
+      chips.push(
+        chip(
+          "extended",
+          "Underlying already extended",
+          "penalty",
+          EXTENDED_DELTA,
+          `Stock is ${Math.round(pct * 1000) / 10}% vs prior close. Chase risk.`,
+        ),
+      );
+    }
+  }
+
+  const regime = opts.regime;
+  if (
+    regime &&
+    regime.rateTechPenalty < 0 &&
+    row.alert.type === "call" &&
+    isLongDurationTech(row.alert.ticker) &&
+    !hasScoreChip(row, "rate-pressure")
+  ) {
+    score += regime.rateTechPenalty;
+    chips.push(
+      chip(
+        "rate-pressure",
+        "Rising yields vs long-duration tech",
+        "penalty",
+        regime.rateTechPenalty,
+        `Long yields rising on a ${regime.label} day. Sep 30: six GOOG/GOOGL calls lost 16–26% as 10Y/30Y rose ahead of reports.`,
+      ),
+    );
+  }
+
   if (isLateSessionPrint(row.alert.created_at, opts.now) && !hasScoreChip(row, "late-print")) {
     score += LATE_PRINT_DELTA;
     chips.push(
@@ -656,7 +771,7 @@ export function applyActionableOverlay(
         "Late print",
         "penalty",
         LATE_PRINT_DELTA,
-        "Printed at or after 14:00 ET. Late live-board tape was ~97% flat — still on the board, not the lead of this card.",
+        "Printed at or after 14:00 ET. Sep 23–30: late prints 0W / 0L / 44 flat — excluded from actionable lists.",
       ),
     );
   }
@@ -664,6 +779,7 @@ export function applyActionableOverlay(
   return {
     ...row,
     score: Math.round(clamp(score, 0, 100)),
+    rawScore: Math.round(score),
     chips,
   };
 }
@@ -672,13 +788,19 @@ export function withActionableAdjustments(
   rows: RankedFlow[],
   otherKeys: Set<string>,
   now?: Date,
+  extra?: { spots?: Record<string, SpotState>; regime?: ActionableRegime | null },
 ): RankedFlow[] {
+  const minDte = extra?.regime?.minDte ?? 0;
   return rows
     .filter((row) => !excludedFromActionable(row))
+    .filter((row) => !isLateSessionPrint(row.alert.created_at, now))
+    .filter((row) => row.dte >= minDte)
     .map((row) =>
       applyActionableOverlay(row, {
         onBoth: otherKeys.has(contractKey(row)),
         now,
+        spot: extra?.spots?.[row.alert.ticker.toUpperCase()] ?? extra?.spots?.[row.alert.ticker],
+        regime: extra?.regime ?? null,
       }),
     );
 }
@@ -689,6 +811,8 @@ export function compareActionable(a: RankedFlow, b: RankedFlow): number {
   const lateB = hasScoreChip(b, "late-print") ? 1 : 0;
   if (lateA !== lateB) return lateA - lateB;
   if (b.score !== a.score) return b.score - a.score;
+  const rawDelta = (b.rawScore ?? b.score) - (a.rawScore ?? a.score);
+  if (rawDelta !== 0) return rawDelta;
   const dteDelta = dtePreference(a.dte) - dtePreference(b.dte);
   if (dteDelta !== 0) return dteDelta;
   return toNumber(b.alert.total_premium) - toNumber(a.alert.total_premium);
