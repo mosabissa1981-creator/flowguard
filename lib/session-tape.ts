@@ -3,7 +3,7 @@ import "server-only";
 import { after } from "next/server";
 
 import { kvDurable, kvGet, kvSet, kvSetNx } from "@/lib/kv";
-import { isInCurrentSession, sessionOpenUtc, tradingDateET } from "@/lib/session";
+import { sessionOpenUtc, tradingDateET } from "@/lib/session";
 import type { FlowAlert } from "@/lib/types";
 import { fetchFlowAlertsPage } from "@/lib/uw";
 
@@ -258,9 +258,11 @@ export async function getSessionTape(opts: { force?: boolean; allowUw?: boolean 
     await syncing;
   }
   if (!st.sorted) {
+    // add() already drops prints before today's open; sort by precomputed ms (newest first).
     st.sorted = [...st.byId.values()]
-      .filter((a) => isInCurrentSession(a.created_at, now))
-      .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
+      .map((a) => [Date.parse(a.created_at), a] as const)
+      .sort((x, y) => y[0] - x[0])
+      .map((x) => x[1]);
   }
   const alerts = st.sorted;
   const holes = st.meta.holes.length;

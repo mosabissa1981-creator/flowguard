@@ -8,7 +8,8 @@ import {
   type ChainFadeSignal,
 } from "@/lib/chain-context";
 import { hoursSinceCreated, isLateSessionPrint, printAgeBand, tradingDateET } from "@/lib/session";
-import { followThroughFromPeers } from "@/lib/follow-through";
+import { followThroughFromPeers, type FollowThroughSignal } from "@/lib/follow-through";
+import { precomputePeerSignals } from "@/lib/peer-index";
 import { alertOtmPct, moneynessBand } from "@/lib/moneyness";
 import { isLongDurationTech, isRateSensitive } from "@/lib/issuers";
 
@@ -33,6 +34,8 @@ export function scoreAlert(
     now?: Date;
     peers?: FlowAlert[];
     chainFade?: ChainFadeSignal | null;
+    /** Precomputed peer signals (lib/peer-index) for large groups; skips the per-alert peer scans. */
+    precomputed?: { fade: ChainFadeSignal; follow: FollowThroughSignal } | null;
   } = {},
 ): Omit<RankedFlow, "rank"> {
   const chips: ScoreChip[] = [];
@@ -460,7 +463,7 @@ export function scoreAlert(
     );
   }
 
-  const peerFade = fadeFromLaterPrints(alert, peers);
+  const peerFade = context.precomputed?.fade ?? fadeFromLaterPrints(alert, peers);
   const remoteFade = context.chainFade?.faded ? context.chainFade : null;
   const fadeHit = peerFade.faded ? peerFade : remoteFade;
   if (fadeHit?.faded) {
@@ -477,7 +480,7 @@ export function scoreAlert(
     );
   }
 
-  const follow = followThroughFromPeers(alert, peers, now);
+  const follow = context.precomputed?.follow ?? followThroughFromPeers(alert, peers, now);
   if (follow.confirmed) {
     const delta = 5;
     score += delta;
@@ -554,6 +557,9 @@ export function scoreAlert(
   };
 }
 
+/** Same ticker+side groups at least this big use the O(n log n) peer index. */
+const LARGE_GROUP = 150;
+
 export function rankAlerts(
   alerts: FlowAlert[],
   context: {
@@ -564,19 +570,27 @@ export function rankAlerts(
   } = {},
 ): RankedFlow[] {
   // Every peer signal (session ask confirmation, later-print fade, follow-through) only looks at the same
-  // ticker/chain, so pass same-ticker peers: O(n) on the full-session tape instead of O(n²).
+  // chain or same ticker+side, so pass same ticker+side peers: O(n) on the full-session tape instead of O(n²).
   const byTicker = new Map<string, FlowAlert[]>();
   for (const a of alerts) {
-    const list = byTicker.get(a.ticker);
+    const k = `${a.ticker}|${a.type}`;
+    const list = byTicker.get(k);
     if (list) list.push(a);
-    else byTicker.set(a.ticker, [a]);
+    else byTicker.set(k, [a]);
+  }
+  const pre = new Map<string, { fade: ChainFadeSignal; follow: FollowThroughSignal }>();
+  const at = context.now ?? new Date();
+  for (const group of byTicker.values()) {
+    if (group.length < LARGE_GROUP) continue;
+    for (const [id, v] of precomputePeerSignals(group, at)) pre.set(id, v);
   }
   const scored = alerts.map((alert) =>
     scoreAlert(alert, {
+      precomputed: pre.get(alert.id) ?? null,
       marketTide: context.marketTide,
       tickerTide: context.tickerTides?.[alert.ticker] ?? null,
       now: context.now,
-      peers: byTicker.get(alert.ticker) ?? [alert],
+      peers: byTicker.get(`${alert.ticker}|${alert.type}`) ?? [alert],
       chainFade: context.chainFades?.[alert.id] ?? null,
     }),
   );

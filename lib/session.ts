@@ -6,29 +6,34 @@ function pad(n: number): string {
   return String(n).padStart(2, "0");
 }
 
+// Formatters are expensive to construct; these run per alert on the full-session tape, so build them once.
+const FMT_DATE = new Intl.DateTimeFormat("en-CA", { timeZone: ET, year: "numeric", month: "2-digit", day: "2-digit" });
+const FMT_CLOCK = new Intl.DateTimeFormat("en-US", { timeZone: ET, hour: "2-digit", minute: "2-digit", hour12: false });
+const FMT_WEEKDAY = new Intl.DateTimeFormat("en-US", { timeZone: ET, weekday: "short" });
+const offsetMemo = new Map<string, "-04:00" | "-05:00">();
+const prevOpenMemo = new Map<number, number>();
+
 export function tradingDateET(now = new Date()): string {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: ET,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(now);
+  return FMT_DATE.format(now);
 }
 
 function etOffsetForLocalWall(dateStr: string, hour: number, minute: number): "-04:00" | "-05:00" {
+  const memoKey = `${dateStr}|${hour}|${minute}`;
+  const hit = offsetMemo.get(memoKey);
+  if (hit) return hit;
+  let found: "-04:00" | "-05:00" = "-04:00";
   for (const offset of ["-04:00", "-05:00"] as const) {
     const instant = new Date(`${dateStr}T${pad(hour)}:${pad(minute)}:00${offset}`);
     const back = tradingDateET(instant);
-    const clock = new Intl.DateTimeFormat("en-US", {
-      timeZone: ET,
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    }).format(instant);
-    const [h, m] = clock.split(":").map(Number);
-    if (back === dateStr && h === hour && m === minute) return offset;
+    const [h, m] = FMT_CLOCK.format(instant).split(":").map(Number);
+    if (back === dateStr && h % 24 === hour && m === minute) {
+      found = offset;
+      break;
+    }
   }
-  return "-04:00";
+  if (offsetMemo.size > 500) offsetMemo.clear();
+  offsetMemo.set(memoKey, found);
+  return found;
 }
 
 export function sessionOpenUtc(now = new Date()): Date {
@@ -67,12 +72,21 @@ export function sessionHasOpened(now = new Date()): boolean {
 }
 
 function weekdayShort(instant: Date): string {
-  return new Intl.DateTimeFormat("en-US", { timeZone: ET, weekday: "short" }).format(instant);
+  return FMT_WEEKDAY.format(instant);
 }
 
 /** 9:30 ET open of the previous weekday session (skips Sat/Sun). */
 export function previousSessionOpenUtc(now = new Date()): Date {
   const currentOpen = sessionOpenUtc(now);
+  const memo = prevOpenMemo.get(currentOpen.getTime());
+  if (memo != null) return new Date(memo);
+  const result = previousOpenUncached(currentOpen);
+  if (prevOpenMemo.size > 50) prevOpenMemo.clear();
+  prevOpenMemo.set(currentOpen.getTime(), result.getTime());
+  return result;
+}
+
+function previousOpenUncached(currentOpen: Date): Date {
   let cursor = new Date(currentOpen.getTime() - 36 * 3600_000);
   for (let i = 0; i < 8; i += 1) {
     const open = sessionOpenUtc(cursor);

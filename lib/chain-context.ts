@@ -1,5 +1,6 @@
 import type { FlowAlert } from "@/lib/types";
 import { askShare, toNumber } from "@/lib/numbers";
+import { alertMs, alertNums } from "@/lib/alert-time";
 
 export type ChainFadeSignal = {
   faded: boolean;
@@ -23,26 +24,22 @@ export function hasSessionAskConfirmation(alert: FlowAlert, peers: FlowAlert[]):
   });
 }
 
-function isBidSideDump(alert: FlowAlert): boolean {
-  return askShare(alert) < 0.4;
-}
 
 export function fadeFromLaterPrints(alert: FlowAlert, peers: FlowAlert[]): ChainFadeSignal {
   const chain = alert.option_chain;
   const alertPx = toNumber(alert.price);
-  const alertTs = new Date(alert.created_at).getTime();
+  const alertTs = alertMs(alert);
   if (!chain || !Number.isFinite(alertTs)) {
     return { faded: false, detail: "" };
   }
 
-  const later = peers.filter((peer) => {
-    if (peer.option_chain !== chain) return false;
-    const ts = new Date(peer.created_at).getTime();
-    return Number.isFinite(ts) && ts > alertTs;
-  });
-
-  for (const peer of later) {
-    const px = toNumber(peer.price);
+  // Single pass in input order (same first-match semantics as before), no allocation.
+  for (const peer of peers) {
+    if (peer.option_chain !== chain) continue;
+    const ts = alertMs(peer);
+    if (!(Number.isFinite(ts) && ts > alertTs)) continue;
+    const n = alertNums(peer, askShare, toNumber);
+    const px = n.price;
     if (alertPx > 0 && px > 0 && px <= alertPx * 0.85) {
       const drop = Math.round((1 - px / alertPx) * 100);
       return {
@@ -50,10 +47,10 @@ export function fadeFromLaterPrints(alert: FlowAlert, peers: FlowAlert[]): Chain
         detail: `Later print on ${chain} at $${px.toFixed(2)} is ${drop}% below the alert ($${alertPx.toFixed(2)}).`,
       };
     }
-    if (isBidSideDump(peer) && toNumber(peer.total_premium) >= 10_000) {
+    if (n.askShare < 0.4 && n.premium >= 10_000) {
       return {
         faded: true,
-        detail: `Later bid-side selling on ${chain} after the alert (${Math.round((1 - askShare(peer)) * 100)}% bid-side premium).`,
+        detail: `Later bid-side selling on ${chain} after the alert (${Math.round((1 - n.askShare) * 100)}% bid-side premium).`,
       };
     }
   }
