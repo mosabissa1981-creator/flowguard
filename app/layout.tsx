@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -19,6 +19,12 @@ export const metadata: Metadata = {
   title: "FlowGuard — unusual options flow screener",
   description:
     "Rank high-conviction unusual options flow and downrank fade-prone 0–2 DTE, bid-side, and fighting-tide setups. Powered by Unusual Whales.",
+  appleWebApp: { capable: true, title: "FlowGuard", statusBarStyle: "black" },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#0a0a0a",
+  colorScheme: "dark",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
@@ -26,6 +32,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html
       lang="en"
       className={`dark ${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      style={{ backgroundColor: "#0a0a0a" }}
     >
       <body className="flex min-h-full flex-col bg-background text-foreground">
         <TooltipProvider delay={200}>{children}</TooltipProvider>

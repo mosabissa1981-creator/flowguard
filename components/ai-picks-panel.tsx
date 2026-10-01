@@ -12,7 +12,7 @@ import { formatDte, formatExpiry, formatStrike } from "@/lib/format";
 const POLL_MS = 15 * 60_000;
 
 function money(n: number): string {
-  return `$${n.toFixed(2)}`;
+  return `$${Number(n ?? 0).toFixed(2)}`;
 }
 
 export function AiPicksPanel({ onSelect }: { onSelect: (id: string) => void }) {
@@ -43,7 +43,8 @@ export function AiPicksPanel({ onSelect }: { onSelect: (id: string) => void }) {
     };
   }, [load]);
 
-  const picks = data?.picks ?? [];
+  const picks = Array.isArray(data?.picks) ? data.picks.filter((p) => p?.alert && p.exitPlan) : [];
+  const skips = Array.isArray(data?.skips) ? data.skips : [];
   const engineLabel =
     data?.engine === "llm"
       ? `AI · ${data.llmModel ?? "LLM"}`
@@ -137,22 +138,22 @@ export function AiPicksPanel({ onSelect }: { onSelect: (id: string) => void }) {
                 </div>
                 <div>
                   <div className="text-muted-foreground">Time stop</div>
-                  {pick.exitPlan.timeStop.date}
+                  {pick.exitPlan.timeStop?.date ?? "—"}
                 </div>
               </div>
               <div className="text-[10px] text-muted-foreground">
-                Lanes: {pick.lanes.join(" + ")} · score {pick.score} · {pick.exitPlan.timeStop.rule}
+                Lanes: {(pick.lanes ?? []).join(" + ")} · score {pick.score} · {pick.exitPlan.timeStop?.rule ?? ""}
               </div>
             </article>
           ))}
         </div>
       ) : null}
 
-      {data && data.skips.length > 0 ? (
+      {skips.length > 0 ? (
         <details className="mt-3 text-xs text-muted-foreground">
-          <summary className="cursor-pointer">Skipped ({data.skips.length})</summary>
+          <summary className="cursor-pointer">Skipped ({skips.length})</summary>
           <ul className="mt-1 space-y-0.5">
-            {data.skips.map((s) => (
+            {skips.map((s) => (
               <li key={s.option_chain}>
                 <span className="font-mono">{s.option_chain}</span> — {s.reason}
               </li>
@@ -160,7 +161,7 @@ export function AiPicksPanel({ onSelect }: { onSelect: (id: string) => void }) {
           </ul>
         </details>
       ) : null}
-      {data?.study ? (
+      {data?.study?.totals ? (
         <p className="mt-2 text-[10px] text-muted-foreground">
           Study book {data.study.since}→{data.study.through}: {data.study.totals.w}W / {data.study.totals.l}L /{" "}
           {data.study.totals.flat} flat.

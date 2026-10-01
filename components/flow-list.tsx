@@ -186,7 +186,19 @@ export function FlowList({
                 watched && "border-amber-400/30",
               )}
             >
-              <button type="button" className="w-full text-left" onClick={() => onSelect(row.alert.id)}>
+              {/* div, not <button>: the score chips contain tooltip <button>s and nested buttons break hydration. */}
+              <div
+                role="button"
+                tabIndex={0}
+                className="w-full cursor-pointer text-left"
+                onClick={() => onSelect(row.alert.id)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    onSelect(row.alert.id);
+                  }
+                }}
+              >
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <div className="flex items-center gap-2">
@@ -210,7 +222,7 @@ export function FlowList({
                   <ScoreChips chips={row.chips} limit={4} compact />
                 </div>
                 <HoldWindowCopy hold={row.holdWindow} compact className="mt-2" />
-              </button>
+              </div>
               <div className="mt-2 flex flex-wrap gap-1">
                 <Button size="sm" variant="outline" onClick={() => onPinTicker(row.alert.ticker)}>
                   <Pin /> Pin
