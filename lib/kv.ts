@@ -9,7 +9,7 @@ import { gunzipSync, gzipSync } from "node:zlib";
  * Tiny key/value persistence for FlowGuard state, built to stay inside free tiers.
  *
  * Backends (first that is configured wins):
- *  1. "redis"  – Upstash Redis REST (UPSTASH_REDIS_REST_URL/TOKEN or KV_REST_API_URL/TOKEN, set by the
+ *  1. "redis"  – Upstash Redis REST (KV_REST_API_URL/TOKEN, STORAGE_KV_REST_API_URL/TOKEN, UPSTASH_REDIS_REST_URL/TOKEN or any *_KV_REST_API_URL pair, set by the
  *                Vercel Marketplace Upstash integration). Durable, global. All hot state lives here.
  *  2. "local"  – SHADOW_LOCAL_DIR (local tests).
  *  3. "blob"   – Vercel Blob "lite": NO list()/head() ever. Reads fetch the blob by its known URL (a simple op),
@@ -36,10 +36,33 @@ function env(name: string): string {
   return process.env[name]?.trim() ?? "";
 }
 
+/** Upstash REST creds: explicit names first, then any custom-prefixed Marketplace pair (e.g. STORAGE_KV_REST_API_URL). */
 function redisConf(): { url: string; token: string } | null {
-  const url = env("UPSTASH_REDIS_REST_URL") || env("KV_REST_API_URL");
-  const token = env("UPSTASH_REDIS_REST_TOKEN") || env("KV_REST_API_TOKEN");
-  return url && token ? { url: url.replace(/\/$/, ""), token } : null;
+  const pairs: Array<[string, string]> = [
+    ["KV_REST_API_URL", "KV_REST_API_TOKEN"],
+    ["STORAGE_KV_REST_API_URL", "STORAGE_KV_REST_API_TOKEN"],
+    ["UPSTASH_REDIS_REST_URL", "UPSTASH_REDIS_REST_TOKEN"],
+  ];
+  for (const k of Object.keys(process.env).sort()) {
+    const m = /^(.+_)KV_REST_API_URL$/.exec(k);
+    if (m) pairs.push([k, `${m[1]}KV_REST_API_TOKEN`]);
+    const u = /^(.+_)REDIS_REST_URL$/.exec(k);
+    if (u) pairs.push([k, `${u[1]}REDIS_REST_TOKEN`]);
+  }
+  for (const [uk, tk] of pairs) {
+    const url = env(uk);
+    const token = env(tk);
+    if (url && token && /^https:\/\//.test(url)) return { url: url.replace(/\/$/, ""), token };
+  }
+  return null;
+}
+
+/** Name (never value) of the env var pair in use, for diag. */
+export function kvCredSource(): string | null {
+  const c = redisConf();
+  if (!c) return null;
+  for (const k of Object.keys(process.env)) if (env(k).replace(/\/$/, "") === c.url && /REST/.test(k)) return k;
+  return "unknown";
 }
 
 function blobToken(): string {
@@ -94,6 +117,7 @@ export function kvStats() {
   const o = opDay();
   return {
     backend: kvBackend(),
+    credEnv: kvCredSource(),
     durable: kvDurable(),
     instanceOpsToday: { ...o, reported: undefined },
     caps: { blobWritesPerDay: blobWriteCap(), blobReadsPerDay: blobReadCap(), redisCmdsPerInstanceDay: redisCmdCap() },
