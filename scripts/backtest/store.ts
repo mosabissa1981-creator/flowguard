@@ -13,7 +13,7 @@ export const MIN_PREMIUM = 10_000; // same floor as the live session tape
 
 export const p = (...parts: string[]) => path.join(ROOT, ...parts);
 export function ensureDirs() {
-  for (const d of ["flow", "tide", "ohlc", "earnings", "contracts", "replay", "datasets", "logs"]) fs.mkdirSync(p(d), { recursive: true });
+  for (const d of ["flow", "tide", "ohlc", "earnings", "contracts", "replay", "pools", "datasets", "logs"]) fs.mkdirSync(p(d), { recursive: true });
 }
 
 export function readJson<T>(file: string): T | null {
@@ -167,6 +167,7 @@ export async function earningsFor(ticker: string): Promise<Earn[]> {
   const f = p("earnings", `${ticker.replace(/[^A-Z0-9._-]/gi, "_")}.json`);
   const hit = readJson<{ at: number; rows: Earn[] }>(f);
   if (hit && Date.now() - hit.at < 30 * 86400_000) return hit.rows;
+  if (hit && process.env.UW_OFFLINE === "1") return hit.rows; // cache-only runs: stale earnings beat no earnings
   let rows: Earn[] = [];
   try {
     const j = await uwJson<{ data?: Array<Record<string, string | null>> }>(`/api/earnings/${encodeURIComponent(ticker)}`);
@@ -186,6 +187,7 @@ export async function contractHistory(symbol: string, needThrough: string, today
   const hit = readJson<ContractDoc>(f);
   const expiry = `20${symbol.slice(-15, -13)}-${symbol.slice(-13, -11)}-${symbol.slice(-11, -9)}`;
   if (hit && (hit.fetchedDay > needThrough || hit.fetchedDay > expiry || hit.fetchedDay === today)) return hit.chains;
+  if (process.env.UW_OFFLINE === "1") return hit?.chains ?? null; // cache-only run
   try {
     const j = await uwJson<{ chains?: Record<string, unknown>[] }>(`/api/option-contract/${encodeURIComponent(symbol)}/historic`);
     const doc: ContractDoc = { at: Date.now(), fetchedDay: today, chains: j.chains ?? [] };
@@ -233,7 +235,7 @@ export async function netPremTicks(ticker: string, day: string): Promise<Record<
 export async function insiderRows(ticker: string): Promise<Record<string, unknown>[]> {
   const f = p("signals", "insider", `${ticker.replace(/[^A-Z0-9._-]/gi, "_")}.json.gz`);
   const hit = readJson<{ at: number; rows: Record<string, unknown>[] }>(f);
-  if (hit && Date.now() - hit.at < 7 * 86400_000) return hit.rows;
+  if (hit && (Date.now() - hit.at < 7 * 86400_000 || process.env.UW_OFFLINE === "1")) return hit.rows;
   let rows: Record<string, unknown>[] = [];
   try {
     const j = await uwJson<{ data?: Record<string, unknown>[] }>(`/api/insider/transactions?ticker_symbol=${encodeURIComponent(ticker)}&limit=500`);

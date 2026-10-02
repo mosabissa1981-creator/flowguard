@@ -32,7 +32,13 @@ function key(): string {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+/** UW_OFFLINE=1: cache-only run, never calls UW (e.g. before the 8 pm ET reset once the day's budget is spent). */
+const OFFLINE = process.env.UW_OFFLINE === "1";
 export function canSpend(n = 1): boolean {
+  if (OFFLINE) {
+    budget.stopped ||= "UW_OFFLINE=1 (cache-only run)";
+    return false;
+  }
   return !budget.stopped && budget.tokenCountToday + n < STOP_AT && budget.runCalls + n <= RUN_MAX;
 }
 

@@ -116,7 +116,17 @@ const PICKS_AT = "13:55";
 const PREMOVE_AT = "15:45";
 
 import type { ReplayDay, ReplayEntry } from "./replay-types";
+import { picksPool, premovePool, type Pool } from "./pools";
 export type { ReplayDay, ReplayEntry };
+export type PoolsDay = { v: 1; day: string; pools: Pool[]; check: Record<string, boolean>; ms: number };
+
+/** Live top-3 vs pool top-3 (by capRank) — proves the pool mirrors the live ordering. */
+function poolMatches(pool: Pool | null, live: { alert: { option_chain: string; id: string } }[]): boolean {
+  if (!pool) return false;
+  const a = pool.locked ? [] : pool.rows.filter((r) => r.capRank != null && r.capRank <= 3).sort((x, y) => x.capRank! - y.capRank!).map((r) => r.contract);
+  const b = live.slice(0, 3).map((p) => p.alert.option_chain || p.alert.id);
+  return a.length === b.length && a.every((c, i) => c === b[i]);
+}
 
 const num = (v: unknown) => (Number.isFinite(Number(v)) ? Number(v) : null);
 
@@ -144,6 +154,8 @@ export async function replayDay(day: string, alerts: FlowAlert[], tide: TideRow[
   let lastLanes: Awaited<ReturnType<typeof lanes.loadLanes>> | null = null;
   let lastPuts: Awaited<ReturnType<typeof puts.loadPuts>> | null = null;
   let lastLottery: Awaited<ReturnType<typeof lottery.loadLottery>> | null = null;
+  const pools: Pool[] = [];
+  const check: Record<string, boolean> = {};
   try {
     for (const [hh, mm] of CHECKPOINTS) {
       const now = etMs(day, hh, mm);
@@ -156,6 +168,9 @@ export async function replayDay(day: string, alerts: FlowAlert[], tide: TideRow[
       lastLottery = await lottery.loadLottery({ fresh: true }).catch((e) => (console.error(`[replay ${day} ${label}] lottery`, e?.message), lastLottery));
       if (label === PICKS_AT) {
         const r = await picks.loadDailyPicks({ forceFresh: true }).catch(() => null);
+        const pool = await picksPool().catch((e) => (console.error(`[replay ${day}] picks pool`, e?.message), null));
+        if (pool) pools.push(pool);
+        check.picks = poolMatches(pool, r?.picks ?? []);
         for (const pk of (r?.picks ?? []).slice(0, 3)) {
           const a = pk.alert;
           push({
@@ -170,6 +185,9 @@ export async function replayDay(day: string, alerts: FlowAlert[], tide: TideRow[
       }
       if (label === PREMOVE_AT) {
         const r = await premove.loadPremoveShortlist({ forceFresh: true }).catch(() => null);
+        const pool = await premovePool().catch((e) => (console.error(`[replay ${day}] premove pool`, e?.message), null));
+        if (pool) pools.push(pool);
+        check.premove = poolMatches(pool, r?.picks ?? []);
         for (const pk of (r?.picks ?? []).slice(0, 3)) {
           const a = pk.alert;
           push({
@@ -191,5 +209,41 @@ export async function replayDay(day: string, alerts: FlowAlert[], tide: TideRow[
   for (const e of lastPuts?.picks ?? []) push({ lane: "puts", kind: "logged", contract: e.contract, ticker: e.ticker, side: "put", expiry: e.expiry, day, entry: e.entry, printTimeUtc: e.printTimeUtc, underlying: e.underlying, timeStopSessions: e.exitPlan.timeStopSessions, features: { putsScore: e.putsScore, flowScore: e.flowScore, dte: e.dte, moneynessPct: e.moneynessPct, askSharePct: e.askSharePct, volOi: e.volOi, premium: e.premiumUsd, tickerTide: e.tickerTide, marketTide: e.marketTide, confirmations: e.confirmations.length } });
   for (const e of lastLottery?.picks ?? []) push({ lane: "lottery", kind: "logged", contract: e.contract, ticker: e.ticker, side: e.side ?? sideOf(e.contract), expiry: e.expiry, day, entry: e.entry, printTimeUtc: e.printTimeUtc ?? null, underlying: e.underlying, timeStopSessions: 0, features: { lotteryScore: e.lotteryScore, flowScore: e.flowScore, dte: e.dte, otmPct: e.otmPct, askSharePct: e.askSharePct, volOi: e.volOi, premium: e.premiumUsd, catalyst: e.catalyst?.kind ?? null } });
   ctx = null;
-  return { v: 1, day, prints: alerts.length, entries, unhandled: Object.fromEntries(unhandled), ms: RealDate.now() - t0 };
+  return { v: 1, day, prints: alerts.length, entries, unhandled: Object.fromEntries(unhandled), ms: RealDate.now() - t0, pools: { v: 1, day, pools, check, ms: 0 } };
+}
+
+/**
+ * Pools-only replay for days replayed before pools existed: just the Picks (13:55) and Premove (15:45) checkpoints.
+ * Picks/Premove keep no cross-day state, so this reproduces the same lists (verified via `check`).
+ */
+export async function replayPoolsDay(day: string, alerts: FlowAlert[], tide: TideRow[]): Promise<PoolsDay> {
+  const t0 = RealDate.now();
+  const [{ primeSessionTape }, picks, premove] = await Promise.all([import("@/lib/session-tape"), import("@/lib/picks"), import("@/lib/premove")]);
+  ctx = { day, alerts, visible: [], tide };
+  unhandled.clear();
+  const pools: Pool[] = [];
+  const check: Record<string, boolean> = {};
+  try {
+    for (const [label, hh, mm] of [[PICKS_AT, 13, 55], [PREMOVE_AT, 15, 45]] as const) {
+      const now = etMs(day, hh, mm);
+      setClock(now);
+      ctx.visible = alerts.filter((a) => Date.parse(a.created_at) <= now);
+      primeSessionTape(ctx.visible, new Date(now));
+      if (label === PICKS_AT) {
+        const r = await picks.loadDailyPicks({ forceFresh: true });
+        const pool = await picksPool();
+        pools.push(pool);
+        check.picks = poolMatches(pool, r?.picks ?? []);
+      } else {
+        const r = await premove.loadPremoveShortlist({ forceFresh: true });
+        const pool = await premovePool();
+        pools.push(pool);
+        check.premove = poolMatches(pool, r?.picks ?? []);
+      }
+    }
+  } finally {
+    setClock(null);
+    ctx = null;
+  }
+  return { v: 1, day, pools, check, ms: RealDate.now() - t0 };
 }
