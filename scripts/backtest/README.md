@@ -25,3 +25,16 @@ Data lands in `/workspace/flowguard/history/` (override `HISTORY_DIR`):
 Replay = fake clock + fetch shim (UW/Yahoo served from the files above; calendar/treasury/LLM/Telegram refused; the
 wrapper passes only the UW key). Days are fetched newest → oldest and replayed in ascending blocks in a fresh process.
 Known gaps: no yields / economic-calendar lockouts in replay; sector field absent (same as the live tape).
+
+## Candidate pools (Picks / Premove re-weighting)
+
+- Every replay also stores the **full scored Picks pool (13:55 ET) and Premove pool (15:45 ET)** in `pools/<day>.json`:
+  up to 80 rows per list after the live sort, with chips (+ deltas), `score`, `rawScore`, the raw score and chips
+  entering the actionable overlay (`preActRaw` / `preActChips`, for the score-90 rule), pool rank and post-cap rank.
+  `check` confirms the pool's top 3 equals what `loadDailyPicks` / `loadPremoveShortlist` returned.
+- Older replays get pools from cache via `pools-block.ts` (the nightly runs it automatically; `UW_OFFLINE=1` = never call UW).
+- `candidates.ts` scores rows down to `CAND_DEPTH` (default 25) plus the shown top 3 with the same outcome rule as the
+  logged picks → `datasets/candidate-outcomes.json.gz` + `datasets/candidates.csv` (`chip_<id>` = delta, blank = absent;
+  `outcome=unscored` beyond the depth). Contract histories share the `contracts/` cache; misses are budgeted UW calls.
+- `weight-test.ts [--proposal=path] [--from=YYYY-MM-DD]` rebuilds the top 3/day under current vs proposed chip deltas
+  (same sort, caps, lockouts) → `weight-test-<date>.{json,md}`. Study only; live scoring is never changed by these scripts.

@@ -14,5 +14,5 @@ export type ReplayEntry = {
   features: Record<string, number | string | boolean | null>;
 };
 
-export type ReplayDay = { v: 1; day: string; prints: number; entries: ReplayEntry[]; unhandled: Record<string, number>; ms: number };
+export type ReplayDay = { v: 1; day: string; prints: number; entries: ReplayEntry[]; unhandled: Record<string, number>; ms: number; pools?: unknown };
 

@@ -6,6 +6,8 @@
  *     then replay the current lane/picks/premove rules on that day (fake clock, no UW calls except lazy daily
  *     bars / earnings lookups, cached forever).
  *  3. Outcomes for the new entries, then summary + ML dataset.
+ *  4. Picks/Premove candidate pools (pools/<day>.json; backfilled from cache for older replays) + their outcomes
+ *     → datasets/candidates.csv (for re-weighting studies; see weight-test.ts).
  * Stops cleanly at the UW budget (x-uw-daily-req-count ≥ UW_STOP_AT, default 37,500; hard ceiling 39,000 − 1,500 reserve).
  * Resumable: every finished day / contract is a file; re-running skips them.
  */
@@ -15,6 +17,7 @@ import fs from "node:fs";
 import { budget, BudgetStop, STOP_AT } from "./uw-budget";
 import { addDays, contractHistory, darkPoolWindow, gexStrikes, insiderRows, netPremTicks, ensureDirs, fetchFlowDay, fetchTideDay, loadFlowDay, p, readJson, ROOT, writeJson } from "./store";
 import type { ReplayDay, ReplayEntry } from "./replay-types";
+import { scoreCandidates } from "./candidates";
 
 const args = new Map(process.argv.slice(2).map((a) => (a.includes("=") ? (a.replace(/^--/, "").split("=") as [string, string]) : [a.replace(/^--/, ""), "1"])));
 const MAX_DAYS = Number(args.get("days") || 1e9);
@@ -206,7 +209,23 @@ function writeDataset(all: Outcome[]) {
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
-async function finalize(today: string, t0: number, holidays: Set<string>, report: Record<string, unknown>) {
+function runChild(script: string, days: string[]): Promise<number> {
+  return new Promise<number>((resolve) => {
+    const child = spawn("npx", ["tsx", "--conditions=react-server", script, ...days], { stdio: "inherit", env: process.env });
+    child.on("exit", (c) => resolve(c ?? 1));
+  });
+}
+
+/** Pools for days replayed before pools existed (cache-only replays of the 13:55 / 15:45 checkpoints). */
+async function backfillPools(): Promise<void> {
+  const missing = fs.readdirSync(p("replay")).filter((f) => f.endsWith(".json")).map((f) => f.slice(0, 10)).filter((d) => !fs.existsSync(p("pools", `${d}.json`))).sort();
+  for (let i = 0; i < missing.length && !budget.stopped; i += 40) {
+    const code = await runChild("scripts/backtest/pools-block.ts", missing.slice(i, i + 40));
+    if (code === 3) budget.stopped ||= "UW budget stop (pools lookups)";
+  }
+}
+
+async function finalize(today: string, t0: number, holidays: Set<string>, report: Record<string, unknown>, withCandidates = false) {
   const all = await scoreAll(today);
   const summary = summarize(all);
   writeDataset(all);
@@ -240,6 +259,7 @@ async function finalize(today: string, t0: number, holidays: Set<string>, report
     doc.rules,
   ].join("\n");
   fs.writeFileSync(p("backtest-summary.md"), md);
+  if (withCandidates) await scoreCandidates(today, log).catch((e) => log("candidates error", (e as Error).message));
   writeJson(p("logs", `run-${new Date().toISOString().replace(/[:.]/g, "-")}.json`), doc);
 }
 
@@ -251,6 +271,7 @@ async function main() {
   const report = { startedAt: new Date().toISOString(), today, stopAt: STOP_AT, daysFetched: 0, daysReplayed: 0, flowPagesThisRun: 0, stoppedReason: "", errors: [] as string[] };
   log(`history job start (root ${ROOT}, stop at UW count ${STOP_AT})`);
 
+  if (!SUMMARY_ONLY) await backfillPools();
   if (!SUMMARY_ONLY) {
     const BLOCK = Number(args.get("block") || 10);
     const tried = new Set<string>();
@@ -287,10 +308,7 @@ async function main() {
       }
       if (ready.length) {
         // Fresh process per block; days replayed oldest → newest so the fake clock only moves forward.
-        const code = await new Promise<number>((resolve) => {
-          const child = spawn("npx", ["tsx", "--conditions=react-server", "scripts/backtest/replay-block.ts", ...ready], { stdio: "inherit", env: process.env });
-          child.on("exit", (c) => resolve(c ?? 1));
-        });
+        const code = await runChild("scripts/backtest/replay-block.ts", ready);
         const done = ready.filter((d) => fs.existsSync(replayFile(d)));
         // Score outcomes progressively (newest first) so coverage of outcomes tracks coverage of days.
         if (code !== 3) await finalize(today, t0, holidays, report).catch((e) => log("finalize error", (e as Error).message));
@@ -308,7 +326,7 @@ async function main() {
     }
   }
 
-  await finalize(today, t0, holidays, report);
+  await finalize(today, t0, holidays, report, true);
   log(`done: replayed=${report.daysReplayed} fetched=${report.daysFetched} uwCalls=${budget.runCalls} tokenCount=${budget.tokenCountToday} ${budget.stopped || ""}`);
 }
 
