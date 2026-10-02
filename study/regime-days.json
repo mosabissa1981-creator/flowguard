@@ -1,5 +1,5 @@
 {
- "generatedAt": "2026-10-01T20:14:55.562Z",
+ "generatedAt": "2026-10-02T20:14:02.396Z",
  "note": "Per study day: regime features + outcome counts by pick type (side|dteBand|bucket). Built by scripts/build-study-summary.mjs.",
  "days": [
   {
@@ -667,6 +667,27 @@
      "w": 0,
      "l": 1,
      "flat": 0
+    }
+   }
+  },
+  {
+   "day": "2026-10-02",
+   "label": "report-day",
+   "tide": "bullish",
+   "us10yChangeBp": 4,
+   "us30yChangeBp": 2,
+   "calendarType": "report",
+   "calendarNote": null,
+   "types": {
+    "call|dte11-30|morning": {
+     "w": 0,
+     "l": 1,
+     "flat": 2
+    },
+    "call|dte11-30|late": {
+     "w": 2,
+     "l": 0,
+     "flat": 2
     }
    }
   }

@@ -1,24 +1,24 @@
 {
-  "generatedAt": "2026-10-01T20:14:55.543Z",
+  "generatedAt": "2026-10-02T20:14:02.375Z",
   "since": "2026-09-24",
-  "through": "2026-10-01",
-  "days": 6,
-  "definition": "winner \u2265 +15% option premium by EOD check, loser \u2264 \u221215%, else expired_flat. Entry = flow print.",
+  "through": "2026-10-02",
+  "days": 7,
+  "definition": "winner ≥ +15% option premium by EOD check, loser ≤ −15%, else expired_flat. Entry = flow print.",
   "totals": {
-    "w": 9,
-    "l": 11,
-    "flat": 63
+    "w": 11,
+    "l": 12,
+    "flat": 67
   },
   "buckets": {
     "morning": {
       "w": 9,
-      "l": 11,
-      "flat": 19
+      "l": 12,
+      "flat": 21
     },
     "late": {
-      "w": 0,
+      "w": 2,
       "l": 0,
-      "flat": 41
+      "flat": 43
     },
     "other": {
       "w": 0,
@@ -27,23 +27,23 @@
     },
     "bothLaneScore100": {
       "w": 3,
-      "l": 5,
-      "flat": 6
+      "l": 6,
+      "flat": 9
     },
     "quietUnderlying": {
-      "w": 6,
-      "l": 3,
-      "flat": 30
+      "w": 7,
+      "l": 4,
+      "flat": 32
     },
     "dte11to30": {
-      "w": 7,
-      "l": 11,
-      "flat": 43
+      "w": 9,
+      "l": 12,
+      "flat": 47
     },
     "calls": {
-      "w": 9,
-      "l": 10,
-      "flat": 41
+      "w": 11,
+      "l": 11,
+      "flat": 45
     },
     "puts": {
       "w": 0,
@@ -68,10 +68,10 @@
     }
   ],
   "lessons": [
-    "All decided trades came from the morning shortlist; late prints (\u226514:00 ET) were all flat.",
+    "All decided trades came from the morning shortlist; late prints (≥14:00 ET) were all flat.",
     "Both-lane score-100 is not an edge (ties at the clamp); do not treat overlap as confirmation.",
-    "Same-issuer clusters (GOOG/GOOGL 9/30, APP 9/24) lose together \u2014 one bet, not several.",
-    "Quiet underlying + morning ask-side in 11\u201330 DTE produced the cleanest winners (INTC 130C +33%, META 800C +42%).",
+    "Same-issuer clusters (GOOG/GOOGL 9/30, APP 9/24) lose together — one bet, not several.",
+    "Quiet underlying + morning ask-side in 11–30 DTE produced the cleanest winners (INTC 130C +33%, META 800C +42%).",
     "Rising long yields into reports hurt long-duration tech calls."
   ],
   "recentDecided": [
@@ -544,576 +544,478 @@
         "quiet underlying"
       ],
       "quiet": true
+    },
+    {
+      "day": "2026-10-02",
+      "contract": "XLF261016C00055000",
+      "ticker": "XLF",
+      "type": "call",
+      "dte": 14,
+      "score": 100,
+      "lane": "BOTH",
+      "bucket": "morning",
+      "outcome": "loser",
+      "pct": -18.5,
+      "entry": 0.27,
+      "tags": [
+        "ask-side dominance",
+        "solid premium",
+        "sweet-spot DTE",
+        "sweep",
+        "ask-sweep",
+        "modest OTM",
+        "single-leg",
+        "with tide",
+        "fresh",
+        "BOTH-lane"
+      ],
+      "quiet": true
+    },
+    {
+      "day": "2026-10-02",
+      "contract": "VIAV261016C00046000",
+      "ticker": "VIAV",
+      "type": "call",
+      "dte": 14,
+      "score": 100,
+      "lane": "Picks-only",
+      "bucket": "late",
+      "outcome": "winner",
+      "pct": 21.4,
+      "entry": 2.8,
+      "tags": [
+        "ask-side dominance",
+        "sweet-spot DTE",
+        "sweep",
+        "ask-sweep",
+        "modest OTM",
+        "single-leg",
+        "with tide",
+        "follow-through",
+        "BOTH-lane",
+        "morning ask"
+      ],
+      "quiet": false
+    },
+    {
+      "day": "2026-10-02",
+      "contract": "WDC261023C00380000",
+      "ticker": "WDC",
+      "type": "call",
+      "dte": 21,
+      "score": 100,
+      "lane": "Premove-only",
+      "bucket": "late",
+      "outcome": "winner",
+      "pct": 19.5,
+      "entry": 38.23,
+      "tags": [
+        "ask-side dominance",
+        "sweet-spot DTE",
+        "single-leg",
+        "with tide",
+        "follow-through",
+        "quiet underlying",
+        "BOTH-lane",
+        "score ≥90",
+        "morning ask",
+        "expiry spans macro event"
+      ],
+      "quiet": true
     }
   ],
   "shadowAccuracy": {
     "days": [
-      "2026-10-01"
+      "2026-10-01",
+      "2026-10-02"
     ],
-    "joinedCandidates": 0,
-    "unmatchedCandidates": 0,
+    "joinedCandidates": 4,
+    "unmatchedCandidates": 10,
     "definition": "Per module: outcome mix (winner/loser/flat per the book definition) of candidates the module flagged vs passed vs boosted. A useful flag has a lower win rate / higher loss rate than pass; a useful boost has a higher win rate.",
-    "modules": {}
-  },
-  "puts": {
-    "mode": "test",
-    "files": 1,
-    "days": [
-      "2026-10-01"
-    ],
-    "definition": "Separate from the same-day \u00b115% book. Entry = flow print. Within a 3-session time stop: winner = option high \u2265 +40% first, loser = low \u2264 \u221225% first (same session both = loser), flat = neither. T+1..T+5 = closes vs entry.",
-    "overall": {
-      "n": 3,
-      "w": 0,
-      "l": 0,
-      "flat": 0,
-      "open": 3,
-      "winRate": null,
-      "lossRate": null,
-      "avgT1": null,
-      "avgT3": null,
-      "avgT5": null
-    },
-    "byRegime": {
-      "unknown": {
-        "n": 3,
-        "w": 0,
-        "l": 0,
-        "flat": 0,
-        "open": 3,
-        "winRate": null,
-        "lossRate": null,
-        "avgT1": null,
-        "avgT3": null,
-        "avgT5": null
-      }
-    },
-    "byMarketTide": {
-      "unknown": {
-        "n": 3,
-        "w": 0,
-        "l": 0,
-        "flat": 0,
-        "open": 3,
-        "winRate": null,
-        "lossRate": null,
-        "avgT1": null,
-        "avgT3": null,
-        "avgT5": null
-      }
-    },
-    "byTickerTide": {
-      "unknown": {
-        "n": 3,
-        "w": 0,
-        "l": 0,
-        "flat": 0,
-        "open": 3,
-        "winRate": null,
-        "lossRate": null,
-        "avgT1": null,
-        "avgT3": null,
-        "avgT5": null
-      }
-    },
-    "byConfirmation": {
-      "market-tide-bearish+ticker-tide-bearish": {
-        "n": 3,
-        "w": 0,
-        "l": 0,
-        "flat": 0,
-        "open": 3,
-        "winRate": null,
-        "lossRate": null,
-        "avgT1": null,
-        "avgT3": null,
-        "avgT5": null
-      }
-    },
-    "byYields": {
-      "unknown": {
-        "n": 3,
-        "w": 0,
-        "l": 0,
-        "flat": 0,
-        "open": 3,
-        "winRate": null,
-        "lossRate": null,
-        "avgT1": null,
-        "avgT3": null,
-        "avgT5": null
-      }
-    },
-    "entries": [
-      {
-        "day": "2026-10-01",
-        "contract": "IWM261014P00271000",
-        "entry": 2.16,
-        "regime": null,
-        "tide": "?/?",
-        "confirmations": [
-          "market-tide-bearish",
-          "ticker-tide-bearish"
-        ],
-        "outcome": "open",
-        "returns": null,
-        "maxGainPct": null
-      },
-      {
-        "day": "2026-10-01",
-        "contract": "PEP261016P00127000",
-        "entry": 3.1,
-        "regime": null,
-        "tide": "?/?",
-        "confirmations": [
-          "market-tide-bearish",
-          "ticker-tide-bearish"
-        ],
-        "outcome": "open",
-        "returns": null,
-        "maxGainPct": null
-      },
-      {
-        "day": "2026-10-01",
-        "contract": "SLV261012P00054000",
-        "entry": 0.7,
-        "regime": null,
-        "tide": "?/?",
-        "confirmations": [
-          "market-tide-bearish",
-          "ticker-tide-bearish"
-        ],
-        "outcome": "open",
-        "returns": null,
-        "maxGainPct": null
-      }
-    ]
-  },
-  "lanes": {
-    "mode": "test",
-    "files": 1,
-    "definition": "Separate from the same-day \u00b115% book. Entry = flow print. Within each lane's time stop (earnings lanes 5 sessions, capped to exit before the report; others 3): winner = option high \u2265 +40% first, loser = low \u2264 \u221225% first (same session both = loser), flat = neither. T+1..T+5 = closes vs entry.",
-    "byLane": {
-      "calls-earnings-runup": {
-        "n": 0,
-        "w": 0,
-        "l": 0,
-        "flat": 0,
-        "open": 0,
-        "winRate": null,
-        "lossRate": null,
-        "avgT1": null,
-        "avgT3": null,
-        "avgT5": null,
-        "days": [],
-        "byRegime": {},
-        "recent": []
-      },
-      "calls-breakout": {
-        "n": 0,
-        "w": 0,
-        "l": 0,
-        "flat": 0,
-        "open": 0,
-        "winRate": null,
-        "lossRate": null,
-        "avgT1": null,
-        "avgT3": null,
-        "avgT5": null,
-        "days": [],
-        "byRegime": {},
-        "recent": []
-      },
-      "calls-sector-wave": {
-        "n": 2,
-        "w": 0,
-        "l": 0,
-        "flat": 0,
-        "open": 2,
-        "winRate": null,
-        "lossRate": null,
-        "avgT1": null,
-        "avgT3": null,
-        "avgT5": null,
-        "days": [
-          "2026-10-01"
-        ],
-        "byRegime": {
-          "unknown": {
-            "n": 2,
-            "w": 0,
-            "l": 0,
-            "flat": 0,
-            "open": 2,
-            "winRate": null,
-            "lossRate": null,
-            "avgT1": null,
-            "avgT3": null,
-            "avgT5": null
-          }
-        },
-        "recent": [
-          {
-            "day": "2026-10-01",
-            "contract": "MS261009C00192500",
-            "entry": 1.35,
-            "outcome": "open",
-            "t1": null,
-            "t3": null
-          },
-          {
-            "day": "2026-10-01",
-            "contract": "V261009C00360000",
-            "entry": 3.25,
-            "outcome": "open",
-            "t1": null,
-            "t3": null
-          }
-        ]
-      },
-      "puts-earnings-rundown": {
-        "n": 1,
-        "w": 0,
-        "l": 0,
-        "flat": 0,
-        "open": 1,
-        "winRate": null,
-        "lossRate": null,
-        "avgT1": null,
-        "avgT3": null,
-        "avgT5": null,
-        "days": [
-          "2026-10-01"
-        ],
-        "byRegime": {
-          "unknown": {
-            "n": 1,
-            "w": 0,
-            "l": 0,
-            "flat": 0,
-            "open": 1,
-            "winRate": null,
-            "lossRate": null,
-            "avgT1": null,
-            "avgT3": null,
-            "avgT5": null
-          }
-        },
-        "recent": [
-          {
-            "day": "2026-10-01",
-            "contract": "PEP261016P00127000",
-            "entry": 3.1,
-            "outcome": "open",
-            "t1": null,
-            "t3": null
-          }
-        ]
-      },
-      "puts-breakdown": {
-        "n": 3,
-        "w": 0,
-        "l": 0,
-        "flat": 0,
-        "open": 3,
-        "winRate": null,
-        "lossRate": null,
-        "avgT1": null,
-        "avgT3": null,
-        "avgT5": null,
-        "days": [
-          "2026-10-01"
-        ],
-        "byRegime": {
-          "unknown": {
-            "n": 3,
-            "w": 0,
-            "l": 0,
-            "flat": 0,
-            "open": 3,
-            "winRate": null,
-            "lossRate": null,
-            "avgT1": null,
-            "avgT3": null,
-            "avgT5": null
-          }
-        },
-        "recent": [
-          {
-            "day": "2026-10-01",
-            "contract": "KRE261023P00068000",
-            "entry": 1.55,
-            "outcome": "open",
-            "t1": null,
-            "t3": null
-          },
-          {
-            "day": "2026-10-01",
-            "contract": "PEP261016P00127000",
-            "entry": 3.1,
-            "outcome": "open",
-            "t1": null,
-            "t3": null
-          },
-          {
-            "day": "2026-10-01",
-            "contract": "SLV261012P00054000",
-            "entry": 0.7,
-            "outcome": "open",
-            "t1": null,
-            "t3": null
-          }
-        ]
-      },
-      "puts-sector-selloff": {
-        "n": 2,
-        "w": 0,
-        "l": 0,
-        "flat": 0,
-        "open": 2,
-        "winRate": null,
-        "lossRate": null,
-        "avgT1": null,
-        "avgT3": null,
-        "avgT5": null,
-        "days": [
-          "2026-10-01"
-        ],
-        "byRegime": {
-          "unknown": {
-            "n": 2,
-            "w": 0,
-            "l": 0,
-            "flat": 0,
-            "open": 2,
-            "winRate": null,
-            "lossRate": null,
-            "avgT1": null,
-            "avgT3": null,
-            "avgT5": null
-          }
-        },
-        "recent": [
-          {
-            "day": "2026-10-01",
-            "contract": "AVGO261012P00325000",
-            "entry": 1.04,
-            "outcome": "open",
-            "t1": null,
-            "t3": null
-          },
-          {
-            "day": "2026-10-01",
-            "contract": "NVDA261009P00227500",
-            "entry": 3.05,
-            "outcome": "open",
-            "t1": null,
-            "t3": null
-          }
-        ]
-      }
-    }
-  },
-  "laneDebate": {
-    "mode": "shadow",
-    "files": 0,
-    "verdicts": 0,
-    "spendUsd": 0,
-    "definition": "Direction-aware bull/bear/macro debate \u2192 TAKE/SKIP per TEST-lane pick (never changes picks). Outcomes from the lane trackers (+40% / -25% within the lane time stop). A useful debate has take win rate > skip win rate.",
-    "byLane": {},
-    "bySide": {
-      "call": {
-        "take": {
+    "modules": {
+      "earnings_check": {
+        "boost": {
           "w": 0,
           "l": 0,
           "flat": 0,
-          "open": 0,
-          "decided": 0,
+          "n": 0,
           "winRate": null,
-          "lossRate": null
+          "lossRate": null,
+          "flatRate": null,
+          "avgPct": null
+        },
+        "pass": {
+          "w": 0,
+          "l": 1,
+          "flat": 2,
+          "n": 3,
+          "winRate": 0,
+          "lossRate": 33.3,
+          "flatRate": 66.7,
+          "avgPct": -13.4
+        },
+        "flag": {
+          "w": 0,
+          "l": 0,
+          "flat": 1,
+          "n": 1,
+          "winRate": 0,
+          "lossRate": 0,
+          "flatRate": 100,
+          "avgPct": 6.2
         },
         "skip": {
           "w": 0,
           "l": 0,
           "flat": 0,
-          "open": 0,
-          "decided": 0,
+          "n": 0,
           "winRate": null,
-          "lossRate": null
+          "lossRate": null,
+          "flatRate": null,
+          "avgPct": null
         },
-        "edge": null
+        "flagEdge": {
+          "flaggedLossRate": 0,
+          "othersLossRate": 33.3,
+          "flaggedWinRate": 0,
+          "othersWinRate": 0
+        },
+        "boostEdge": null
       },
-      "put": {
-        "take": {
+      "same_buyer_tracking": {
+        "boost": {
+          "w": 0,
+          "l": 1,
+          "flat": 0,
+          "n": 1,
+          "winRate": 0,
+          "lossRate": 100,
+          "flatRate": 0,
+          "avgPct": -18.5
+        },
+        "pass": {
+          "w": 0,
+          "l": 0,
+          "flat": 3,
+          "n": 3,
+          "winRate": 0,
+          "lossRate": 0,
+          "flatRate": 100,
+          "avgPct": -5.2
+        },
+        "flag": {
           "w": 0,
           "l": 0,
           "flat": 0,
-          "open": 0,
-          "decided": 0,
+          "n": 0,
           "winRate": null,
-          "lossRate": null
+          "lossRate": null,
+          "flatRate": null,
+          "avgPct": null
         },
         "skip": {
           "w": 0,
           "l": 0,
           "flat": 0,
-          "open": 0,
-          "decided": 0,
+          "n": 0,
           "winRate": null,
-          "lossRate": null
+          "lossRate": null,
+          "flatRate": null,
+          "avgPct": null
         },
-        "edge": null
+        "flagEdge": null,
+        "boostEdge": {
+          "boostedWinRate": 0,
+          "passedWinRate": 0
+        }
+      },
+      "worth_the_price": {
+        "boost": {
+          "w": 0,
+          "l": 1,
+          "flat": 1,
+          "n": 2,
+          "winRate": 0,
+          "lossRate": 50,
+          "flatRate": 50,
+          "avgPct": -16
+        },
+        "pass": {
+          "w": 0,
+          "l": 0,
+          "flat": 1,
+          "n": 1,
+          "winRate": 0,
+          "lossRate": 0,
+          "flatRate": 100,
+          "avgPct": -8.3
+        },
+        "flag": {
+          "w": 0,
+          "l": 0,
+          "flat": 1,
+          "n": 1,
+          "winRate": 0,
+          "lossRate": 0,
+          "flatRate": 100,
+          "avgPct": 6.2
+        },
+        "skip": {
+          "w": 0,
+          "l": 0,
+          "flat": 0,
+          "n": 0,
+          "winRate": null,
+          "lossRate": null,
+          "flatRate": null,
+          "avgPct": null
+        },
+        "flagEdge": {
+          "flaggedLossRate": 0,
+          "othersLossRate": 33.3,
+          "flaggedWinRate": 0,
+          "othersWinRate": 0
+        },
+        "boostEdge": {
+          "boostedWinRate": 0,
+          "passedWinRate": 0
+        }
+      },
+      "adaptive_exits": {
+        "boost": {
+          "w": 0,
+          "l": 0,
+          "flat": 0,
+          "n": 0,
+          "winRate": null,
+          "lossRate": null,
+          "flatRate": null,
+          "avgPct": null
+        },
+        "pass": {
+          "w": 0,
+          "l": 1,
+          "flat": 2,
+          "n": 3,
+          "winRate": 0,
+          "lossRate": 33.3,
+          "flatRate": 66.7,
+          "avgPct": -13.4
+        },
+        "flag": {
+          "w": 0,
+          "l": 0,
+          "flat": 1,
+          "n": 1,
+          "winRate": 0,
+          "lossRate": 0,
+          "flatRate": 100,
+          "avgPct": 6.2
+        },
+        "skip": {
+          "w": 0,
+          "l": 0,
+          "flat": 0,
+          "n": 0,
+          "winRate": null,
+          "lossRate": null,
+          "flatRate": null,
+          "avgPct": null
+        },
+        "flagEdge": {
+          "flaggedLossRate": 0,
+          "othersLossRate": 33.3,
+          "flaggedWinRate": 0,
+          "othersWinRate": 0
+        },
+        "boostEdge": null
+      },
+      "regime_analogs": {
+        "boost": {
+          "w": 0,
+          "l": 0,
+          "flat": 0,
+          "n": 0,
+          "winRate": null,
+          "lossRate": null,
+          "flatRate": null,
+          "avgPct": null
+        },
+        "pass": {
+          "w": 0,
+          "l": 0,
+          "flat": 0,
+          "n": 0,
+          "winRate": null,
+          "lossRate": null,
+          "flatRate": null,
+          "avgPct": null
+        },
+        "flag": {
+          "w": 0,
+          "l": 1,
+          "flat": 3,
+          "n": 4,
+          "winRate": 0,
+          "lossRate": 25,
+          "flatRate": 75,
+          "avgPct": -8.5
+        },
+        "skip": {
+          "w": 0,
+          "l": 0,
+          "flat": 0,
+          "n": 0,
+          "winRate": null,
+          "lossRate": null,
+          "flatRate": null,
+          "avgPct": null
+        },
+        "flagEdge": null,
+        "boostEdge": null
+      },
+      "news_x_check": {
+        "boost": {
+          "w": 0,
+          "l": 0,
+          "flat": 0,
+          "n": 0,
+          "winRate": null,
+          "lossRate": null,
+          "flatRate": null,
+          "avgPct": null
+        },
+        "pass": {
+          "w": 0,
+          "l": 0,
+          "flat": 3,
+          "n": 3,
+          "winRate": 0,
+          "lossRate": 0,
+          "flatRate": 100,
+          "avgPct": -5.2
+        },
+        "flag": {
+          "w": 0,
+          "l": 1,
+          "flat": 0,
+          "n": 1,
+          "winRate": 0,
+          "lossRate": 100,
+          "flatRate": 0,
+          "avgPct": -18.5
+        },
+        "skip": {
+          "w": 0,
+          "l": 0,
+          "flat": 0,
+          "n": 0,
+          "winRate": null,
+          "lossRate": null,
+          "flatRate": null,
+          "avgPct": null
+        },
+        "flagEdge": {
+          "flaggedLossRate": 100,
+          "othersLossRate": 0,
+          "flaggedWinRate": 0,
+          "othersWinRate": 0
+        },
+        "boostEdge": null
+      },
+      "x_sentiment_shift": {
+        "boost": {
+          "w": 0,
+          "l": 0,
+          "flat": 0,
+          "n": 0,
+          "winRate": null,
+          "lossRate": null,
+          "flatRate": null,
+          "avgPct": null
+        },
+        "pass": {
+          "w": 0,
+          "l": 1,
+          "flat": 3,
+          "n": 4,
+          "winRate": 0,
+          "lossRate": 25,
+          "flatRate": 75,
+          "avgPct": -8.5
+        },
+        "flag": {
+          "w": 0,
+          "l": 0,
+          "flat": 0,
+          "n": 0,
+          "winRate": null,
+          "lossRate": null,
+          "flatRate": null,
+          "avgPct": null
+        },
+        "skip": {
+          "w": 0,
+          "l": 0,
+          "flat": 0,
+          "n": 0,
+          "winRate": null,
+          "lossRate": null,
+          "flatRate": null,
+          "avgPct": null
+        },
+        "flagEdge": null,
+        "boostEdge": null
+      },
+      "debate": {
+        "boost": {
+          "w": 0,
+          "l": 0,
+          "flat": 0,
+          "n": 0,
+          "winRate": null,
+          "lossRate": null,
+          "flatRate": null,
+          "avgPct": null
+        },
+        "pass": {
+          "w": 0,
+          "l": 0,
+          "flat": 2,
+          "n": 2,
+          "winRate": 0,
+          "lossRate": 0,
+          "flatRate": 100,
+          "avgPct": -10.9
+        },
+        "flag": {
+          "w": 0,
+          "l": 1,
+          "flat": 1,
+          "n": 2,
+          "winRate": 0,
+          "lossRate": 50,
+          "flatRate": 50,
+          "avgPct": -6.1
+        },
+        "skip": {
+          "w": 0,
+          "l": 0,
+          "flat": 0,
+          "n": 0,
+          "winRate": null,
+          "lossRate": null,
+          "flatRate": null,
+          "avgPct": null
+        },
+        "flagEdge": {
+          "flaggedLossRate": 50,
+          "othersLossRate": 0,
+          "flaggedWinRate": 0,
+          "othersWinRate": 0
+        },
+        "boostEdge": null
       }
     }
-  },
-  "lottery": {
-    "mode": "test",
-    "files": 1,
-    "days": [
-      "2026-10-01"
-    ],
-    "definition": "Multi-day horizon, not same-day W/L. Entry = flow print. maxGainPct = best daily high after the entry day vs entry; hit100/300/1000 = reached +100/+300/+1000% at any point before expiry; expiredWorthless = expired with last <= max($0.05, 10% of entry). Rates over tracked (hits) / final (worthless) entries.",
-    "overall": {
-      "n": 3,
-      "tracked": 0,
-      "final": 0,
-      "hit100": 0,
-      "hit300": 0,
-      "hit1000": 0,
-      "hit100Rate": null,
-      "hit300Rate": null,
-      "hit1000Rate": null,
-      "expiredWorthless": 0,
-      "expiredWorthlessRate": null,
-      "medianMaxGainPct": null
-    },
-    "byCatalyst": {
-      "macro": {
-        "n": 3,
-        "tracked": 0,
-        "final": 0,
-        "hit100": 0,
-        "hit300": 0,
-        "hit1000": 0,
-        "hit100Rate": null,
-        "hit300Rate": null,
-        "hit1000Rate": null,
-        "expiredWorthless": 0,
-        "expiredWorthlessRate": null,
-        "medianMaxGainPct": null
-      }
-    },
-    "bySide": {
-      "call": {
-        "n": 2,
-        "tracked": 0,
-        "final": 0,
-        "hit100": 0,
-        "hit300": 0,
-        "hit1000": 0,
-        "hit100Rate": null,
-        "hit300Rate": null,
-        "hit1000Rate": null,
-        "expiredWorthless": 0,
-        "expiredWorthlessRate": null,
-        "medianMaxGainPct": null
-      },
-      "put": {
-        "n": 1,
-        "tracked": 0,
-        "final": 0,
-        "hit100": 0,
-        "hit300": 0,
-        "hit1000": 0,
-        "hit100Rate": null,
-        "hit300Rate": null,
-        "hit1000Rate": null,
-        "expiredWorthless": 0,
-        "expiredWorthlessRate": null,
-        "medianMaxGainPct": null
-      }
-    },
-    "byPriceBand": {
-      "0.10-0.60": {
-        "n": 3,
-        "tracked": 0,
-        "final": 0,
-        "hit100": 0,
-        "hit300": 0,
-        "hit1000": 0,
-        "hit100Rate": null,
-        "hit300Rate": null,
-        "hit1000Rate": null,
-        "expiredWorthless": 0,
-        "expiredWorthlessRate": null,
-        "medianMaxGainPct": null
-      }
-    },
-    "byDte": {
-      "11-20": {
-        "n": 2,
-        "tracked": 0,
-        "final": 0,
-        "hit100": 0,
-        "hit300": 0,
-        "hit1000": 0,
-        "hit100Rate": null,
-        "hit300Rate": null,
-        "hit1000Rate": null,
-        "expiredWorthless": 0,
-        "expiredWorthlessRate": null,
-        "medianMaxGainPct": null
-      },
-      "5-10": {
-        "n": 1,
-        "tracked": 0,
-        "final": 0,
-        "hit100": 0,
-        "hit300": 0,
-        "hit1000": 0,
-        "hit100Rate": null,
-        "hit300Rate": null,
-        "hit1000Rate": null,
-        "expiredWorthless": 0,
-        "expiredWorthlessRate": null,
-        "medianMaxGainPct": null
-      }
-    },
-    "topRunners": [],
-    "entries": [
-      {
-        "day": "2026-10-01",
-        "contract": "CART261016C00049000",
-        "entry": 0.23,
-        "dte": 15,
-        "catalyst": "macro 2026-10-02",
-        "maxGainPct": null,
-        "last": null,
-        "final": false,
-        "expiredWorthless": null
-      },
-      {
-        "day": "2026-10-01",
-        "contract": "HBAN261016C00015000",
-        "entry": 0.4,
-        "dte": 15,
-        "catalyst": "macro 2026-10-02",
-        "maxGainPct": null,
-        "last": null,
-        "final": false,
-        "expiredWorthless": null
-      },
-      {
-        "day": "2026-10-01",
-        "contract": "IYR261009P00093000",
-        "entry": 0.6,
-        "dte": 8,
-        "catalyst": "macro 2026-10-02",
-        "maxGainPct": null,
-        "last": null,
-        "final": false,
-        "expiredWorthless": null
-      }
-    ]
   }
 }
