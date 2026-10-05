@@ -1,24 +1,24 @@
 {
-  "generatedAt": "2026-10-02T20:14:02.375Z",
+  "generatedAt": "2026-10-05T20:15:18.874Z",
   "since": "2026-09-24",
-  "through": "2026-10-02",
-  "days": 7,
+  "through": "2026-10-05",
+  "days": 8,
   "definition": "winner ≥ +15% option premium by EOD check, loser ≤ −15%, else expired_flat. Entry = flow print.",
   "totals": {
-    "w": 11,
+    "w": 15,
     "l": 12,
-    "flat": 67
+    "flat": 72
   },
   "buckets": {
     "morning": {
-      "w": 9,
+      "w": 10,
       "l": 12,
       "flat": 21
     },
     "late": {
-      "w": 2,
+      "w": 5,
       "l": 0,
-      "flat": 43
+      "flat": 48
     },
     "other": {
       "w": 0,
@@ -26,24 +26,24 @@
       "flat": 3
     },
     "bothLaneScore100": {
-      "w": 3,
+      "w": 4,
       "l": 6,
-      "flat": 9
+      "flat": 12
     },
     "quietUnderlying": {
-      "w": 7,
+      "w": 10,
       "l": 4,
-      "flat": 32
+      "flat": 36
     },
     "dte11to30": {
-      "w": 9,
+      "w": 12,
       "l": 12,
-      "flat": 47
+      "flat": 51
     },
     "calls": {
-      "w": 11,
+      "w": 15,
       "l": 11,
-      "flat": 45
+      "flat": 50
     },
     "puts": {
       "w": 0,
@@ -622,15 +622,91 @@
         "expiry spans macro event"
       ],
       "quiet": true
+    },
+    {
+      "day": "2026-10-05",
+      "contract": "NFLX261023C00070000",
+      "ticker": "NFLX",
+      "type": "call",
+      "dte": 18,
+      "score": 84,
+      "lane": "BOTH",
+      "bucket": "morning",
+      "outcome": "winner",
+      "pct": 16.9,
+      "entry": 1.83,
+      "tags": [
+        "quiet underlying",
+        "BOTH lane"
+      ],
+      "quiet": true
+    },
+    {
+      "day": "2026-10-05",
+      "contract": "NVAX261030C00012000",
+      "ticker": "NVAX",
+      "type": "call",
+      "dte": 25,
+      "score": 100,
+      "lane": "BOTH",
+      "bucket": "late",
+      "outcome": "winner",
+      "pct": 240,
+      "entry": 0.5,
+      "tags": [
+        "late print",
+        "quiet underlying",
+        "BOTH lane",
+        "score 100"
+      ],
+      "quiet": true
+    },
+    {
+      "day": "2026-10-05",
+      "contract": "SPCX261030C00180000",
+      "ticker": "SPCX",
+      "type": "call",
+      "dte": 25,
+      "score": 100,
+      "lane": "premove",
+      "bucket": "late",
+      "outcome": "winner",
+      "pct": 15.6,
+      "entry": 4.5,
+      "tags": [
+        "late print",
+        "score 100"
+      ],
+      "quiet": false
+    },
+    {
+      "day": "2026-10-05",
+      "contract": "TSLA261106C00375000",
+      "ticker": "TSLA",
+      "type": "call",
+      "dte": 32,
+      "score": 100,
+      "lane": "picks",
+      "bucket": "late",
+      "outcome": "winner",
+      "pct": 22,
+      "entry": 18.2,
+      "tags": [
+        "late print",
+        "quiet underlying",
+        "score 100"
+      ],
+      "quiet": true
     }
   ],
   "shadowAccuracy": {
     "days": [
       "2026-10-01",
-      "2026-10-02"
+      "2026-10-02",
+      "2026-10-05"
     ],
-    "joinedCandidates": 4,
-    "unmatchedCandidates": 10,
+    "joinedCandidates": 11,
+    "unmatchedCandidates": 12,
     "definition": "Per module: outcome mix (winner/loser/flat per the book definition) of candidates the module flagged vs passed vs boosted. A useful flag has a lower win rate / higher loss rate than pass; a useful boost has a higher win rate.",
     "modules": {
       "earnings_check": {
@@ -645,24 +721,24 @@
           "avgPct": null
         },
         "pass": {
-          "w": 0,
+          "w": 1,
           "l": 1,
-          "flat": 2,
-          "n": 3,
-          "winRate": 0,
-          "lossRate": 33.3,
-          "flatRate": 66.7,
-          "avgPct": -13.4
+          "flat": 5,
+          "n": 7,
+          "winRate": 14.3,
+          "lossRate": 14.3,
+          "flatRate": 71.4,
+          "avgPct": 28.2
         },
         "flag": {
-          "w": 0,
+          "w": 2,
           "l": 0,
-          "flat": 1,
-          "n": 1,
-          "winRate": 0,
+          "flat": 2,
+          "n": 4,
+          "winRate": 50,
           "lossRate": 0,
-          "flatRate": 100,
-          "avgPct": 6.2
+          "flatRate": 50,
+          "avgPct": 8.4
         },
         "skip": {
           "w": 0,
@@ -676,60 +752,13 @@
         },
         "flagEdge": {
           "flaggedLossRate": 0,
-          "othersLossRate": 33.3,
-          "flaggedWinRate": 0,
-          "othersWinRate": 0
+          "othersLossRate": 14.3,
+          "flaggedWinRate": 50,
+          "othersWinRate": 14.3
         },
         "boostEdge": null
       },
       "same_buyer_tracking": {
-        "boost": {
-          "w": 0,
-          "l": 1,
-          "flat": 0,
-          "n": 1,
-          "winRate": 0,
-          "lossRate": 100,
-          "flatRate": 0,
-          "avgPct": -18.5
-        },
-        "pass": {
-          "w": 0,
-          "l": 0,
-          "flat": 3,
-          "n": 3,
-          "winRate": 0,
-          "lossRate": 0,
-          "flatRate": 100,
-          "avgPct": -5.2
-        },
-        "flag": {
-          "w": 0,
-          "l": 0,
-          "flat": 0,
-          "n": 0,
-          "winRate": null,
-          "lossRate": null,
-          "flatRate": null,
-          "avgPct": null
-        },
-        "skip": {
-          "w": 0,
-          "l": 0,
-          "flat": 0,
-          "n": 0,
-          "winRate": null,
-          "lossRate": null,
-          "flatRate": null,
-          "avgPct": null
-        },
-        "flagEdge": null,
-        "boostEdge": {
-          "boostedWinRate": 0,
-          "passedWinRate": 0
-        }
-      },
-      "worth_the_price": {
         "boost": {
           "w": 0,
           "l": 1,
@@ -738,17 +767,17 @@
           "winRate": 0,
           "lossRate": 50,
           "flatRate": 50,
-          "avgPct": -16
+          "avgPct": -9.7
         },
         "pass": {
-          "w": 0,
+          "w": 3,
           "l": 0,
-          "flat": 1,
-          "n": 1,
-          "winRate": 0,
+          "flat": 5,
+          "n": 8,
+          "winRate": 37.5,
           "lossRate": 0,
-          "flatRate": 100,
-          "avgPct": -8.3
+          "flatRate": 62.5,
+          "avgPct": 32.7
         },
         "flag": {
           "w": 0,
@@ -758,7 +787,7 @@
           "winRate": 0,
           "lossRate": 0,
           "flatRate": 100,
-          "avgPct": 6.2
+          "avgPct": -11.6
         },
         "skip": {
           "w": 0,
@@ -772,13 +801,65 @@
         },
         "flagEdge": {
           "flaggedLossRate": 0,
-          "othersLossRate": 33.3,
+          "othersLossRate": 10,
           "flaggedWinRate": 0,
-          "othersWinRate": 0
+          "othersWinRate": 30
         },
         "boostEdge": {
           "boostedWinRate": 0,
-          "passedWinRate": 0
+          "passedWinRate": 37.5
+        }
+      },
+      "worth_the_price": {
+        "boost": {
+          "w": 0,
+          "l": 1,
+          "flat": 2,
+          "n": 3,
+          "winRate": 0,
+          "lossRate": 33.3,
+          "flatRate": 66.7,
+          "avgPct": -11
+        },
+        "pass": {
+          "w": 3,
+          "l": 0,
+          "flat": 3,
+          "n": 6,
+          "winRate": 50,
+          "lossRate": 0,
+          "flatRate": 50,
+          "avgPct": 42.6
+        },
+        "flag": {
+          "w": 0,
+          "l": 0,
+          "flat": 2,
+          "n": 2,
+          "winRate": 0,
+          "lossRate": 0,
+          "flatRate": 100,
+          "avgPct": 4.1
+        },
+        "skip": {
+          "w": 0,
+          "l": 0,
+          "flat": 0,
+          "n": 0,
+          "winRate": null,
+          "lossRate": null,
+          "flatRate": null,
+          "avgPct": null
+        },
+        "flagEdge": {
+          "flaggedLossRate": 0,
+          "othersLossRate": 11.1,
+          "flaggedWinRate": 0,
+          "othersWinRate": 33.3
+        },
+        "boostEdge": {
+          "boostedWinRate": 0,
+          "passedWinRate": 50
         }
       },
       "adaptive_exits": {
@@ -793,24 +874,24 @@
           "avgPct": null
         },
         "pass": {
-          "w": 0,
+          "w": 2,
           "l": 1,
-          "flat": 2,
-          "n": 3,
-          "winRate": 0,
-          "lossRate": 33.3,
-          "flatRate": 66.7,
-          "avgPct": -13.4
+          "flat": 5,
+          "n": 8,
+          "winRate": 25,
+          "lossRate": 12.5,
+          "flatRate": 62.5,
+          "avgPct": 25.7
         },
         "flag": {
-          "w": 0,
+          "w": 1,
           "l": 0,
-          "flat": 1,
-          "n": 1,
-          "winRate": 0,
+          "flat": 2,
+          "n": 3,
+          "winRate": 33.3,
           "lossRate": 0,
-          "flatRate": 100,
-          "avgPct": 6.2
+          "flatRate": 66.7,
+          "avgPct": 8.3
         },
         "skip": {
           "w": 0,
@@ -824,9 +905,9 @@
         },
         "flagEdge": {
           "flaggedLossRate": 0,
-          "othersLossRate": 33.3,
-          "flaggedWinRate": 0,
-          "othersWinRate": 0
+          "othersLossRate": 12.5,
+          "flaggedWinRate": 33.3,
+          "othersWinRate": 25
         },
         "boostEdge": null
       },
@@ -842,24 +923,24 @@
           "avgPct": null
         },
         "pass": {
-          "w": 0,
+          "w": 2,
           "l": 0,
-          "flat": 0,
-          "n": 0,
-          "winRate": null,
-          "lossRate": null,
-          "flatRate": null,
-          "avgPct": null
+          "flat": 4,
+          "n": 6,
+          "winRate": 33.3,
+          "lossRate": 0,
+          "flatRate": 66.7,
+          "avgPct": 41.3
         },
         "flag": {
-          "w": 0,
+          "w": 1,
           "l": 1,
           "flat": 3,
-          "n": 4,
-          "winRate": 0,
-          "lossRate": 25,
-          "flatRate": 75,
-          "avgPct": -8.5
+          "n": 5,
+          "winRate": 20,
+          "lossRate": 20,
+          "flatRate": 60,
+          "avgPct": -3.4
         },
         "skip": {
           "w": 0,
@@ -871,7 +952,12 @@
           "flatRate": null,
           "avgPct": null
         },
-        "flagEdge": null,
+        "flagEdge": {
+          "flaggedLossRate": 20,
+          "othersLossRate": 0,
+          "flaggedWinRate": 20,
+          "othersWinRate": 33.3
+        },
         "boostEdge": null
       },
       "news_x_check": {
@@ -886,24 +972,24 @@
           "avgPct": null
         },
         "pass": {
-          "w": 0,
+          "w": 2,
           "l": 0,
-          "flat": 3,
-          "n": 3,
-          "winRate": 0,
+          "flat": 5,
+          "n": 7,
+          "winRate": 28.6,
           "lossRate": 0,
-          "flatRate": 100,
-          "avgPct": -5.2
+          "flatRate": 71.4,
+          "avgPct": 3.5
         },
         "flag": {
-          "w": 0,
+          "w": 1,
           "l": 1,
-          "flat": 0,
-          "n": 1,
-          "winRate": 0,
-          "lossRate": 100,
-          "flatRate": 0,
-          "avgPct": -18.5
+          "flat": 2,
+          "n": 4,
+          "winRate": 25,
+          "lossRate": 25,
+          "flatRate": 50,
+          "avgPct": 51.6
         },
         "skip": {
           "w": 0,
@@ -916,10 +1002,10 @@
           "avgPct": null
         },
         "flagEdge": {
-          "flaggedLossRate": 100,
+          "flaggedLossRate": 25,
           "othersLossRate": 0,
-          "flaggedWinRate": 0,
-          "othersWinRate": 0
+          "flaggedWinRate": 25,
+          "othersWinRate": 28.6
         },
         "boostEdge": null
       },
@@ -935,14 +1021,14 @@
           "avgPct": null
         },
         "pass": {
-          "w": 0,
+          "w": 3,
           "l": 1,
-          "flat": 3,
-          "n": 4,
-          "winRate": 0,
-          "lossRate": 25,
-          "flatRate": 75,
-          "avgPct": -8.5
+          "flat": 7,
+          "n": 11,
+          "winRate": 27.3,
+          "lossRate": 9.1,
+          "flatRate": 63.6,
+          "avgPct": 21
         },
         "flag": {
           "w": 0,
@@ -979,24 +1065,24 @@
           "avgPct": null
         },
         "pass": {
-          "w": 0,
+          "w": 2,
           "l": 0,
-          "flat": 2,
-          "n": 2,
-          "winRate": 0,
+          "flat": 5,
+          "n": 7,
+          "winRate": 28.6,
           "lossRate": 0,
-          "flatRate": 100,
-          "avgPct": -10.9
+          "flatRate": 71.4,
+          "avgPct": 0.1
         },
         "flag": {
-          "w": 0,
+          "w": 1,
           "l": 1,
-          "flat": 1,
-          "n": 2,
-          "winRate": 0,
-          "lossRate": 50,
+          "flat": 2,
+          "n": 4,
+          "winRate": 25,
+          "lossRate": 25,
           "flatRate": 50,
-          "avgPct": -6.1
+          "avgPct": 57.4
         },
         "skip": {
           "w": 0,
@@ -1009,10 +1095,10 @@
           "avgPct": null
         },
         "flagEdge": {
-          "flaggedLossRate": 50,
+          "flaggedLossRate": 25,
           "othersLossRate": 0,
-          "flaggedWinRate": 0,
-          "othersWinRate": 0
+          "flaggedWinRate": 25,
+          "othersWinRate": 28.6
         },
         "boostEdge": null
       }
