@@ -1,4 +1,4 @@
-import { NextRequest } from "next/server";
+import { NextRequest, after } from "next/server";
 
 import {
   buildCheckResponse,
@@ -15,6 +15,7 @@ import {
 import { notifyWatchAlerts } from "@/lib/watch-notify";
 import { fireWebhook } from "@/lib/watch-webhook";
 import { isUwBlocked } from "@/lib/uw-quota";
+import { paperTickQuietly } from "@/lib/paper";
 import type { PriceWatch } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -37,6 +38,8 @@ export async function POST(request: NextRequest) {
 }
 
 async function check(watches: PriceWatch[], persistExpire: boolean) {
+  // 15-min price-alert routine also drives paper-account exit checks (throttled; separate budget).
+  after(() => paperTickQuietly());
   const blocked = await isUwBlocked();
   const snapshots =
     !blocked && (await hasUnusualWhalesKey())

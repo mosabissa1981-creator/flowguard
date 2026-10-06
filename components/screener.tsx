@@ -13,6 +13,7 @@ import { RegimeBanner } from "@/components/regime-banner";
 import { MorningPanel } from "@/components/morning-panel";
 import { AiPicksPanel } from "@/components/ai-picks-panel";
 import { ShadowPanel } from "@/components/shadow-panel";
+import { PaperPanel } from "@/components/paper-panel";
 import { PanelBoundary } from "@/components/panel-boundary";
 import { PremoveAiPanel } from "@/components/premove-ai-panel";
 import { LotteryPanel } from "@/components/lottery-panel";
@@ -629,6 +630,10 @@ export function Screener({
 
       <PanelBoundary name="AI picks">
         <AiPicksPanel onSelect={setSelectedId} onData={handleAiData} />
+      </PanelBoundary>
+
+      <PanelBoundary name="Paper account">
+        <PaperPanel />
       </PanelBoundary>
 
       <PanelBoundary name="Shadow signals">

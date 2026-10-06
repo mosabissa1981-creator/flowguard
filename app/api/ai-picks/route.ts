@@ -3,6 +3,7 @@ import { NextRequest, after } from "next/server";
 
 import { loadAiPicks } from "@/lib/ai-picks";
 import { triggerShadowQuietly } from "@/lib/shadow";
+import { paperTickQuietly } from "@/lib/paper";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -28,6 +29,8 @@ export async function GET(request: NextRequest) {
   const payload = await loadAiPicks({ force });
   // Shadow modules annotate the same finalists after the response is sent (never changes this payload).
   after(triggerShadowQuietly);
+  // Paper/test account: open TAKEN picks at the live ask + check exits (throttled; never changes this payload).
+  after(() => paperTickQuietly(payload));
   return Response.json(payload, {
     headers: { "Cache-Control": rerun ? "no-store" : "s-maxage=300, stale-while-revalidate=60" },
   });

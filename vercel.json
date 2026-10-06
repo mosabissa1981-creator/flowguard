@@ -5,6 +5,14 @@
     {
       "path": "/api/shadow/signals",
       "schedule": "30 21 * * 1-5"
+    },
+    {
+      "path": "/api/paper?tick=1&slot=edt",
+      "schedule": "40 19 * * 1-5"
+    },
+    {
+      "path": "/api/paper?tick=1&slot=est",
+      "schedule": "40 20 * * 1-5"
     }
   ]
 }
