@@ -484,6 +484,56 @@ export async function fetchOptionQuote(
   return quoteFromFlowPrint(flowPrint);
 }
 
+/**
+ * Live quotes (NBBO bid/ask + last) for several contracts on ONE underlying in a single
+ * option-contracts call (`option_symbol[]` repeated). Same 15-min cache as fetchOptionQuote, so
+ * paper-account checks reuse quotes other routes already pulled. Symbols missing from the batch
+ * fall back to fetchOptionQuote (historic bar → flow print). `calls` counts UW requests attempted
+ * (cache hits included, so it is an upper bound).
+ */
+export async function fetchTickerOptionQuotes(
+  ticker: string,
+  symbols: string[],
+  flowPrints: Record<string, number | undefined> = {},
+): Promise<{ quotes: Record<string, WatchQuote | null>; calls: number }> {
+  const name = ticker.trim().toUpperCase();
+  const wanted = [...new Set(symbols.map((s) => s.trim()).filter(Boolean))].sort();
+  const quotes: Record<string, WatchQuote | null> = {};
+  let calls = 0;
+  if (!name || wanted.length === 0) return { quotes, calls };
+  if (await isUwBlocked()) {
+    for (const s of wanted) quotes[s] = quoteFromFlowPrint(flowPrints[s]);
+    return { quotes, calls };
+  }
+  try {
+    const url = buildUrl(`/api/stock/${encodeURIComponent(name)}/option-contracts`, { limit: Math.min(500, Math.max(5, wanted.length * 2)) });
+    for (const s of wanted) url.searchParams.append("option_symbol[]", s);
+    calls += 1;
+    const payload = await uwRequest<{ data?: Record<string, unknown>[] }>(url, QUOTE_TTL_MS);
+    for (const row of payload.data ?? []) {
+      const sym = asString(row.option_symbol);
+      if (!wanted.includes(sym) || quotes[sym]) continue;
+      const q = quoteFromContract(row, flowPrints[sym]);
+      if (q) quotes[sym] = q;
+    }
+  } catch (error) {
+    if (error instanceof UwQuotaError) {
+      for (const s of wanted) quotes[s] = quoteFromFlowPrint(flowPrints[s]);
+      return { quotes, calls };
+    }
+  }
+  for (const s of wanted) {
+    if (quotes[s]) continue;
+    calls += 1;
+    try {
+      quotes[s] = await fetchOptionQuote(name, s, flowPrints[s]);
+    } catch {
+      quotes[s] = quoteFromFlowPrint(flowPrints[s]);
+    }
+  }
+  return { quotes, calls };
+}
+
 export function parseHistoricBar(raw: Record<string, unknown>): HistoricBar {
   return {
     date: asString(raw.date),

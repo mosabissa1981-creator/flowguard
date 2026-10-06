@@ -47,7 +47,7 @@ Set `UNUSUAL_WHALES_API_KEY` in `.env.local`, or paste it in the **Unusual Whale
 | `GET /api/ticker/{ticker}/net-prem` | `GET /api/stock/{ticker}/net-prem-ticks` |
 | `GET/POST /api/watches/check` | One `GET /api/option-contract/{id}/historic` (`limit=5`) per armed watch on the 15-min path. Quote + fade path (last vs open / prior, ask vs bid volume, IV) from that payload. Last flow print if historic is empty or the 429 breaker is open. Not on the board poll. |
 | `GET/POST/DELETE /api/watches` | Vercel Blob (`flowguard/watches.json`) — durable across deploys; external checker reads `GET /api/watches` |
-| `GET /api/quote` | Live arming premium: UW last/mid, else last session flow print, else `alert.price` |
+| `GET /api/quote?ticker=NFLX&option_chain=NFLX261023C00070000&alertPrice=1.83` | Live arming premium: UW last/mid, else last session flow print, else `alertPrice`. `symbol=<OCC>` is accepted as an alias (ticker read from it); bad input returns a 400 with usage. |
 | `GET/POST /api/notify` | Lock-screen ping (Pushover + Telegram). POST `{ title, body }`. |
 | `POST /api/notify/test` | Sends “FlowGuard test” to configured channels. |
 
@@ -158,6 +158,29 @@ Next.js App Router, TypeScript, Tailwind CSS, shadcn/ui.
 - `ivEvents` + an informational `event-iv` chip and `exitPlan.eventRisk` when an expiry spans CPI/PPI/NFP/FOMC.
 - Yields: official Treasury daily par-curve CSV first (prior close + 5-session trend, bear-steepening flag);
   Yahoo only supplies the intraday last before Treasury posts the day's close.
+
+## Paper account (test mode — fake money)
+
+`GET /api/paper` · card "Paper account" under AI picks. **Paper / test mode, not real money, not financial advice.**
+Never places orders and never changes live picks.
+
+- **Books:** `main` = Picks of the Day + Premove that the rules/AI actually **took** (`/api/ai-picks` `picks` +
+  `premove.picks`; watch-only, skipped and lockout picks never enter). Headline balance = main only. Test lanes
+  (`lottery`, `puts`, `lanes`, `earnings-calendar`) are separate $10k sub-books for comparison.
+- **Size:** 2% of the book value per trade (min 1 contract); skip if 1 contract > 5%; total open cost ≤ 10%.
+  Lottery 0.5% per trade, open ≤ 5%.
+- **Fill:** live UW ask when the pick is taken (batched `option-contracts?option_symbol[]=…`, one call per underlying);
+  no ask → alert price +5%. **Exit:** live bid when it reaches the pick's target/stop (its exit-plan %, applied to the
+  fill) or at the time stop (15:30 ET on the plan date; lottery: expiry day, +100% take-profit, no stop). No bid → last −5%.
+- **Ticks:** after responses on `/api/ai-picks`, `/api/lanes`, `/api/puts`, `/api/lottery`, `/api/watches/check`, `/api/paper`
+  (shared Redis gap `PAPER_TICK_GAP_S`, default 120 s, market hours only); exits re-quoted at most every 15 min.
+  Daily Vercel crons `/api/paper?tick=1` at 19:40 and 20:40 UTC force a tick for time stops after 15:30 ET.
+- **UW budget:** `PAPER_UW_DAILY_CAP` (default 800) quote calls/day; typical ≈ 26 checks × distinct open underlyings.
+- **Storage:** Redis `paper:positions`, `paper:closed`, `paper:balance`, `paper:main-picks`, `paper:snapshot:YYYY-MM-DD`.
+  The study routine saves `GET /api/paper?day=YYYY-MM-DD` (or plain `/api/paper` after the close) as `study/paper-YYYY-MM-DD.json`.
+- **External test trade (admin):** `POST /api/paper?key=<AI_PICKS_ADMIN_SECRET>` with
+  `{ "book": "earnings-calendar", "legs": [{"option_chain":"LW261016C00045000","action":"sell"},{"option_chain":"LW261120C00045000","action":"buy"}], "alertDebit": 0.5, "exitBy": "2026-10-07T14:00:00Z" }`.
+- `npm run paper-check` runs the pure-logic assertions.
 
 ## Shadow modules (study only — never change the live lists)
 
