@@ -58,6 +58,9 @@ export const PAPER_DISCLAIMER = "Paper / test mode — not real money, not finan
 const K_POS = "paper:positions";
 const K_CLOSED = "paper:closed";
 const K_BAL = "paper:balance";
+/** TRACKING ONLY: picks skipped by the 1-contract > 5% rule, followed at 1 contract. Never touches balances. */
+const K_TRACK = "paper:tracking";
+const MAX_TRACK_CLOSED = 200;
 const K_MAIN = "paper:main-picks";
 const K_GAP = "paper:tick-gap";
 const snapKey = (day: string) => `paper:snapshot:${day}`;
@@ -88,12 +91,15 @@ type MainPickLite = {
 };
 type MainPicksDoc = { day: string; at: string; engine: string; picks: MainPickLite[] };
 
-export type PaperState = { positions: PaperPosition[]; closed: PaperClosed[]; bal: PaperBalanceDoc; isNew?: boolean };
+export type PaperTracking = { open: PaperPosition[]; closed: PaperClosed[] };
+export type PaperState = { positions: PaperPosition[]; closed: PaperClosed[]; bal: PaperBalanceDoc; tracking: PaperTracking; isNew?: boolean };
 
 async function loadState(): Promise<PaperState> {
-  const [positions, closed, bal] = await kvGetMany<unknown>([K_POS, K_CLOSED, K_BAL]);
+  const [positions, closed, bal, track] = await kvGetMany<unknown>([K_POS, K_CLOSED, K_BAL, K_TRACK]);
   const b = bal as PaperBalanceDoc | null;
+  const t = track as PaperTracking | null;
   return {
+    tracking: { open: Array.isArray(t?.open) ? t.open : [], closed: Array.isArray(t?.closed) ? t.closed : [] },
     positions: Array.isArray(positions) ? (positions as PaperPosition[]) : [],
     closed: Array.isArray(closed) ? (closed as PaperClosed[]) : [],
     bal: b && b.version === 1 && b.books ? { ...newBalanceDoc(new Date(b.startedAt)), ...b, books: { ...newBalanceDoc(new Date()).books, ...b.books } } : newBalanceDoc(new Date()),
@@ -101,8 +107,11 @@ async function loadState(): Promise<PaperState> {
   };
 }
 
-async function saveState(s: PaperState, prev: { positions: string; closed: string; bal: string }) {
+async function saveState(s: PaperState, prev: { positions: string; closed: string; bal: string; tracking?: string }) {
   const writes: Promise<boolean>[] = [];
+  if (prev.tracking !== undefined && JSON.stringify(s.tracking) !== prev.tracking) {
+    writes.push(kvSet(K_TRACK, { open: s.tracking.open, closed: s.tracking.closed.slice(-MAX_TRACK_CLOSED) }, { tier: "rare" }));
+  }
   if (JSON.stringify(s.positions) !== prev.positions) writes.push(kvSet(K_POS, s.positions, { tier: "rare" }));
   if (JSON.stringify(s.closed) !== prev.closed) writes.push(kvSet(K_CLOSED, s.closed.slice(-MAX_CLOSED_KEPT), { tier: "rare" }));
   if (JSON.stringify(s.bal) !== prev.bal) writes.push(kvSet(K_BAL, s.bal, { tier: "rare" }));
@@ -346,7 +355,12 @@ async function runTick(opts: { force?: boolean; ai?: AiPicksResponse | null; now
   if (!opts.force && !(await kvSetNx(K_GAP, now.toISOString(), tickGapSec()))) return none("throttled");
 
   const state = await loadState();
-  const prev = { positions: JSON.stringify(state.positions), closed: JSON.stringify(state.closed), bal: JSON.stringify(state.bal) };
+  const prev = {
+    positions: JSON.stringify(state.positions),
+    closed: JSON.stringify(state.closed),
+    bal: JSON.stringify(state.bal),
+    tracking: JSON.stringify(state.tracking),
+  };
   const { bal } = state;
   const et = etNow(now);
   const today = et.day;
@@ -389,6 +403,37 @@ async function runTick(opts: { force?: boolean; ai?: AiPicksResponse | null; now
       const size = sizeTrade(fill.price, book.balance + openCost, openCost, SIZING[c.book]);
       if (!size.ok) {
         skip(size.reason);
+        // TRACKING ONLY: the 1-contract > 5% rule hides expensive picks from the study, so follow them at
+        // 1 contract in a separate list (no balance, no book stats, sizing unchanged).
+        if (/^1 contract .* is over/.test(size.reason) && !state.tracking.open.some((t) => t.book === c.book && t.contract === c.contract)) {
+          const tl = levelsFor(fill.price, c.targetPct, c.stopPct);
+          state.tracking.open.push({
+            id: `track:${c.book}:${c.day}:${c.contract}`,
+            book: c.book,
+            source: c.source,
+            day: c.day,
+            contract: c.contract,
+            ticker: c.ticker,
+            side: c.side,
+            strike: c.strike,
+            expiry: c.expiry,
+            qty: 1,
+            entryPrice: fill.price,
+            entryBasis: fill.basis,
+            alertPrice: c.alertPrice || null,
+            enteredAt: now.toISOString(),
+            costUsd: round2(fill.price * 100),
+            targetPct: c.targetPct,
+            stopPct: c.stopPct,
+            target: tl.target,
+            stop: tl.stop,
+            timeStopDate: c.expiry && c.expiry < c.timeStopDate ? c.expiry : c.timeStopDate,
+            planLevels: c.planLevels,
+            confidence: c.confidence ?? null,
+            note: "TRACKING ONLY — skipped by the 5% one-contract rule; would-be P&L at 1 contract.",
+            lastMark: null,
+          });
+        }
         continue;
       }
       const lv = levelsFor(fill.price, c.targetPct, c.stopPct);
@@ -427,10 +472,10 @@ async function runTick(opts: { force?: boolean; ai?: AiPicksResponse | null; now
 
   // 2) Exits (≤ every 15 min; forced runs always check).
   const lastCheck = bal.lastExitCheckAt ? Date.parse(bal.lastExitCheckAt) : 0;
-  if (state.positions.length > 0 && (opts.force || now.getTime() - lastCheck >= EXIT_CHECK_GAP_MS)) {
+  if (state.positions.length + state.tracking.open.length > 0 && (opts.force || now.getTime() - lastCheck >= EXIT_CHECK_GAP_MS)) {
     res.exitCheck = true;
     bal.lastExitCheckAt = now.toISOString();
-    const reqs = state.positions.flatMap((p) =>
+    const reqs = [...state.positions, ...state.tracking.open].flatMap((p) =>
       p.legs?.length ? p.legs.map((l) => ({ ticker: l.ticker, contract: l.option_chain })) : [{ ticker: p.ticker, contract: p.contract, alertPrice: null }],
     );
     const quotes = await quotesFor(bal, today, reqs);
@@ -464,6 +509,25 @@ async function runTick(opts: { force?: boolean; ai?: AiPicksResponse | null; now
       res.closed += 1;
     }
     state.positions = keep;
+    // TRACKING ONLY exits: same rules, no balance changes.
+    const keepT: PaperPosition[] = [];
+    for (const p of state.tracking.open) {
+      const q = toFill(quotes[p.contract], now);
+      const v = exitValue(q);
+      const mark: PaperMark | null = v
+        ? { value: v.value, basis: v.basis, bid: q?.bid ?? null, ask: q?.ask ?? null, last: q?.last ?? null, at: now.toISOString(), quoteAsOf: q?.asOf ?? null }
+        : null;
+      if (mark) p.lastMark = mark;
+      const why = exitDecision(p, mark, now, et.day, et.minutes);
+      if (!why) {
+        keepT.push(p);
+        continue;
+      }
+      const px = mark?.value ?? p.lastMark?.value ?? (why === "expiry" ? 0 : p.entryPrice);
+      const basis = mark?.basis ?? (p.lastMark ? `last mark ${p.lastMark.at}` : why === "expiry" ? "expired (no quote)" : "no quote (flat)");
+      state.tracking.closed.push(closePosition(p, px, basis, why, now));
+    }
+    state.tracking.open = keepT;
   }
 
   bal.skips = bal.skips.slice(-MAX_SKIPS_KEPT);
@@ -595,6 +659,13 @@ export type PaperView = {
   skips: PaperBalanceDoc["skips"];
   uw: { day: string; quoteCalls: number; cap: number };
   rules: string[];
+  /** TRACKING ONLY — picks the 5% one-contract rule skipped, followed at 1 contract. Not in balances or stats. */
+  tracking: {
+    label: string;
+    open: PaperPosition[];
+    closed: PaperClosed[];
+    stats: { closed: number; wins: number; losses: number; pnlUsd: number; openMarkUsd: number };
+  };
 };
 
 function buildView(s: PaperState, now: Date): PaperView {
@@ -621,6 +692,18 @@ function buildView(s: PaperState, now: Date): PaperView {
     closedTest: s.closed.filter((c) => c.book !== "main").sort(byExit).slice(0, 10),
     closedToday: s.closed.filter((c) => tradingDateET(new Date(c.exitedAt)) === day).sort(byExit),
     skips: s.bal.skips.slice(-10).reverse(),
+    tracking: {
+      label: "TRACKING ONLY — picks skipped by the 5% one-contract rule, would-be P&L at 1 contract. Not part of any balance; sizing unchanged.",
+      open: s.tracking.open,
+      closed: [...s.tracking.closed].sort(byExit).slice(0, 30),
+      stats: {
+        closed: s.tracking.closed.length,
+        wins: s.tracking.closed.filter((c) => c.pnlUsd > 0).length,
+        losses: s.tracking.closed.filter((c) => c.pnlUsd < 0).length,
+        pnlUsd: round2(s.tracking.closed.reduce((a, c) => a + c.pnlUsd, 0)),
+        openMarkUsd: round2(s.tracking.open.reduce((a, p) => a + ((p.lastMark?.value ?? p.entryPrice) - p.entryPrice) * 100, 0)),
+      },
+    },
     uw: { day: s.bal.uw.day, quoteCalls: s.bal.uw.day === day ? s.bal.uw.quoteCalls : 0, cap: uwDailyCap() },
     rules: [
       "Start $10,000 per book. Headline = main picks only (AI/rules-taken Picks of the Day + Premove). Test lanes are separate sub-books.",

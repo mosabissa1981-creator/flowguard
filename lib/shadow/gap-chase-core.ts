@@ -13,6 +13,15 @@
  *    penalty (−6 at 2–3%, −10 at ≥3%) even if confirmed.
  * Backtest (2y replay, 1,802 gap-up-morning call candidates): flagged 40.4% win vs kept 46.5%
  * (baseline 42.0%); it removes ~76% of losers but also ~71% of winners — a soft flag, not a filter.
+ *
+ * Mirror for PUTS (Oct 7 2026: opening put sweeps bought the low on a gap-down morning):
+ *  - Gap-down day: SPY or QQQ open ≤ −0.3% vs prior close.
+ *  - On a gap-down day, a PUT printed 9:30–11:00 ET on a stock already down 1–3% at the print → flag
+ *    "gap-down put chase" (shadow penalty −6). Puts on stocks down ≥3% are NOT flagged (in the replay they
+ *    won more, 42.8%), and the plain "no 2nd ask / no bounce" mirror had no edge, so it is shown as info only.
+ * Backtest (2y replay, 1,151 gap-down-morning put candidates): flagged 26.4% win (72W/201L/32F) vs kept
+ * 40.4% (308W/455L/83F), baseline 36.7%; cuts 31% of losers and 19% of winners. Held in both years
+ * (30.3% vs 44.1%; 23.2% vs 37.8%). The 1–3% band was chosen from the same data — treat as a flag.
  */
 
 export const GAP_DAY_MIN = 0.003;
@@ -21,11 +30,15 @@ export const EXTENDED_HARD = 0.03;
 export const PULLBACK_MIN = 0.003;
 export const MORNING_START_ET = 9 * 60 + 30;
 export const MORNING_END_ET = 11 * 60;
+export const PUT_DOWN_MIN = 0.01;
+export const PUT_DOWN_MAX = 0.03;
 
 export type GapChaseMarket = {
   spyGapPct: number | null;
   qqqGapPct: number | null;
   gapDay: boolean;
+  /** SPY or QQQ open ≤ −0.3% (older stored docs lack it; derived from the gaps). */
+  gapDownDay?: boolean;
   capturedAt: string | null;
 };
 
@@ -69,7 +82,8 @@ export function marketFromStates(
   const spyGapPct = g(spy);
   const qqqGapPct = g(qqq);
   const best = Math.max(spyGapPct ?? -1, qqqGapPct ?? -1);
-  return { spyGapPct, qqqGapPct, gapDay: best >= GAP_DAY_MIN, capturedAt };
+  const worst = Math.min(spyGapPct ?? 1, qqqGapPct ?? 1);
+  return { spyGapPct, qqqGapPct, gapDay: best >= GAP_DAY_MIN, gapDownDay: worst <= -GAP_DAY_MIN, capturedAt };
 }
 
 export function evaluateGapChase(input: GapChaseInput): GapChaseVerdict {
@@ -84,7 +98,7 @@ export function evaluateGapChase(input: GapChaseInput): GapChaseVerdict {
   const confirmation: GapChaseVerdict["confirmation"] = input.secondAskAt ? "2nd-ask" : input.pullbackAt || pullbackNow ? "pullback" : null;
   const base = { gapDay: market.gapDay, morning, stockPctAtPrint, confirmed: confirmation != null, confirmation, pullbackNow };
 
-  if (input.side !== "call") return { ...base, verdict: "n/a", penalty: 0, reasons: ["Puts are not checked (call-chase rule)."] };
+  if (input.side === "put") return evaluatePut(input, base, morning, stockPctAtPrint);
   const gapText = `SPY ${market.spyGapPct != null ? pct(market.spyGapPct) : "?"} / QQQ ${market.qqqGapPct != null ? pct(market.qqqGapPct) : "?"} at the open`;
   if (!market.gapDay) {
     return { ...base, verdict: "pass", penalty: 0, reasons: [`No gap-up (${gapText}).`] };
@@ -109,4 +123,39 @@ export function evaluateGapChase(input: GapChaseInput): GapChaseVerdict {
     reasons.push("Printed after 11:00 ET — confirmation rule not required.");
   }
   return { ...base, verdict: flag ? "flag" : "pass", penalty, reasons };
+}
+
+function evaluatePut(
+  input: GapChaseInput,
+  base: Omit<GapChaseVerdict, "verdict" | "penalty" | "reasons">,
+  morning: boolean,
+  stockPctAtPrint: number | null,
+): GapChaseVerdict {
+  const m = input.market;
+  const gapDown =
+    m.gapDownDay ?? Math.min(m.spyGapPct ?? 1, m.qqqGapPct ?? 1) <= -GAP_DAY_MIN;
+  const gapText = `SPY ${m.spyGapPct != null ? pct(m.spyGapPct) : "?"} / QQQ ${m.qqqGapPct != null ? pct(m.qqqGapPct) : "?"} at the open`;
+  // For puts the "pullback" confirmation is a bounce: spot ≥0.3% above the print, or the print ≥0.3% over the open.
+  const bounceNow = Boolean(
+    (input.spotNow && input.underlyingAtPrint && input.spotNow >= input.underlyingAtPrint * (1 + PULLBACK_MIN)) ||
+      (input.dayOpen && input.underlyingAtPrint && input.underlyingAtPrint >= input.dayOpen * (1 + PULLBACK_MIN)),
+  );
+  const confirmation: GapChaseVerdict["confirmation"] = input.secondAskAt ? "2nd-ask" : input.pullbackAt || bounceNow ? "pullback" : null;
+  const b = { ...base, confirmed: confirmation != null, confirmation, pullbackNow: bounceNow };
+  if (!gapDown) return { ...b, verdict: "pass", penalty: 0, reasons: [`No gap-down (${gapText}).`] };
+  const reasons = [`Gap-down day (${gapText}).`];
+  if (!morning) {
+    reasons.push("Printed after 11:00 ET — gap-down put rule not applied.");
+    return { ...b, verdict: "pass", penalty: 0, reasons };
+  }
+  const down = stockPctAtPrint != null ? -stockPctAtPrint : null;
+  if (down != null && down >= PUT_DOWN_MIN && down < PUT_DOWN_MAX) {
+    reasons.push(`Stock already ${pct(stockPctAtPrint!)} vs prior close at the print — gap-down put chase (replay: 26% win vs 40%).`);
+    if (confirmation) reasons.push(`(Confirmation seen: ${confirmation} — the replay showed no edge from it for puts.)`);
+    return { ...b, verdict: "flag", penalty: -6, reasons };
+  }
+  if (down != null && down >= PUT_DOWN_MAX) reasons.push(`Stock ${pct(stockPctAtPrint!)} at the print — ≥3% down is not flagged (replay: these won more).`);
+  else reasons.push(`Stock ${stockPctAtPrint != null ? pct(stockPctAtPrint) : "?"} at the print — outside the 1–3% chase zone.`);
+  if (!confirmation) reasons.push("No 2nd ask print or bounce yet (info only; no edge in the replay).");
+  return { ...b, verdict: "pass", penalty: 0, reasons };
 }

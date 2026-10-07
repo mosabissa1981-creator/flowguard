@@ -30,7 +30,7 @@ type View = {
   disclaimer: string;
   rule: string;
   backtest: string;
-  market: { spyGapPct: number | null; qqqGapPct: number | null; gapDay: boolean; capturedAt: string | null };
+  market: { spyGapPct: number | null; qqqGapPct: number | null; gapDay: boolean; gapDownDay?: boolean; capturedAt: string | null };
   rows: Record<string, Row>;
   log: Array<{ at: string; contract: string; from: string | null; to: string; why: string }>;
   uwCalls: number;
@@ -75,7 +75,7 @@ export function GapChaseBadge({ contract }: { contract?: string | null }) {
       title={`TEST / shadow only — not applied to this pick.\n${row.reasons.join("\n")}`}
       className="rounded-md border border-dashed border-orange-400/50 bg-orange-500/10 font-mono text-[10px] uppercase text-orange-200"
     >
-      test · gap-up chase{row.penalty ? ` ${row.penalty}` : ""}
+      test · {row.side === "put" ? "gap-down put chase" : "gap-up chase"}{row.penalty ? ` ${row.penalty}` : ""}
     </Badge>
   );
 }
@@ -86,7 +86,7 @@ export function GapChasePanel() {
   const rows = useMemo(
     () =>
       Object.values(view?.rows ?? {})
-        .filter((r) => r.side === "call")
+        .filter((r) => r.side === "call" || r.side === "put")
         .sort((a, b) => (a.verdict === b.verdict ? (a.firstSeenAt < b.firstSeenAt ? -1 : 1) : a.verdict === "flag" ? -1 : 1)),
     [view],
   );
@@ -100,16 +100,16 @@ export function GapChasePanel() {
           <div className="flex items-center gap-1 text-[10px] font-medium uppercase tracking-[0.2em] text-orange-200/80">
             <FlaskConical className="size-3" /> Test · shadow checker
           </div>
-          <h2 className="font-medium">Gap-up chase check</h2>
+          <h2 className="font-medium">Gap chase check (calls on gap-ups, puts on gap-downs)</h2>
           <p className="mt-1 text-xs text-muted-foreground">
             {m.capturedAt
-              ? `SPY ${pct(m.spyGapPct)} / QQQ ${pct(m.qqqGapPct)} at the open — ${m.gapDay ? "gap-up day: morning calls need a 2nd ask print or a pullback" : "no gap-up today"}.`
+              ? `SPY ${pct(m.spyGapPct)} / QQQ ${pct(m.qqqGapPct)} at the open — ${m.gapDay ? "gap-up day: morning calls need a 2nd ask print or a pullback" : m.gapDownDay ?? Math.min(m.spyGapPct ?? 1, m.qqqGapPct ?? 1) <= -0.003 ? "gap-down day: morning puts on names already down 1–3% are flagged" : "no gap today"}.`
               : "Market gap not captured yet (runs in market hours)."}{" "}
             Flags only; live picks are unchanged.
           </p>
         </div>
         <Badge className={cn("rounded-md", flagged ? "bg-orange-500/15 text-orange-200" : "bg-zinc-500/15 text-zinc-300")}>
-          {flagged} flagged / {rows.length} calls
+          {flagged} flagged / {rows.length} picks
         </Badge>
       </button>
       {open ? (
@@ -117,7 +117,7 @@ export function GapChasePanel() {
           <p className="text-muted-foreground">{view.rule}</p>
           <p className="text-muted-foreground">Backtest: {view.backtest}</p>
           {rows.length === 0 ? (
-            <p className="text-muted-foreground">No call picks checked yet today.</p>
+            <p className="text-muted-foreground">No picks checked yet today.</p>
           ) : (
             <ul className="space-y-1">
               {rows.map((r) => (

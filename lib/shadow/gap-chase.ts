@@ -65,9 +65,9 @@ export type GapChaseView = GapChaseDoc & {
 };
 
 const RULE =
-  "Gap-up day = SPY or QQQ open ≥ +0.3% vs prior close. Calls printed 9:30–11:00 ET on a gap-up need a 2nd ask-side print on the same contract or a ≥0.3% pullback before they count; calls on stocks already ≥ +2% at the print get a shadow penalty (−6, −10 at ≥ +3%).";
+  "Gap-down day = SPY or QQQ open ≤ −0.3%: puts printed 9:30–11:00 ET on stocks already down 1–3% are flagged (−6). Gap-up day = SPY or QQQ open ≥ +0.3% vs prior close. Calls printed 9:30–11:00 ET on a gap-up need a 2nd ask-side print on the same contract or a ≥0.3% pullback before they count; calls on stocks already ≥ +2% at the print get a shadow penalty (−6, −10 at ≥ +3%).";
 const BACKTEST =
-  "2-year replay (499 sessions, 8,388 scored call candidates; 131 gap-up days): on gap-up mornings flagged calls won 40.4% (495W/729L/111F) vs kept 46.5% (198W/228L/41F), baseline 42.0%. Cuts ~76% of losers but ~71% of winners → flag/penalty, not a filter.";
+  "Puts (gap-down mornings, 1,151): flagged 26.4% win (72W/201L/32F) vs kept 40.4% (308W/455L/83F), baseline 36.7%; held in both years. Calls: 2-year replay (499 sessions, 8,388 scored call candidates; 131 gap-up days): on gap-up mornings flagged calls won 40.4% (495W/729L/111F) vs kept 46.5% (198W/228L/41F), baseline 42.0%. Cuts ~76% of losers but ~71% of winners → flag/penalty, not a filter.";
 
 let memo: { at: number; day: string; doc: GapChaseDoc } | null = null;
 let inflight: Promise<GapChaseDoc> | null = null;
@@ -191,7 +191,7 @@ async function compute(now: Date): Promise<GapChaseDoc> {
   if (!inRegularHours(now)) return doc;
 
   const seen = await gatherLists();
-  const calls = [...seen.values()].filter((s) => s.row.alert.type === "call");
+  const calls = [...seen.values()]; // calls (gap-up rule) and puts (gap-down rule)
   const live = (await hasUnusualWhalesKey()) && !(await isUwBlocked());
 
   // Market gap: frozen once per day (first capture in regular hours).

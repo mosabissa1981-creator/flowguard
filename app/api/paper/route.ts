@@ -5,7 +5,7 @@ import { loadPaperSnapshot, loadPaperView, logExternalPaperTrade, paperTick, pap
 import { tradingDateET } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 /** Vercel cron (Bearer CRON_SECRET when set) or the admin key may force a tick. */
 function forceOk(request: NextRequest): boolean {
