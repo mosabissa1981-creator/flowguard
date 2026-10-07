@@ -223,6 +223,29 @@ export function PaperPanel() {
             ) : null}
           </details>
 
+          {data!.tracking && (data!.tracking.open.length > 0 || data!.tracking.closed.length > 0) ? (
+            <details className="mt-1">
+              <summary className="cursor-pointer select-none py-1 text-[11px] font-medium text-amber-200/80">
+                Tracking only · skipped by 5% rule ({data!.tracking.open.length} open, {data!.tracking.stats.closed} closed, would-be P&amp;L $
+                {data!.tracking.stats.pnlUsd.toFixed(0)})
+              </summary>
+              <p className="text-[10px] text-muted-foreground">{data!.tracking.label}</p>
+              <ul className="space-y-0.5 font-mono text-[11px] text-muted-foreground">
+                {data!.tracking.open.map((p) => (
+                  <li key={p.id}>
+                    {p.contract} [{p.source}] in {p.entryPrice.toFixed(2)} · mark {(p.lastMark?.value ?? p.entryPrice).toFixed(2)}
+                  </li>
+                ))}
+                {data!.tracking.closed.map((c) => (
+                  <li key={`${c.id}-${c.exitedAt}`}>
+                    {c.contract} [{c.source}] {c.exitReason} {c.pnlPct >= 0 ? "+" : ""}
+                    {c.pnlPct.toFixed(1)}% (${c.pnlUsd.toFixed(0)})
+                  </li>
+                ))}
+              </ul>
+            </details>
+          ) : null}
+
           <details className="mt-1">
             <summary className="cursor-pointer select-none py-1 text-[11px] font-medium text-muted-foreground">How it works</summary>
             <ul className="list-disc space-y-0.5 pl-4 text-[11px] text-muted-foreground">

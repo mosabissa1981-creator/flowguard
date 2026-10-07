@@ -253,3 +253,16 @@ Scheduling: 88 daily Vercel crons on `/api/shadow/tick` spread over 13:00–20:5
 plus the gap-chase poll from open browsers, plus the optional box loop `scripts/study/shadow-ticker.sh`.
 New jobs stop when UW's daily count reaches `UW_JOBS_STOP_AT` (default 35,000), leaving ~2,500 of the 37,500 ceiling for the live site.
 Backtest: `scripts/study/intraday-signals-backtest.py` → `study/intraday-signals-backtest.json`.
+
+### Paper ticks + tracking-only list (TEST)
+
+- `/api/shadow/tick` (88 daily Vercel crons + box loop) now also runs the paper tick: entries + exits every tick
+  (exits ≤ 15 min), and once a day after 15:30 ET a forced exit check so time stops close before the bell. Before,
+  paper ticks only ran when someone loaded the site.
+- `tracking` in `/api/paper`: picks skipped by the 1-contract > 5% rule are followed at 1 contract with the same
+  target/stop/time-stop. TRACKING ONLY — not in any balance or book stats; sizing (2%/trade, 10% open cap) unchanged.
+
+### Gap-down put chase (TEST flag)
+
+Gap-down day (SPY or QQQ open ≤ −0.3%): puts printed 9:30–11:00 ET on stocks already down 1–3% are flagged (−6).
+Backtest `scripts/study/gap-down-put-backtest.py` → `study/gap-down-put-backtest.json`.

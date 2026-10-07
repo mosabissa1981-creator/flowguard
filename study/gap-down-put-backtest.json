@@ -1,0 +1,1077 @@
+{
+ "generated": "2026-10-07T20:23:48.728241+00:00",
+ "n_put_candidates": 6554,
+ "gap_down_days": 93,
+ "days": 265,
+ "missing_prev_close": 104,
+ "reports": [
+  {
+   "universe": "all_puts",
+   "baseline": {
+    "n": 6554,
+    "W": 2226,
+    "L": 3685,
+    "F": 643,
+    "win_pct": 37.7
+   },
+   "rules": {
+    "A_gapdown_morning_unconfirmed": {
+     "flagged": {
+      "n": 765,
+      "W": 255,
+      "L": 437,
+      "F": 73,
+      "win_pct": 36.8
+     },
+     "kept": {
+      "n": 5789,
+      "W": 1971,
+      "L": 3248,
+      "F": 570,
+      "win_pct": 37.8
+     },
+     "losers_cut_pct": 11.9,
+     "winners_cut_pct": 11.5
+    },
+    "B_gapdown_stock_down_2pct": {
+     "flagged": {
+      "n": 811,
+      "W": 249,
+      "L": 497,
+      "F": 65,
+      "win_pct": 33.4
+     },
+     "kept": {
+      "n": 5743,
+      "W": 1977,
+      "L": 3188,
+      "F": 578,
+      "win_pct": 38.3
+     },
+     "losers_cut_pct": 13.5,
+     "winners_cut_pct": 11.2
+    },
+    "B3_gapdown_stock_down_3pct": {
+     "flagged": {
+      "n": 573,
+      "W": 185,
+      "L": 342,
+      "F": 46,
+      "win_pct": 35.1
+     },
+     "kept": {
+      "n": 5981,
+      "W": 2041,
+      "L": 3343,
+      "F": 597,
+      "win_pct": 37.9
+     },
+     "losers_cut_pct": 9.3,
+     "winners_cut_pct": 8.3
+    },
+    "C_anyday_stock_down_3pct": {
+     "flagged": {
+      "n": 1027,
+      "W": 344,
+      "L": 600,
+      "F": 83,
+      "win_pct": 36.4
+     },
+     "kept": {
+      "n": 5527,
+      "W": 1882,
+      "L": 3085,
+      "F": 560,
+      "win_pct": 37.9
+     },
+     "losers_cut_pct": 16.3,
+     "winners_cut_pct": 15.5
+    },
+    "FULL_A_or_B": {
+     "flagged": {
+      "n": 1274,
+      "W": 397,
+      "L": 766,
+      "F": 111,
+      "win_pct": 34.1
+     },
+     "kept": {
+      "n": 5280,
+      "W": 1829,
+      "L": 2919,
+      "F": 532,
+      "win_pct": 38.5
+     },
+     "losers_cut_pct": 20.8,
+     "winners_cut_pct": 17.8
+    },
+    "FULL_morning_only": {
+     "flagged": {
+      "n": 832,
+      "W": 273,
+      "L": 480,
+      "F": 79,
+      "win_pct": 36.3
+     },
+     "kept": {
+      "n": 5722,
+      "W": 1953,
+      "L": 3205,
+      "F": 564,
+      "win_pct": 37.9
+     },
+     "losers_cut_pct": 13.0,
+     "winners_cut_pct": 12.3
+    },
+    "FULL_3pct": {
+     "flagged": {
+      "n": 806,
+      "W": 267,
+      "L": 464,
+      "F": 75,
+      "win_pct": 36.5
+     },
+     "kept": {
+      "n": 5748,
+      "W": 1959,
+      "L": 3221,
+      "F": 568,
+      "win_pct": 37.8
+     },
+     "losers_cut_pct": 12.6,
+     "winners_cut_pct": 12.0
+    },
+    "GAP05_FULL": {
+     "flagged": {
+      "n": 600,
+      "W": 186,
+      "L": 356,
+      "F": 58,
+      "win_pct": 34.3
+     },
+     "kept": {
+      "n": 5954,
+      "W": 2040,
+      "L": 3329,
+      "F": 585,
+      "win_pct": 38.0
+     },
+     "losers_cut_pct": 9.7,
+     "winners_cut_pct": 8.4
+    },
+    "D_gapdown_morning_down_1to3": {
+     "flagged": {
+      "n": 305,
+      "W": 72,
+      "L": 201,
+      "F": 32,
+      "win_pct": 26.4
+     },
+     "kept": {
+      "n": 6249,
+      "W": 2154,
+      "L": 3484,
+      "F": 611,
+      "win_pct": 38.2
+     },
+     "losers_cut_pct": 5.5,
+     "winners_cut_pct": 3.2
+    },
+    "D2_gapdown_morning_down_2to3": {
+     "flagged": {
+      "n": 110,
+      "W": 24,
+      "L": 76,
+      "F": 10,
+      "win_pct": 24.0
+     },
+     "kept": {
+      "n": 6444,
+      "W": 2202,
+      "L": 3609,
+      "F": 633,
+      "win_pct": 37.9
+     },
+     "losers_cut_pct": 2.1,
+     "winners_cut_pct": 1.1
+    }
+   }
+  },
+  {
+   "universe": "shown_puts",
+   "baseline": {
+    "n": 1141,
+    "W": 395,
+    "L": 658,
+    "F": 88,
+    "win_pct": 37.5
+   },
+   "rules": {
+    "A_gapdown_morning_unconfirmed": {
+     "flagged": {
+      "n": 141,
+      "W": 51,
+      "L": 80,
+      "F": 10,
+      "win_pct": 38.9
+     },
+     "kept": {
+      "n": 1000,
+      "W": 344,
+      "L": 578,
+      "F": 78,
+      "win_pct": 37.3
+     },
+     "losers_cut_pct": 12.2,
+     "winners_cut_pct": 12.9
+    },
+    "B_gapdown_stock_down_2pct": {
+     "flagged": {
+      "n": 69,
+      "W": 26,
+      "L": 42,
+      "F": 1,
+      "win_pct": 38.2
+     },
+     "kept": {
+      "n": 1072,
+      "W": 369,
+      "L": 616,
+      "F": 87,
+      "win_pct": 37.5
+     },
+     "losers_cut_pct": 6.4,
+     "winners_cut_pct": 6.6
+    },
+    "B3_gapdown_stock_down_3pct": {
+     "flagged": {
+      "n": 42,
+      "W": 17,
+      "L": 25,
+      "F": 0,
+      "win_pct": 40.5
+     },
+     "kept": {
+      "n": 1099,
+      "W": 378,
+      "L": 633,
+      "F": 88,
+      "win_pct": 37.4
+     },
+     "losers_cut_pct": 3.8,
+     "winners_cut_pct": 4.3
+    },
+    "C_anyday_stock_down_3pct": {
+     "flagged": {
+      "n": 64,
+      "W": 21,
+      "L": 43,
+      "F": 0,
+      "win_pct": 32.8
+     },
+     "kept": {
+      "n": 1077,
+      "W": 374,
+      "L": 615,
+      "F": 88,
+      "win_pct": 37.8
+     },
+     "losers_cut_pct": 6.5,
+     "winners_cut_pct": 5.3
+    },
+    "FULL_A_or_B": {
+     "flagged": {
+      "n": 178,
+      "W": 63,
+      "L": 104,
+      "F": 11,
+      "win_pct": 37.7
+     },
+     "kept": {
+      "n": 963,
+      "W": 332,
+      "L": 554,
+      "F": 77,
+      "win_pct": 37.5
+     },
+     "losers_cut_pct": 15.8,
+     "winners_cut_pct": 15.9
+    },
+    "FULL_morning_only": {
+     "flagged": {
+      "n": 149,
+      "W": 53,
+      "L": 85,
+      "F": 11,
+      "win_pct": 38.4
+     },
+     "kept": {
+      "n": 992,
+      "W": 342,
+      "L": 573,
+      "F": 77,
+      "win_pct": 37.4
+     },
+     "losers_cut_pct": 12.9,
+     "winners_cut_pct": 13.4
+    },
+    "FULL_3pct": {
+     "flagged": {
+      "n": 145,
+      "W": 53,
+      "L": 82,
+      "F": 10,
+      "win_pct": 39.3
+     },
+     "kept": {
+      "n": 996,
+      "W": 342,
+      "L": 576,
+      "F": 78,
+      "win_pct": 37.3
+     },
+     "losers_cut_pct": 12.5,
+     "winners_cut_pct": 13.4
+    },
+    "GAP05_FULL": {
+     "flagged": {
+      "n": 109,
+      "W": 40,
+      "L": 60,
+      "F": 9,
+      "win_pct": 40.0
+     },
+     "kept": {
+      "n": 1032,
+      "W": 355,
+      "L": 598,
+      "F": 79,
+      "win_pct": 37.3
+     },
+     "losers_cut_pct": 9.1,
+     "winners_cut_pct": 10.1
+    },
+    "D_gapdown_morning_down_1to3": {
+     "flagged": {
+      "n": 48,
+      "W": 14,
+      "L": 32,
+      "F": 2,
+      "win_pct": 30.4
+     },
+     "kept": {
+      "n": 1093,
+      "W": 381,
+      "L": 626,
+      "F": 86,
+      "win_pct": 37.8
+     },
+     "losers_cut_pct": 4.9,
+     "winners_cut_pct": 3.5
+    },
+    "D2_gapdown_morning_down_2to3": {
+     "flagged": {
+      "n": 11,
+      "W": 3,
+      "L": 7,
+      "F": 1,
+      "win_pct": 30.0
+     },
+     "kept": {
+      "n": 1130,
+      "W": 392,
+      "L": 651,
+      "F": 87,
+      "win_pct": 37.6
+     },
+     "losers_cut_pct": 1.1,
+     "winners_cut_pct": 0.8
+    }
+   }
+  },
+  {
+   "universe": "gap_down_day_puts",
+   "baseline": {
+    "n": 2426,
+    "W": 760,
+    "L": 1419,
+    "F": 247,
+    "win_pct": 34.9
+   },
+   "rules": {
+    "A_gapdown_morning_unconfirmed": {
+     "flagged": {
+      "n": 765,
+      "W": 255,
+      "L": 437,
+      "F": 73,
+      "win_pct": 36.8
+     },
+     "kept": {
+      "n": 1661,
+      "W": 505,
+      "L": 982,
+      "F": 174,
+      "win_pct": 34.0
+     },
+     "losers_cut_pct": 30.8,
+     "winners_cut_pct": 33.6
+    },
+    "B_gapdown_stock_down_2pct": {
+     "flagged": {
+      "n": 811,
+      "W": 249,
+      "L": 497,
+      "F": 65,
+      "win_pct": 33.4
+     },
+     "kept": {
+      "n": 1615,
+      "W": 511,
+      "L": 922,
+      "F": 182,
+      "win_pct": 35.7
+     },
+     "losers_cut_pct": 35.0,
+     "winners_cut_pct": 32.8
+    },
+    "B3_gapdown_stock_down_3pct": {
+     "flagged": {
+      "n": 573,
+      "W": 185,
+      "L": 342,
+      "F": 46,
+      "win_pct": 35.1
+     },
+     "kept": {
+      "n": 1853,
+      "W": 575,
+      "L": 1077,
+      "F": 201,
+      "win_pct": 34.8
+     },
+     "losers_cut_pct": 24.1,
+     "winners_cut_pct": 24.3
+    },
+    "C_anyday_stock_down_3pct": {
+     "flagged": {
+      "n": 573,
+      "W": 185,
+      "L": 342,
+      "F": 46,
+      "win_pct": 35.1
+     },
+     "kept": {
+      "n": 1853,
+      "W": 575,
+      "L": 1077,
+      "F": 201,
+      "win_pct": 34.8
+     },
+     "losers_cut_pct": 24.1,
+     "winners_cut_pct": 24.3
+    },
+    "FULL_A_or_B": {
+     "flagged": {
+      "n": 1274,
+      "W": 397,
+      "L": 766,
+      "F": 111,
+      "win_pct": 34.1
+     },
+     "kept": {
+      "n": 1152,
+      "W": 363,
+      "L": 653,
+      "F": 136,
+      "win_pct": 35.7
+     },
+     "losers_cut_pct": 54.0,
+     "winners_cut_pct": 52.2
+    },
+    "FULL_morning_only": {
+     "flagged": {
+      "n": 832,
+      "W": 273,
+      "L": 480,
+      "F": 79,
+      "win_pct": 36.3
+     },
+     "kept": {
+      "n": 1594,
+      "W": 487,
+      "L": 939,
+      "F": 168,
+      "win_pct": 34.2
+     },
+     "losers_cut_pct": 33.8,
+     "winners_cut_pct": 35.9
+    },
+    "FULL_3pct": {
+     "flagged": {
+      "n": 806,
+      "W": 267,
+      "L": 464,
+      "F": 75,
+      "win_pct": 36.5
+     },
+     "kept": {
+      "n": 1620,
+      "W": 493,
+      "L": 955,
+      "F": 172,
+      "win_pct": 34.0
+     },
+     "losers_cut_pct": 32.7,
+     "winners_cut_pct": 35.1
+    },
+    "GAP05_FULL": {
+     "flagged": {
+      "n": 600,
+      "W": 186,
+      "L": 356,
+      "F": 58,
+      "win_pct": 34.3
+     },
+     "kept": {
+      "n": 1826,
+      "W": 574,
+      "L": 1063,
+      "F": 189,
+      "win_pct": 35.1
+     },
+     "losers_cut_pct": 25.1,
+     "winners_cut_pct": 24.5
+    },
+    "D_gapdown_morning_down_1to3": {
+     "flagged": {
+      "n": 305,
+      "W": 72,
+      "L": 201,
+      "F": 32,
+      "win_pct": 26.4
+     },
+     "kept": {
+      "n": 2121,
+      "W": 688,
+      "L": 1218,
+      "F": 215,
+      "win_pct": 36.1
+     },
+     "losers_cut_pct": 14.2,
+     "winners_cut_pct": 9.5
+    },
+    "D2_gapdown_morning_down_2to3": {
+     "flagged": {
+      "n": 110,
+      "W": 24,
+      "L": 76,
+      "F": 10,
+      "win_pct": 24.0
+     },
+     "kept": {
+      "n": 2316,
+      "W": 736,
+      "L": 1343,
+      "F": 237,
+      "win_pct": 35.4
+     },
+     "losers_cut_pct": 5.4,
+     "winners_cut_pct": 3.2
+    }
+   }
+  },
+  {
+   "universe": "gap_down_morning_puts",
+   "baseline": {
+    "n": 1151,
+    "W": 380,
+    "L": 656,
+    "F": 115,
+    "win_pct": 36.7
+   },
+   "rules": {
+    "A_gapdown_morning_unconfirmed": {
+     "flagged": {
+      "n": 765,
+      "W": 255,
+      "L": 437,
+      "F": 73,
+      "win_pct": 36.8
+     },
+     "kept": {
+      "n": 386,
+      "W": 125,
+      "L": 219,
+      "F": 42,
+      "win_pct": 36.3
+     },
+     "losers_cut_pct": 66.6,
+     "winners_cut_pct": 67.1
+    },
+    "B_gapdown_stock_down_2pct": {
+     "flagged": {
+      "n": 369,
+      "W": 125,
+      "L": 211,
+      "F": 33,
+      "win_pct": 37.2
+     },
+     "kept": {
+      "n": 782,
+      "W": 255,
+      "L": 445,
+      "F": 82,
+      "win_pct": 36.4
+     },
+     "losers_cut_pct": 32.2,
+     "winners_cut_pct": 32.9
+    },
+    "B3_gapdown_stock_down_3pct": {
+     "flagged": {
+      "n": 259,
+      "W": 101,
+      "L": 135,
+      "F": 23,
+      "win_pct": 42.8
+     },
+     "kept": {
+      "n": 892,
+      "W": 279,
+      "L": 521,
+      "F": 92,
+      "win_pct": 34.9
+     },
+     "losers_cut_pct": 20.6,
+     "winners_cut_pct": 26.6
+    },
+    "C_anyday_stock_down_3pct": {
+     "flagged": {
+      "n": 259,
+      "W": 101,
+      "L": 135,
+      "F": 23,
+      "win_pct": 42.8
+     },
+     "kept": {
+      "n": 892,
+      "W": 279,
+      "L": 521,
+      "F": 92,
+      "win_pct": 34.9
+     },
+     "losers_cut_pct": 20.6,
+     "winners_cut_pct": 26.6
+    },
+    "FULL_A_or_B": {
+     "flagged": {
+      "n": 832,
+      "W": 273,
+      "L": 480,
+      "F": 79,
+      "win_pct": 36.3
+     },
+     "kept": {
+      "n": 319,
+      "W": 107,
+      "L": 176,
+      "F": 36,
+      "win_pct": 37.8
+     },
+     "losers_cut_pct": 73.2,
+     "winners_cut_pct": 71.8
+    },
+    "FULL_morning_only": {
+     "flagged": {
+      "n": 832,
+      "W": 273,
+      "L": 480,
+      "F": 79,
+      "win_pct": 36.3
+     },
+     "kept": {
+      "n": 319,
+      "W": 107,
+      "L": 176,
+      "F": 36,
+      "win_pct": 37.8
+     },
+     "losers_cut_pct": 73.2,
+     "winners_cut_pct": 71.8
+    },
+    "FULL_3pct": {
+     "flagged": {
+      "n": 806,
+      "W": 267,
+      "L": 464,
+      "F": 75,
+      "win_pct": 36.5
+     },
+     "kept": {
+      "n": 345,
+      "W": 113,
+      "L": 192,
+      "F": 40,
+      "win_pct": 37.0
+     },
+     "losers_cut_pct": 70.7,
+     "winners_cut_pct": 70.3
+    },
+    "GAP05_FULL": {
+     "flagged": {
+      "n": 600,
+      "W": 186,
+      "L": 356,
+      "F": 58,
+      "win_pct": 34.3
+     },
+     "kept": {
+      "n": 551,
+      "W": 194,
+      "L": 300,
+      "F": 57,
+      "win_pct": 39.3
+     },
+     "losers_cut_pct": 54.3,
+     "winners_cut_pct": 48.9
+    },
+    "D_gapdown_morning_down_1to3": {
+     "flagged": {
+      "n": 305,
+      "W": 72,
+      "L": 201,
+      "F": 32,
+      "win_pct": 26.4
+     },
+     "kept": {
+      "n": 846,
+      "W": 308,
+      "L": 455,
+      "F": 83,
+      "win_pct": 40.4
+     },
+     "losers_cut_pct": 30.6,
+     "winners_cut_pct": 18.9
+    },
+    "D2_gapdown_morning_down_2to3": {
+     "flagged": {
+      "n": 110,
+      "W": 24,
+      "L": 76,
+      "F": 10,
+      "win_pct": 24.0
+     },
+     "kept": {
+      "n": 1041,
+      "W": 356,
+      "L": 580,
+      "F": 105,
+      "win_pct": 38.0
+     },
+     "losers_cut_pct": 11.6,
+     "winners_cut_pct": 6.3
+    }
+   }
+  },
+  {
+   "universe": "gap_down_morning_shown",
+   "baseline": {
+    "n": 201,
+    "W": 69,
+    "L": 118,
+    "F": 14,
+    "win_pct": 36.9
+   },
+   "rules": {
+    "A_gapdown_morning_unconfirmed": {
+     "flagged": {
+      "n": 141,
+      "W": 51,
+      "L": 80,
+      "F": 10,
+      "win_pct": 38.9
+     },
+     "kept": {
+      "n": 60,
+      "W": 18,
+      "L": 38,
+      "F": 4,
+      "win_pct": 32.1
+     },
+     "losers_cut_pct": 67.8,
+     "winners_cut_pct": 73.9
+    },
+    "B_gapdown_stock_down_2pct": {
+     "flagged": {
+      "n": 40,
+      "W": 16,
+      "L": 23,
+      "F": 1,
+      "win_pct": 41.0
+     },
+     "kept": {
+      "n": 161,
+      "W": 53,
+      "L": 95,
+      "F": 13,
+      "win_pct": 35.8
+     },
+     "losers_cut_pct": 19.5,
+     "winners_cut_pct": 23.2
+    },
+    "B3_gapdown_stock_down_3pct": {
+     "flagged": {
+      "n": 29,
+      "W": 13,
+      "L": 16,
+      "F": 0,
+      "win_pct": 44.8
+     },
+     "kept": {
+      "n": 172,
+      "W": 56,
+      "L": 102,
+      "F": 14,
+      "win_pct": 35.4
+     },
+     "losers_cut_pct": 13.6,
+     "winners_cut_pct": 18.8
+    },
+    "C_anyday_stock_down_3pct": {
+     "flagged": {
+      "n": 29,
+      "W": 13,
+      "L": 16,
+      "F": 0,
+      "win_pct": 44.8
+     },
+     "kept": {
+      "n": 172,
+      "W": 56,
+      "L": 102,
+      "F": 14,
+      "win_pct": 35.4
+     },
+     "losers_cut_pct": 13.6,
+     "winners_cut_pct": 18.8
+    },
+    "FULL_A_or_B": {
+     "flagged": {
+      "n": 149,
+      "W": 53,
+      "L": 85,
+      "F": 11,
+      "win_pct": 38.4
+     },
+     "kept": {
+      "n": 52,
+      "W": 16,
+      "L": 33,
+      "F": 3,
+      "win_pct": 32.7
+     },
+     "losers_cut_pct": 72.0,
+     "winners_cut_pct": 76.8
+    },
+    "FULL_morning_only": {
+     "flagged": {
+      "n": 149,
+      "W": 53,
+      "L": 85,
+      "F": 11,
+      "win_pct": 38.4
+     },
+     "kept": {
+      "n": 52,
+      "W": 16,
+      "L": 33,
+      "F": 3,
+      "win_pct": 32.7
+     },
+     "losers_cut_pct": 72.0,
+     "winners_cut_pct": 76.8
+    },
+    "FULL_3pct": {
+     "flagged": {
+      "n": 145,
+      "W": 53,
+      "L": 82,
+      "F": 10,
+      "win_pct": 39.3
+     },
+     "kept": {
+      "n": 56,
+      "W": 16,
+      "L": 36,
+      "F": 4,
+      "win_pct": 30.8
+     },
+     "losers_cut_pct": 69.5,
+     "winners_cut_pct": 76.8
+    },
+    "GAP05_FULL": {
+     "flagged": {
+      "n": 109,
+      "W": 40,
+      "L": 60,
+      "F": 9,
+      "win_pct": 40.0
+     },
+     "kept": {
+      "n": 92,
+      "W": 29,
+      "L": 58,
+      "F": 5,
+      "win_pct": 33.3
+     },
+     "losers_cut_pct": 50.8,
+     "winners_cut_pct": 58.0
+    },
+    "D_gapdown_morning_down_1to3": {
+     "flagged": {
+      "n": 48,
+      "W": 14,
+      "L": 32,
+      "F": 2,
+      "win_pct": 30.4
+     },
+     "kept": {
+      "n": 153,
+      "W": 55,
+      "L": 86,
+      "F": 12,
+      "win_pct": 39.0
+     },
+     "losers_cut_pct": 27.1,
+     "winners_cut_pct": 20.3
+    },
+    "D2_gapdown_morning_down_2to3": {
+     "flagged": {
+      "n": 11,
+      "W": 3,
+      "L": 7,
+      "F": 1,
+      "win_pct": 30.0
+     },
+     "kept": {
+      "n": 190,
+      "W": 66,
+      "L": 111,
+      "F": 13,
+      "win_pct": 37.3
+     },
+     "losers_cut_pct": 5.9,
+     "winners_cut_pct": 4.3
+    }
+   }
+  }
+ ],
+ "gap_down_morning_by_stock_move": {
+  ">0%": {
+   "n": 221,
+   "W": 79,
+   "L": 111,
+   "F": 31,
+   "win_pct": 41.6
+  },
+  "0 to -1%": {
+   "n": 343,
+   "W": 122,
+   "L": 196,
+   "F": 25,
+   "win_pct": 38.4
+  },
+  "-1 to -2%": {
+   "n": 195,
+   "W": 48,
+   "L": 125,
+   "F": 22,
+   "win_pct": 27.7
+  },
+  "-2 to -3%": {
+   "n": 110,
+   "W": 24,
+   "L": 76,
+   "F": 10,
+   "win_pct": 24.0
+  },
+  "-3 to -5%": {
+   "n": 130,
+   "W": 41,
+   "L": 75,
+   "F": 14,
+   "win_pct": 35.3
+  },
+  "<=-5%": {
+   "n": 129,
+   "W": 60,
+   "L": 60,
+   "F": 9,
+   "win_pct": 50.0
+  }
+ },
+ "gap_down_morning_by_confirmation": {
+  "2nd ask print": {
+   "n": 137,
+   "W": 43,
+   "L": 81,
+   "F": 13,
+   "win_pct": 34.7
+  },
+  "bounce only": {
+   "n": 249,
+   "W": 82,
+   "L": 138,
+   "F": 29,
+   "win_pct": 37.3
+  },
+  "neither": {
+   "n": 765,
+   "W": 255,
+   "L": 437,
+   "F": 73,
+   "win_pct": 36.8
+  }
+ },
+ "non_gap_morning_puts": {
+  "n": 1953,
+  "W": 715,
+  "L": 1045,
+  "F": 193,
+  "win_pct": 40.6
+ },
+ "D_rule_by_year": {
+  "2024-10..2025-09": {
+   "flagged": {
+    "n": 135,
+    "W": 37,
+    "L": 85,
+    "F": 13,
+    "win_pct": 30.3
+   },
+   "kept": {
+    "n": 349,
+    "W": 138,
+    "L": 175,
+    "F": 36,
+    "win_pct": 44.1
+   }
+  },
+  "2025-10..2026-10": {
+   "flagged": {
+    "n": 170,
+    "W": 35,
+    "L": 116,
+    "F": 19,
+    "win_pct": 23.2
+   },
+   "kept": {
+    "n": 497,
+    "W": 170,
+    "L": 280,
+    "F": 47,
+    "win_pct": 37.8
+   }
+  }
+ }
+}
