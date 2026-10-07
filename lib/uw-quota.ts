@@ -37,7 +37,18 @@ export function isUwQuotaError(error: unknown): error is UwQuotaError {
   return error instanceof UwQuotaError;
 }
 
+/**
+ * UW plan limit "You have exceeded 3 concurrent requests" comes back as HTTP 429. It is NOT a quota
+ * problem: the request should simply be retried a moment later. Treating it as a quota hit used to trip
+ * the 90 s UW circuit (shared via Redis) on every burst, and /api/quote then answered source="alert"
+ * for every contract (seen after the close Oct 5–6 when several routes + quote checks ran at once).
+ */
+export function isConcurrencyHttp(status: number, body: string): boolean {
+  return status === 429 && /concurrent request/i.test(body);
+}
+
 export function isQuotaHttp(status: number, body: string): boolean {
+  if (isConcurrencyHttp(status, body)) return false;
   if (status === 429) return true;
   return /daily_request_limit_hit|daily request limit/i.test(body);
 }
@@ -83,6 +94,8 @@ export async function cachedCall<T>(
   ttlMs: number,
   fn: () => Promise<T>,
   bust = false,
+  /** Optional: only memoize values this accepts (e.g. never pin an empty quote payload for 15 min). */
+  keep?: (value: T) => boolean,
 ): Promise<T> {
   if (!bust) {
     const hit = mem.get(key);
@@ -92,7 +105,7 @@ export async function cachedCall<T>(
   if (pending) return pending as Promise<T>;
   const run = fn()
     .then((value) => {
-      if (ttlMs > 0) mem.set(key, { at: Date.now(), ttl: ttlMs, value });
+      if (ttlMs > 0 && (!keep || keep(value))) mem.set(key, { at: Date.now(), ttl: ttlMs, value });
       inflight.delete(key);
       return value;
     })
@@ -126,6 +139,23 @@ export async function getCircuit(): Promise<Circuit | null> {
 
 export async function isUwBlocked(): Promise<boolean> {
   return (await getCircuit()) != null;
+}
+
+/**
+ * True only for a real daily-cap block (or any block with > 10 min left). A short per-minute /
+ * burst 429 trips the circuit for ~90 s; single-contract quote lookups may still try once through
+ * it instead of silently falling back to the alert print.
+ */
+export async function isUwHardBlocked(): Promise<boolean> {
+  const c = await getCircuit();
+  if (!c) return false;
+  return /daily/i.test(c.reason) || c.untilMs - Date.now() > 10 * 60_000;
+}
+
+/** Non-secret circuit summary for diagnostics. */
+export async function uwCircuitInfo(): Promise<{ open: boolean; until: string | null; reason: string | null }> {
+  const c = await getCircuit();
+  return c ? { open: true, until: new Date(c.untilMs).toISOString(), reason: c.reason.slice(0, 160) } : { open: false, until: null, reason: null };
 }
 
 export async function tripUwQuota(detail: string, untilMs = quotaResetUtcMs()): Promise<number> {

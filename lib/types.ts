@@ -187,6 +187,12 @@ export type ArmingPremium = {
   source: ArmingSource;
   label: string;
   asOf: string | null;
+  /** /api/quote only: live NBBO + last-trade detail when UW answered. */
+  bid?: number | null;
+  ask?: number | null;
+  last?: number | null;
+  /** /api/quote only: why the live UW quote was not used (shown only on session_print / alert fallbacks). */
+  diag?: { session: "open" | "closed"; steps: string[]; circuit?: { open: boolean; until: string | null; reason: string | null } };
 };
 
 /** Options-only price watch. Premiums are per-share option prices, not flow notional. */
@@ -217,6 +223,8 @@ export type WatchQuote = {
   last: number;
   bid: number | null;
   ask: number | null;
+  /** NBBO midpoint when both sides are live. */
+  mid?: number | null;
   asOf: string | null;
   quality: WatchDataQuality;
 };

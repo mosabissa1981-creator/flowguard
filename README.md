@@ -47,7 +47,7 @@ Set `UNUSUAL_WHALES_API_KEY` in `.env.local`, or paste it in the **Unusual Whale
 | `GET /api/ticker/{ticker}/net-prem` | `GET /api/stock/{ticker}/net-prem-ticks` |
 | `GET/POST /api/watches/check` | One `GET /api/option-contract/{id}/historic` (`limit=5`) per armed watch on the 15-min path. Quote + fade path (last vs open / prior, ask vs bid volume, IV) from that payload. Last flow print if historic is empty or the 429 breaker is open. Not on the board poll. |
 | `GET/POST/DELETE /api/watches` | Vercel Blob (`flowguard/watches.json`) — durable across deploys; external checker reads `GET /api/watches` |
-| `GET /api/quote?ticker=NFLX&option_chain=NFLX261023C00070000&alertPrice=1.83` | Live arming premium: UW last/mid, else last session flow print, else `alertPrice`. `symbol=<OCC>` is accepted as an alias (ticker read from it); bad input returns a 400 with usage. |
+| `GET /api/quote?ticker=NFLX&option_chain=NFLX261023C00070000&alertPrice=1.83` | Live premium: `uw_nbbo` (NBBO mid) in the cash session, `uw_last` (last trade/close) after the close or when the book is one-sided/wide; UW option-contracts → historic bar → last option trade. Only when UW has nothing: last session flow print, else `alertPrice` (`source: alert`, with a `diag` step trace). `symbol=<OCC>` is accepted as an alias (ticker read from it); bad input returns a 400 with usage. UW allows 3 concurrent requests per key: the server queues UW calls (`UW_MAX_CONCURRENCY`, default 2) and retries a concurrency 429 instead of tripping the quota circuit. |
 | `GET/POST /api/notify` | Lock-screen ping (Pushover + Telegram). POST `{ title, body }`. |
 | `POST /api/notify/test` | Sends “FlowGuard test” to configured channels. |
 

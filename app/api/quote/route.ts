@@ -8,7 +8,8 @@ export const dynamic = "force-dynamic";
 
 const USAGE =
   "Use /api/quote?ticker=NFLX&option_chain=NFLX261023C00070000&alertPrice=1.83 (alertPrice optional). " +
-  "symbol=<OCC> is also accepted and the ticker is read from it.";
+  "symbol=<OCC> is also accepted and the ticker is read from it. source: uw_nbbo (cash-session NBBO mid), " +
+  "uw_last (last trade/close; used after the close), session_print / alert only when UW has nothing (see diag).";
 
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
@@ -46,14 +47,23 @@ export async function GET(request: NextRequest) {
       option_chain: optionChain,
       alertPrice: alertPrice ?? undefined,
     });
-    return Response.json(arming);
-  } catch {
+    if (arming.source !== "uw_last" && arming.source !== "uw_nbbo") {
+      console.warn(`[quote] ${optionChain} fell back to ${arming.source}: ${JSON.stringify(arming.diag ?? {})}`);
+    }
+    return Response.json({ ticker, option_chain: optionChain, ...arming }, { headers: { "Cache-Control": "no-store" } });
+  } catch (error) {
     const premium = alertPrice ?? 0;
-    return Response.json({
-      premium,
-      source: "alert",
-      label: premium > 0 ? `$${premium.toFixed(2)} (alert print)` : "no premium",
-      asOf: null,
-    });
+    return Response.json(
+      {
+        ticker,
+        option_chain: optionChain,
+        premium,
+        source: "alert",
+        label: premium > 0 ? `$${premium.toFixed(2)} (alert print)` : "no premium",
+        asOf: null,
+        diag: { steps: [`quote route error: ${error instanceof Error ? error.message.slice(0, 160) : "error"}`] },
+      },
+      { headers: { "Cache-Control": "no-store" } },
+    );
   }
 }
