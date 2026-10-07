@@ -6,7 +6,7 @@ import { triggerShadowQuietly } from "@/lib/shadow";
 import { paperTickQuietly } from "@/lib/paper";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 120;
+export const maxDuration = 180;
 
 function adminOk(provided: string | null): boolean {
   const secret = process.env.AI_PICKS_ADMIN_SECRET?.trim() ?? "";

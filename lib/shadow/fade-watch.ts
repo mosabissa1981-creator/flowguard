@@ -112,7 +112,11 @@ async function compute(now: Date): Promise<FadeDoc> {
       let bidPrem = 0;
       try {
         calls += 1;
-        const trades = await fetchContractTradesRaw(p.contract, new Date(p.enteredAt).getTime() / 1000, 150_000);
+        // UW option-trades only serves the latest trading day (400 historical_data_not_supported for older
+        // newer_than), so carried-over positions read today's tape from the 9:30 ET open.
+        const openSec = now.getTime() / 1000 - (etClock(now).minutes - (9 * 60 + 30)) * 60;
+        const sinceSec = Math.max(new Date(p.enteredAt).getTime() / 1000, openSec);
+        const trades = await fetchContractTradesRaw(p.contract, sinceSec, 150_000);
         for (const t of trades) {
           const tags = Array.isArray(t.tags) ? (t.tags as string[]) : [];
           const prem = n(t.premium);

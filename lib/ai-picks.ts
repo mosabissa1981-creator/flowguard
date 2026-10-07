@@ -19,8 +19,12 @@ import type { AiPick, AiPicksResponse, AiPremoveReview, AiSkip, DailyPick, Regim
 const MAX_CANDIDATES = 8;
 /** Premove ("Before the move") lane candidates sent to the same LLM call for a separate review. */
 const MAX_PREMOVE_CANDIDATES = 6;
-/** Reasoning models (e.g. grok-4.x) need ~20–40s on this prompt; route maxDuration is 60s. */
-const LLM_TIMEOUT_MS = Math.min(55_000, Math.max(5_000, Number(process.env.LLM_TIMEOUT_MS) || 50_000));
+/**
+ * Grok 4.7 usually answers this ~5k-token prompt in 20–40s, but xAI latency spikes push it past 50s (Oct 7 open:
+ * two aborts at 50s; the same prompt then succeeded). Allow 110s; the route's maxDuration is 180s so the
+ * candidate gather + LLM + state save still fit. An aborted call costs $0 (no tokens billed), so the $1/day cap holds.
+ */
+const LLM_TIMEOUT_MS = Math.min(150_000, Math.max(5_000, Number(process.env.LLM_TIMEOUT_MS) || 110_000));
 const CACHE_MS = 12 * 60_000;
 /** Cost guard: at most one LLM call per 30 min per trading day, and only when candidates change. */
 const LLM_MIN_INTERVAL_MS = 30 * 60_000;
