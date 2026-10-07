@@ -76,15 +76,28 @@ export async function flushUwUsage(): Promise<void> {
   }
 }
 
-/** Latest known whole-token UW count for the current UW day (memory, refreshed from Redis ≤ every 30 s). */
+let ownCounted: { day: string; sum: number } | null = null;
+
+/**
+ * Best known whole-token UW count for the current UW day (refreshed from Redis at most every 30 s).
+ * UW stopped sending `x-uw-daily-req-count` on Oct 7 2026 (only per-minute headers), so this is the larger of
+ * the last header value and our own per-job counter (all Vercel-side calls) plus unflushed local calls.
+ */
 export async function uwTokenCount(): Promise<number> {
   const day = uwDayKey();
   if (Date.now() - latestReadAt > 30_000) {
     latestReadAt = Date.now();
-    const stored = await kvGet<{ day: string; count: number; at: string }>(COUNT_KEY, { maxAgeMs: 30_000 });
+    const [stored, byJob] = await Promise.all([
+      kvGet<{ day: string; count: number; at: string }>(COUNT_KEY, { maxAgeMs: 30_000 }),
+      kvHgetAll(HASH(day)).catch((): Record<string, number> => ({})),
+    ]);
     if (stored?.day === day && (!latest || latest.day !== day || stored.count > latest.count)) latest = stored;
+    ownCounted = { day, sum: Object.values(byJob).reduce((a, b) => a + b, 0) };
   }
-  return latest?.day === day ? latest.count : 0;
+  const header = latest?.day === day ? latest.count : 0;
+  const local = pending.day === day ? Object.values(pending.deltas).reduce((a, b) => a + b, 0) : 0;
+  const own = (ownCounted?.day === day ? ownCounted.sum : 0) + local;
+  return Math.max(header, own);
 }
 
 /** True when shadow/test jobs may still spend UW calls (whole-token count under UW_JOBS_STOP_AT). */
@@ -96,11 +109,14 @@ export async function uwUsageView(day = uwDayKey()) {
   await flushUwUsage().catch(() => undefined);
   const byJob = await kvHgetAll(HASH(day));
   const counted = Object.values(byJob).reduce((s, n) => s + n, 0);
-  const token = day === uwDayKey() ? await uwTokenCount() : null;
+  const token = day === uwDayKey() ? Math.max(await uwTokenCount(), counted) : null;
+  const headerCount = day === uwDayKey() && latest?.day === day ? latest.count : null;
   return {
     day,
     resetsAt: "8:00 PM ET (7:00 PM CT)",
     tokenCount: token,
+    /** Last x-uw-daily-req-count seen (UW stopped sending it Oct 7 2026; tokenCount then falls back to our own count). */
+    headerCount,
     ceiling: UW_DAY_CEILING,
     jobsStopAt: UW_JOBS_STOP_AT,
     siteReserve: UW_DAY_CEILING - UW_JOBS_STOP_AT,
@@ -108,6 +124,6 @@ export async function uwUsageView(day = uwDayKey()) {
     /** Calls on the token not made by the Vercel app (box history backfill, study routine, manual). */
     otherOrBox: token != null ? Math.max(0, token - counted) : null,
     byJob,
-    note: "byJob counts Vercel-side UW requests (cache hits excluded). tokenCount is UW's x-uw-daily-req-count for the whole key.",
+    note: "byJob counts Vercel-side UW requests (cache hits excluded). tokenCount = max(UW's x-uw-daily-req-count header when sent, our own count). Box backfill calls are only included via the header.",
   };
 }
