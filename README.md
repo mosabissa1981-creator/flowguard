@@ -82,6 +82,8 @@ The manager book sits on the same Unusual Whales tape. It does not pick stocks.
 
 ## Lock-screen alerts (Pushover + Telegram)
 
+> Telegram is **off** (Oct 7 2026: Mosab asked to stop all FlowGuard Telegram messages). `sendTelegram` returns `skipped: "Telegram disabled"` unless `TELEGRAM_ENABLED=1`. Pushover is unchanged.
+
 Set these as Production secrets on the Vercel project (or in `.env.local`). A channel is skipped if its pair is empty. Secrets are never logged or returned by the API.
 
 | Env | Where to get it |
