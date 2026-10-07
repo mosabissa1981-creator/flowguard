@@ -119,15 +119,25 @@ function inMarketHours(now: Date): boolean {
   return e.weekday && e.minutes >= MARKET_OPEN_ET_MINUTES && e.minutes < MARKET_CLOSE_ET_MINUTES;
 }
 
-function toFill(q: WatchQuote | null | undefined): FillQuote | null {
+/**
+ * Live UW quote → fill inputs. After the close the NBBO is often stale/one-sided/very wide (e.g. bid 0.45
+ * / ask 1.05), so outside market hours a wide or one-sided book is dropped and exits mark off the UW
+ * last trade (last −5%) instead of a junk bid that could fake a stop.
+ */
+function toFill(q: WatchQuote | null | undefined, now?: Date): FillQuote | null {
   if (!q) return null;
   const live = q.quality === "uw_last" || q.quality === "uw_nbbo";
-  return {
-    bid: live ? q.bid : null,
-    ask: live ? q.ask : null,
-    last: live ? q.last : null,
-    asOf: q.asOf,
-  };
+  let bid = live ? q.bid : null;
+  let ask = live ? q.ask : null;
+  const last = live ? q.last : null;
+  if (live && now && !inMarketHours(now) && q.quality === "uw_last" && q.last > 0) {
+    const wide = bid == null || ask == null || !(bid > 0) || !(ask >= bid) || (ask - bid) / ((ask + bid) / 2) > 0.5;
+    if (wide) {
+      bid = null;
+      ask = null;
+    }
+  }
+  return { bid, ask, last, asOf: q.asOf };
 }
 
 // ---------------------------------------------------------------------------
@@ -429,11 +439,11 @@ async function runTick(opts: { force?: boolean; ai?: AiPicksResponse | null; now
       let mark: PaperMark | null = null;
       if (p.legs?.length) {
         const fq: Record<string, FillQuote | null> = {};
-        for (const l of p.legs) fq[l.option_chain] = toFill(quotes[l.option_chain]);
+        for (const l of p.legs) fq[l.option_chain] = toFill(quotes[l.option_chain], now);
         const net = spreadNet(p.legs, fq, "exit");
         if (net != null) mark = { value: Math.max(0, net), basis: "uw_net", bid: null, ask: null, last: null, at: now.toISOString(), quoteAsOf: null };
       } else {
-        const q = toFill(quotes[p.contract]);
+        const q = toFill(quotes[p.contract], now);
         const v = exitValue(q);
         if (v) mark = { value: v.value, basis: v.basis, bid: q?.bid ?? null, ask: q?.ask ?? null, last: q?.last ?? null, at: now.toISOString(), quoteAsOf: q?.asOf ?? null };
       }

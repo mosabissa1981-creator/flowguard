@@ -14,8 +14,10 @@ import {
   TIDE_TTL_MS,
   UwQuotaError,
   cachedCall,
+  isConcurrencyHttp,
   isQuotaHttp,
   isUwBlocked,
+  isUwHardBlocked,
   quotaResetUtcMs,
   tripUwQuota,
 } from "@/lib/uw-quota";
@@ -82,8 +84,52 @@ function buildUrl(path: string, params?: Record<string, string | number | boolea
 
 const UW_TIMEOUT_MS = 15_000;
 
-async function uwRequest<T>(url: URL, ttlMs = 0, bust = false): Promise<T> {
-  if (await isUwBlocked()) {
+/**
+ * UW plan cap: 3 concurrent requests per key (429 "exceeded 3 concurrent requests" beyond that). The box
+ * study/history jobs share the key, so each server instance keeps at most UW_MAX_CONCURRENCY (default 2)
+ * UW requests in flight and queues the rest; a concurrency 429 that still slips through is retried with
+ * a short jittered backoff instead of tripping the quota circuit.
+ */
+const UW_MAX_INFLIGHT = (() => {
+  const v = Number(process.env.UW_MAX_CONCURRENCY);
+  return Number.isFinite(v) && v >= 1 ? Math.min(3, Math.floor(v)) : 2;
+})();
+const UW_CONCURRENCY_RETRIES = 4;
+let uwInflight = 0;
+const uwWaiters: Array<() => void> = [];
+
+async function acquireUwSlot(): Promise<void> {
+  if (uwInflight < UW_MAX_INFLIGHT) {
+    uwInflight += 1;
+    return;
+  }
+  // The releasing request hands its slot straight to the next waiter (uwInflight unchanged).
+  await new Promise<void>((resolve) => uwWaiters.push(resolve));
+}
+
+function releaseUwSlot(): void {
+  const next = uwWaiters.shift();
+  if (next) next();
+  else uwInflight = Math.max(0, uwInflight - 1);
+}
+
+/** Diagnostics: UW requests queued/in flight on this instance. */
+export function uwConcurrencyStats() {
+  return { max: UW_MAX_INFLIGHT, inflight: uwInflight, queued: uwWaiters.length };
+}
+
+const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+type UwRequestOpts<T> = {
+  /** Only memoize payloads this accepts (empty quote payloads are retried instead of pinned for the TTL). */
+  keep?: (value: T) => boolean;
+  /** Single-contract quote lookups: try through a short (~90 s burst) circuit; still honor a daily-cap block. */
+  allowShortBlock?: boolean;
+};
+
+async function uwRequest<T>(url: URL, ttlMs = 0, bust = false, opts: UwRequestOpts<T> = {}): Promise<T> {
+  const blocked = () => (opts.allowShortBlock ? isUwHardBlocked() : isUwBlocked());
+  if (await blocked()) {
     throw new UwQuotaError(
       "Unusual Whales daily request cap is in effect. Not calling UW.",
       quotaResetUtcMs(),
@@ -94,7 +140,7 @@ async function uwRequest<T>(url: URL, ttlMs = 0, bust = false): Promise<T> {
     url.toString(),
     ttlMs,
     async () => {
-      if (await isUwBlocked()) {
+      if (await blocked()) {
         throw new UwQuotaError(
           "Unusual Whales daily request cap is in effect. Not calling UW.",
           quotaResetUtcMs(),
@@ -104,19 +150,36 @@ async function uwRequest<T>(url: URL, ttlMs = 0, bust = false): Promise<T> {
       if (!key) {
         throw new Error("UNUSUAL_WHALES_API_KEY is not set");
       }
-      const response = await fetch(url, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${key}`,
-          "UW-CLIENT-API-ID": CLIENT_ID,
-          Accept: "application/json",
-        },
-        cache: "no-store",
-        // Never let one slow UW request hang a route (or the session back-fill) indefinitely.
-        signal: AbortSignal.timeout(UW_TIMEOUT_MS),
-      });
-      if (!response.ok) {
-        const body = await response.text();
+      for (let attempt = 0; ; attempt += 1) {
+        await acquireUwSlot();
+        let response: Response;
+        let body = "";
+        let json: T | undefined;
+        try {
+          response = await fetch(url, {
+            method: "GET",
+            headers: {
+              Authorization: `Bearer ${key}`,
+              "UW-CLIENT-API-ID": CLIENT_ID,
+              Accept: "application/json",
+            },
+            cache: "no-store",
+            // Never let one slow UW request hang a route (or the session back-fill) indefinitely.
+            signal: AbortSignal.timeout(UW_TIMEOUT_MS),
+          });
+          if (response.ok) json = (await response.json()) as T;
+          else body = await response.text();
+        } finally {
+          releaseUwSlot();
+        }
+        if (response.ok) return json as T;
+        if (isConcurrencyHttp(response.status, body)) {
+          if (attempt < UW_CONCURRENCY_RETRIES) {
+            await pause(250 * (attempt + 1) + Math.floor(Math.random() * 250));
+            continue;
+          }
+          throw new Error(`Unusual Whales ${url.pathname} 429 (concurrency, after ${attempt + 1} tries): ${body.slice(0, 120)}`);
+        }
         if (isQuotaHttp(response.status, body)) {
           const daily = /daily_request_limit_hit|daily request limit/i.test(body);
           const retryAfter = Number(response.headers.get("retry-after"));
@@ -128,9 +191,9 @@ async function uwRequest<T>(url: URL, ttlMs = 0, bust = false): Promise<T> {
         }
         throw new Error(`Unusual Whales ${url.pathname} ${response.status}: ${body.slice(0, 240)}`);
       }
-      return (await response.json()) as T;
     },
     bust,
+    opts.keep,
   );
 }
 
@@ -418,17 +481,18 @@ function quoteFromContract(raw: Record<string, unknown>, flowPrint?: number): Wa
   const last = firstPositive(raw.last_price, raw.price, raw.close);
   const bid = firstPositive(raw.nbbo_bid, raw.bid);
   const ask = firstPositive(raw.nbbo_ask, raw.ask);
-  const mid = bid != null && ask != null ? (bid + ask) / 2 : null;
-  const asOf = asString(raw.last_tape_time || raw.date || raw.executed_at, "") || null;
+  const mid = bid != null && ask != null && ask >= bid ? Math.round(((bid + ask) / 2) * 100) / 100 : null;
+  const asOf = asString(raw.last_tape_time || raw.executed_at || raw.date, "") || null;
 
   if (last != null) {
-    return { last, bid, ask, asOf, quality: "uw_last" };
+    return { last, bid, ask, mid, asOf, quality: "uw_last" };
   }
   if (mid != null || ask != null || bid != null) {
     return {
       last: mid ?? ask ?? bid ?? 0,
       bid,
       ask,
+      mid,
       asOf,
       quality: "uw_nbbo",
     };
@@ -444,44 +508,128 @@ export function quoteFromFlowPrint(price: number | undefined): WatchQuote | null
   return { last: price, bid: null, ask: null, asOf: null, quality: "flow_print" };
 }
 
+function isLiveQuote(q: WatchQuote | null | undefined): q is WatchQuote {
+  return q != null && q.last > 0 && (q.quality === "uw_last" || q.quality === "uw_nbbo");
+}
+
+function errText(error: unknown): string {
+  return (error instanceof Error ? error.message : String(error)).replace(/Bearer\s+\S+/gi, "Bearer ***").slice(0, 160);
+}
+
+/** One retry (after a short pause) on transient failures; never retries a quota error. */
+async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn();
+  } catch (error) {
+    if (error instanceof UwQuotaError) throw error;
+    await pause(350);
+    return fn();
+  }
+}
+
+/**
+ * Live quote for ONE contract with a step trace (for /api/quote diagnostics). Order:
+ *  1. GET /api/stock/{t}/option-contracts?option_symbol[]=X  (NBBO + last_price; works after the close)
+ *  2. GET /api/option-contract/{X}/historic                   (latest daily bar: last_price + NBBO)
+ *  3. GET /api/option-trades?option_contracts[]=X&limit=1     (true last trade print) — opt-in
+ * Only the exact symbol row is used (never another contract's row). Empty payloads are cached
+ * for 60 s instead of 15 min so a transient blank answer can't pin the alert fallback.
+ */
+export async function fetchOptionQuoteTraced(
+  ticker: string,
+  optionSymbol: string,
+  flowPrint?: number,
+  opts: { allowShortBlock?: boolean; lastTradeFallback?: boolean } = {},
+): Promise<{ quote: WatchQuote | null; steps: string[] }> {
+  const symbol = optionSymbol.trim().toUpperCase();
+  const name = ticker.trim().toUpperCase();
+  const steps: string[] = [];
+  const blocked = () => (opts.allowShortBlock ? isUwHardBlocked() : isUwBlocked());
+  if (!symbol || !name) return { quote: quoteFromFlowPrint(flowPrint), steps: ["missing ticker/symbol"] };
+  if (await blocked()) return { quote: quoteFromFlowPrint(flowPrint), steps: ["uw circuit open (quota)"] };
+  const reqOpts = { allowShortBlock: opts.allowShortBlock };
+
+  // 1) option-contracts (exact symbol)
+  try {
+    const url = buildUrl(`/api/stock/${encodeURIComponent(name)}/option-contracts`, { limit: 5 });
+    url.searchParams.append("option_symbol[]", symbol);
+    const rowOf = (p: { data?: Record<string, unknown>[] }) => (p.data ?? []).find((item) => asString(item.option_symbol).toUpperCase() === symbol);
+    const payload = await withRetry(() =>
+      uwRequest<{ data?: Record<string, unknown>[] }>(url, QUOTE_TTL_MS, false, {
+        ...reqOpts,
+        keep: (p) => isLiveQuote(rowOf(p) ? quoteFromContract(rowOf(p)!) : null),
+      }),
+    );
+    const row = rowOf(payload);
+    const quote = row ? quoteFromContract(row) : null;
+    if (isLiveQuote(quote)) {
+      steps.push(`option-contracts ok (${quote.quality})`);
+      return { quote, steps };
+    }
+    steps.push(row ? "option-contracts: row has no last/bid/ask" : `option-contracts: symbol not in ${payload.data?.length ?? 0} rows`);
+  } catch (error) {
+    steps.push(`option-contracts error: ${errText(error)}`);
+    if (error instanceof UwQuotaError) return { quote: quoteFromFlowPrint(flowPrint), steps };
+  }
+
+  // 2) historic daily bars (latest)
+  try {
+    const payload = await withRetry(() =>
+      uwRequest<{ chains?: Record<string, unknown>[] }>(
+        buildUrl(`/api/option-contract/${encodeURIComponent(symbol)}/historic`, { limit: 5 }),
+        HISTORIC_TTL_MS,
+        false,
+        { ...reqOpts, keep: (p) => (p.chains ?? []).length > 0 },
+      ),
+    );
+    const bars = (payload.chains ?? []).map(parseHistoricBar).sort((a, b) => a.date.localeCompare(b.date));
+    const latest = bars[bars.length - 1];
+    const quote = latest ? quoteFromHistoricBar(latest) : null;
+    if (isLiveQuote(quote)) {
+      steps.push(`historic ok (${latest!.date}, ${quote.quality})`);
+      return { quote, steps };
+    }
+    steps.push(latest ? `historic: ${latest.date} bar has no price` : "historic: no bars");
+  } catch (error) {
+    steps.push(`historic error: ${errText(error)}`);
+    if (error instanceof UwQuotaError) return { quote: quoteFromFlowPrint(flowPrint), steps };
+  }
+
+  // 3) last trade print on the contract
+  if (opts.lastTradeFallback) {
+    try {
+      const url = buildUrl("/api/option-trades", { limit: 1 });
+      url.searchParams.append("option_contracts[]", symbol);
+      const payload = await uwRequest<{ data?: Record<string, unknown>[] }>(url, 60_000, false, {
+        ...reqOpts,
+        keep: (p) => (p.data ?? []).length > 0,
+      });
+      const row = (payload.data ?? []).find((r) => asString(r.option_chain_id || r.option_symbol).toUpperCase() === symbol);
+      const price = row ? firstPositive(row.price) : null;
+      if (row && price != null) {
+        const bid = firstPositive(row.nbbo_bid);
+        const ask = firstPositive(row.nbbo_ask);
+        steps.push("option-trades last print ok");
+        return {
+          quote: { last: price, bid, ask, mid: bid != null && ask != null ? Math.round(((bid + ask) / 2) * 100) / 100 : null, asOf: asString(row.executed_at) || null, quality: "uw_last" },
+          steps,
+        };
+      }
+      steps.push("option-trades: no prints");
+    } catch (error) {
+      steps.push(`option-trades error: ${errText(error)}`);
+    }
+  }
+
+  return { quote: quoteFromFlowPrint(flowPrint), steps };
+}
+
 export async function fetchOptionQuote(
   ticker: string,
   optionSymbol: string,
   flowPrint?: number,
 ): Promise<WatchQuote | null> {
-  const symbol = optionSymbol.trim();
-  const name = ticker.trim().toUpperCase();
-  if (!symbol || !name) return quoteFromFlowPrint(flowPrint);
-  if (await isUwBlocked()) return quoteFromFlowPrint(flowPrint);
-
-  try {
-    const url = buildUrl(`/api/stock/${encodeURIComponent(name)}/option-contracts`, { limit: 5 });
-    url.searchParams.append("option_symbol[]", symbol);
-    const payload = await uwRequest<{ data?: Record<string, unknown>[] }>(url, QUOTE_TTL_MS);
-    const row =
-      (payload.data ?? []).find((item) => asString(item.option_symbol) === symbol) ?? payload.data?.[0];
-    if (row) {
-      const quote = quoteFromContract(row, flowPrint);
-      if (quote) return quote;
-    }
-  } catch (error) {
-    if (error instanceof UwQuotaError) return quoteFromFlowPrint(flowPrint);
-  }
-
-  if (await isUwBlocked()) return quoteFromFlowPrint(flowPrint);
-
-  try {
-    const bars = await fetchContractHistoric(symbol);
-    const latest = bars[bars.length - 1];
-    if (latest) {
-      const quote = quoteFromHistoricBar(latest, flowPrint);
-      if (quote) return quote;
-    }
-  } catch {
-    // Flow print is the last resort.
-  }
-
-  return quoteFromFlowPrint(flowPrint);
+  return (await fetchOptionQuoteTraced(ticker, optionSymbol, flowPrint)).quote;
 }
 
 /**
@@ -509,7 +657,9 @@ export async function fetchTickerOptionQuotes(
     const url = buildUrl(`/api/stock/${encodeURIComponent(name)}/option-contracts`, { limit: Math.min(500, Math.max(5, wanted.length * 2)) });
     for (const s of wanted) url.searchParams.append("option_symbol[]", s);
     calls += 1;
-    const payload = await uwRequest<{ data?: Record<string, unknown>[] }>(url, QUOTE_TTL_MS);
+    const payload = await uwRequest<{ data?: Record<string, unknown>[] }>(url, QUOTE_TTL_MS, false, {
+      keep: (p) => (p.data ?? []).some((row) => wanted.includes(asString(row.option_symbol))),
+    });
     for (const row of payload.data ?? []) {
       const sym = asString(row.option_symbol);
       if (!wanted.includes(sym) || quotes[sym]) continue;
@@ -558,11 +708,13 @@ export function parseHistoricBar(raw: Record<string, unknown>): HistoricBar {
 }
 
 function quoteFromHistoricBar(bar: HistoricBar, flowPrint?: number): WatchQuote | null {
+  const barMid = bar.nbboBid != null && bar.nbboAsk != null && bar.nbboAsk >= bar.nbboBid ? Math.round(((bar.nbboBid + bar.nbboAsk) / 2) * 100) / 100 : null;
   if (bar.last != null && bar.last > 0) {
     return {
       last: bar.last,
       bid: bar.nbboBid,
       ask: bar.nbboAsk,
+      mid: barMid,
       asOf: bar.lastTapeTime || bar.date || null,
       quality: "uw_last",
     };

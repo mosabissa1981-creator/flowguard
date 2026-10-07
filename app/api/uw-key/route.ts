@@ -51,7 +51,8 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  if (probe.status === 429) {
+  const probeBody = probe.status === 429 ? await probe.clone().text().catch(() => "") : "";
+  if (probe.status === 429 && !/concurrent request/i.test(probeBody)) {
     const { tripUwQuota } = await import("@/lib/uw-quota");
     await tripUwQuota("key-probe 429");
     await persistUnusualWhalesKey(key);
