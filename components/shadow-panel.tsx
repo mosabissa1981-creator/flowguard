@@ -40,7 +40,42 @@ const CELL: Record<ShadowVerdict["verdict"], string> = {
 };
 const GLYPH: Record<ShadowVerdict["verdict"], string> = { boost: "▲", flag: "▼", pass: "·", skip: "–" };
 
+type SideCols = {
+  gap: Record<string, { verdict: string; reasons?: string[] }>;
+  ft: Record<string, { byWindow: Record<string, string> }>;
+};
+
+/** Gap-chase + follow-through shadow columns (TEST only; fetched after the board loads). */
+function useSideCols(): SideCols {
+  const [cols, setCols] = useState<SideCols>({ gap: {}, ft: {} });
+  useEffect(() => {
+    let alive = true;
+    const load = async () => {
+      try {
+        const [g, f] = await Promise.all([
+          fetch("/api/shadow/gap-chase", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)),
+          fetch("/api/shadow/follow-through", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)),
+        ]);
+        if (alive) setCols({ gap: g?.rows ?? {}, ft: f?.rows ?? {} });
+      } catch {
+        // shadow only
+      }
+    };
+    const first = setTimeout(() => void load(), 6000);
+    const id = setInterval(() => void load(), 3 * 60_000);
+    return () => {
+      alive = false;
+      clearTimeout(first);
+      clearInterval(id);
+    };
+  }, []);
+  return cols;
+}
+
+const FT_GLYPH: Record<string, string> = { contract: "✓✓", ticker: "✓", none: "✗", pending: "…" };
+
 export function ShadowPanel() {
+  const side = useSideCols();
   const [data, setData] = useState<ShadowView | null>(null);
   const [brief, setBrief] = useState<BriefDoc | null>(null);
   const [reads, setReads] = useState<ReleaseReadDoc | null>(null);
@@ -127,6 +162,8 @@ export function ShadowPanel() {
                     {SHORT[m]}
                   </th>
                 ))}
+                <th className="px-1 text-center font-normal" title="Gap-up chase check (TEST)">Gap</th>
+                <th className="px-1 text-center font-normal" title="Follow-through within 30 min (TEST): ✓✓ same contract, ✓ ticker, ✗ none">FT</th>
               </tr>
             </thead>
             <tbody>
@@ -151,6 +188,12 @@ export function ShadowPanel() {
                         </td>
                       );
                     })}
+                    <td className="px-0.5 text-center">
+                      <GapCell g={side.gap[c.contract]} />
+                    </td>
+                    <td className="px-0.5 text-center">
+                      <FtCell st={side.ft[c.contract]?.byWindow?.["30m"]} />
+                    </td>
                   </tr>
                 );
               })}
@@ -163,5 +206,31 @@ export function ShadowPanel() {
       ) : null}
       <p className="mt-1 text-[10px] text-muted-foreground">▲ boost · ▼ flag · · pass · – skip. Hover a cell for the reason. Full JSON: /api/shadow</p>
     </section>
+  );
+}
+
+function GapCell({ g }: { g?: { verdict: string; reasons?: string[] } }) {
+  if (!g) return <span className="text-zinc-700"> </span>;
+  return (
+    <span
+      title={g.reasons?.join("; ") || g.verdict}
+      className={cn("inline-block min-w-6 cursor-help rounded px-1", g.verdict === "flag" ? "bg-orange-500/20 text-orange-200" : "text-zinc-500")}
+    >
+      {g.verdict === "flag" ? "⚑" : "ok"}
+    </span>
+  );
+}
+
+function FtCell({ st }: { st?: string }) {
+  return (
+    <span
+      title={st ? `follow-through 30m: ${st}` : "not tracked"}
+      className={cn(
+        "inline-block min-w-6 cursor-help rounded px-1",
+        st === "contract" || st === "ticker" ? "text-emerald-300" : st === "none" ? "text-zinc-400" : "text-zinc-700",
+      )}
+    >
+      {st ? (FT_GLYPH[st] ?? st) : " "}
+    </span>
   );
 }

@@ -458,3 +458,28 @@ export async function blobProbe(opts: { write?: boolean } = {}) {
   if (!read && !blobDownUntil) blobDownUntil = savedDown;
   return { read: read ? (read.found ? "ok (found)" : "ok (404)") : `error: ${lastBlobError}`, write };
 }
+
+/** Hash counters (UW usage meter). Memory-only when Redis is not configured. */
+const memHash = new Map<string, Record<string, number>>();
+export async function kvHincrMany(key: string, deltas: Record<string, number>, ttlSec: number): Promise<boolean> {
+  const entries = Object.entries(deltas).filter(([, n]) => n);
+  if (entries.length === 0) return true;
+  if (kvBackend() !== "redis") {
+    const h = memHash.get(key) ?? {};
+    for (const [f, n] of entries) h[f] = (h[f] ?? 0) + n;
+    memHash.set(key, h);
+    return true;
+  }
+  const cmds: (string | number)[][] = entries.map(([f, n]) => ["HINCRBY", key, f, n]);
+  cmds.push(["EXPIRE", key, ttlSec]);
+  return (await redis(cmds)) != null;
+}
+
+export async function kvHgetAll(key: string): Promise<Record<string, number>> {
+  if (kvBackend() !== "redis") return { ...(memHash.get(key) ?? {}) };
+  const out = await redis([["HGETALL", key]]);
+  const arr = (out?.[0] as string[] | null) ?? [];
+  const res: Record<string, number> = {};
+  for (let i = 0; i + 1 < arr.length; i += 2) res[arr[i]] = Number(arr[i + 1]) || 0;
+  return res;
+}

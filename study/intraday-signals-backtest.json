@@ -1,0 +1,225 @@
+{
+ "generated": "2026-10-07T04:59:58.472258Z",
+ "candidates": 14942,
+ "follow_through": {
+  "15min": {
+   "contract": {
+    "n": 3089,
+    "W": 1092,
+    "L": 1710,
+    "F": 287,
+    "win_pct": 39.0,
+    "loser_pct_of_all": 55.4
+   },
+   "ticker": {
+    "n": 8323,
+    "W": 3067,
+    "L": 4631,
+    "F": 625,
+    "win_pct": 39.8,
+    "loser_pct_of_all": 55.6
+   },
+   "either": {
+    "n": 9749,
+    "W": 3551,
+    "L": 5410,
+    "F": 788,
+    "win_pct": 39.6,
+    "loser_pct_of_all": 55.5
+   },
+   "none": {
+    "n": 5193,
+    "W": 1814,
+    "L": 2811,
+    "F": 568,
+    "win_pct": 39.2,
+    "loser_pct_of_all": 54.1
+   }
+  },
+  "30min": {
+   "contract": {
+    "n": 3585,
+    "W": 1290,
+    "L": 1975,
+    "F": 320,
+    "win_pct": 39.5,
+    "loser_pct_of_all": 55.1
+   },
+   "ticker": {
+    "n": 9995,
+    "W": 3664,
+    "L": 5555,
+    "F": 776,
+    "win_pct": 39.7,
+    "loser_pct_of_all": 55.6
+   },
+   "either": {
+    "n": 11283,
+    "W": 4109,
+    "L": 6249,
+    "F": 925,
+    "win_pct": 39.7,
+    "loser_pct_of_all": 55.4
+   },
+   "none": {
+    "n": 3659,
+    "W": 1256,
+    "L": 1972,
+    "F": 431,
+    "win_pct": 38.9,
+    "loser_pct_of_all": 53.9
+   }
+  },
+  "60min": {
+   "contract": {
+    "n": 4129,
+    "W": 1489,
+    "L": 2278,
+    "F": 362,
+    "win_pct": 39.5,
+    "loser_pct_of_all": 55.2
+   },
+   "ticker": {
+    "n": 11465,
+    "W": 4209,
+    "L": 6341,
+    "F": 915,
+    "win_pct": 39.9,
+    "loser_pct_of_all": 55.3
+   },
+   "either": {
+    "n": 12584,
+    "W": 4576,
+    "L": 6951,
+    "F": 1057,
+    "win_pct": 39.7,
+    "loser_pct_of_all": 55.2
+   },
+   "none": {
+    "n": 2358,
+    "W": 789,
+    "L": 1270,
+    "F": 299,
+    "win_pct": 38.3,
+    "loser_pct_of_all": 53.9
+   }
+  }
+ },
+ "baseline": {
+  "n": 14942,
+  "W": 5365,
+  "L": 8221,
+  "F": 1356,
+  "win_pct": 39.5,
+  "loser_pct_of_all": 55.0
+ },
+ "fade_warning": {
+  "warned": {
+   "n": 453,
+   "W": 139,
+   "L": 291,
+   "F": 23,
+   "win_pct": 32.3,
+   "loser_pct_of_all": 64.2
+  },
+  "not_warned": {
+   "n": 14489,
+   "W": 5226,
+   "L": 7930,
+   "F": 1333,
+   "win_pct": 39.7,
+   "loser_pct_of_all": 54.7
+  },
+  "share_of_losers_warned_pct": 3.5,
+  "share_of_winners_warned_pct": 2.6,
+  "median_mins_after_print": 187,
+  "by_signal_combo": {
+   "bid-takeover+prem-10+tide-flip": {
+    "n": 27,
+    "W": 4,
+    "L": 21,
+    "F": 2,
+    "win_pct": 16.0,
+    "loser_pct_of_all": 77.8
+   },
+   "prem-10+tide-flip": {
+    "n": 171,
+    "W": 39,
+    "L": 126,
+    "F": 6,
+    "win_pct": 23.6,
+    "loser_pct_of_all": 73.7
+   },
+   "bid-takeover+tide-flip": {
+    "n": 199,
+    "W": 83,
+    "L": 104,
+    "F": 12,
+    "win_pct": 44.4,
+    "loser_pct_of_all": 52.3
+   },
+   "bid-takeover+prem-10": {
+    "n": 56,
+    "W": 13,
+    "L": 40,
+    "F": 3,
+    "win_pct": 24.5,
+    "loser_pct_of_all": 71.4
+   }
+  },
+  "call": {
+   "warned": {
+    "n": 236,
+    "W": 71,
+    "L": 154,
+    "F": 11,
+    "win_pct": 31.6,
+    "loser_pct_of_all": 65.3
+   },
+   "not_warned": {
+    "n": 8152,
+    "W": 3068,
+    "L": 4382,
+    "F": 702,
+    "win_pct": 41.2,
+    "loser_pct_of_all": 53.8
+   }
+  },
+  "put": {
+   "warned": {
+    "n": 217,
+    "W": 68,
+    "L": 137,
+    "F": 12,
+    "win_pct": 33.2,
+    "loser_pct_of_all": 63.1
+   },
+   "not_warned": {
+    "n": 6337,
+    "W": 2158,
+    "L": 3548,
+    "F": 631,
+    "win_pct": 37.8,
+    "loser_pct_of_all": 56.0
+   }
+  },
+  "shown_only": {
+   "warned": {
+    "n": 37,
+    "W": 9,
+    "L": 24,
+    "F": 4,
+    "win_pct": 27.3,
+    "loser_pct_of_all": 64.9
+   },
+   "not_warned": {
+    "n": 1430,
+    "W": 502,
+    "L": 802,
+    "F": 126,
+    "win_pct": 38.5,
+    "loser_pct_of_all": 56.1
+   }
+  }
+ }
+}

@@ -236,3 +236,20 @@ hard daily cap `SHADOW_LLM_DAILY_USD` (default $1, provider-reported cost). Env:
 
 `POST /api/notify` and `POST /api/notify/test` require `NOTIFY_SECRET` (header `x-flowguard-key` or `?key=`);
 `GET /api/notify` (health) stays public. Fails closed when the env var is missing.
+
+## Intraday shadow monitors (TEST / SHADOW only)
+
+Logged only — never change live picks, the AI review or paper fills.
+
+| Endpoint | What it logs | UW calls/day (est.) |
+|---|---|---|
+| `/api/shadow/fade-watch?day=YYYY-MM-DD` | Early fade warnings on open paper positions (bid-side takeover, −10% from entry, ticker tide flip) | ~3,000 |
+| `/api/shadow/follow-through?day=YYYY-MM-DD` | 2nd ask-side print on the contract / ticker within 15/30/60 min (session tape) | 0 |
+| `/api/shadow/chain-scan?day=YYYY-MM-DD` | Whole-chain "ask building" hits, top 30 tickers, every ~20 min, self-scored | ~600 |
+| `/api/uw-usage?day=YYYY-MM-DD` | UW calls by job + whole-token count (UW day resets 8 PM ET) | 0 |
+| `/api/shadow/tick` | Runs the jobs (≤ 1 per 170 s) | — |
+
+Scheduling: 88 daily Vercel crons on `/api/shadow/tick` spread over 13:00–20:59 UTC Mon–Fri (Hobby = once/day each, ±59 min),
+plus the gap-chase poll from open browsers, plus the optional box loop `scripts/study/shadow-ticker.sh`.
+New jobs stop when UW's daily count reaches `UW_JOBS_STOP_AT` (default 35,000), leaving ~2,500 of the 37,500 ceiling for the live site.
+Backtest: `scripts/study/intraday-signals-backtest.py` → `study/intraday-signals-backtest.json`.

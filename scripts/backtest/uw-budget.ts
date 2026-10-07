@@ -1,7 +1,7 @@
 /**
  * Budgeted Unusual Whales client for the box-side history jobs.
  * Every request reads `x-uw-daily-req-count` (the token's count for the UW day, which resets 8 pm ET and
- * includes the live site) and refuses to call once it reaches UW_STOP_AT (default 37,500), keeping ≥ 1,500
+ * includes the live site) and refuses to call once it reaches UW_STOP_AT (default 35,000), keeping ~2,500 for the live site under the 37,500 ceiling; ≥ 1,500
  * in reserve for the live site under the 39,000/day hard ceiling (never exceeded even if
  * UW_STOP_AT is set higher).
  */
@@ -14,7 +14,7 @@ export class BudgetStop extends Error {
 
 const BASE = "https://api.unusualwhales.com";
 const HARD_CAP = 39_000;
-export const STOP_AT = Math.min(Number(process.env.UW_STOP_AT || 37_500), HARD_CAP - 1_500);
+export const STOP_AT = Math.min(Number(process.env.UW_STOP_AT || 35_000), HARD_CAP - 1_500);
 const RUN_MAX = Number(process.env.UW_RUN_MAX || 1e9);
 
 export const budget = { tokenCountToday: 0, runCalls: 0, errors: 0, stopped: "" as string };
