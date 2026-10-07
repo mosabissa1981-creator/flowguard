@@ -39,7 +39,13 @@ async function sendPushover(title: string, body: string): Promise<NotifyChannelR
   }
 }
 
+/** Telegram is OFF unless TELEGRAM_ENABLED === "1" (Mosab asked to stop all FlowGuard Telegram messages, Oct 7 2026). */
+export function telegramEnabled(): boolean {
+  return process.env.TELEGRAM_ENABLED?.trim() === "1";
+}
+
 async function sendTelegram(title: string, body: string): Promise<NotifyChannelResult> {
+  if (!telegramEnabled()) return skipped("Telegram disabled");
   const token = process.env.TELEGRAM_BOT_TOKEN?.trim();
   const chatId = process.env.TELEGRAM_CHAT_ID?.trim();
   if (!token || !chatId) return skipped("Telegram env not set");
@@ -75,9 +81,11 @@ export async function notifyChannels(title: string, body: string): Promise<Notif
   return { pushover, telegram };
 }
 
-export function notifyConfigured(): { pushover: boolean; telegram: boolean } {
+export function notifyConfigured(): { pushover: boolean; telegram: boolean; telegramDisabled: boolean } {
   return {
     pushover: Boolean(process.env.PUSHOVER_APP_TOKEN?.trim() && process.env.PUSHOVER_USER_KEY?.trim()),
-    telegram: Boolean(process.env.TELEGRAM_BOT_TOKEN?.trim() && process.env.TELEGRAM_CHAT_ID?.trim()),
+    // Reported false while the off switch is set, even if the bot env vars exist.
+    telegram: telegramEnabled() && Boolean(process.env.TELEGRAM_BOT_TOKEN?.trim() && process.env.TELEGRAM_CHAT_ID?.trim()),
+    telegramDisabled: !telegramEnabled(),
   };
 }
