@@ -848,6 +848,10 @@ export type StockState = {
   last: number | null;
   prevClose: number | null;
   pctFromClose: number | null;
+  /** Session open (UW `open`; regular-session open while market_time is regular). */
+  open?: number | null;
+  /** UW `market_time` (e.g. premarket / regular / postmarket). */
+  marketTime?: string | null;
 };
 
 export async function fetchStockStates(tickers: string[], limit = 6): Promise<Record<string, StockState>> {
@@ -876,7 +880,7 @@ export async function fetchStockStates(tickers: string[], limit = 6): Promise<Re
       const prevClose = firstPositive(row.prev_close, row.prev_close_price);
       const pctFromClose =
         last != null && prevClose != null && prevClose > 0 ? (last - prevClose) / prevClose : null;
-      out[ticker] = { ticker, last, prevClose, pctFromClose };
+      out[ticker] = { ticker, last, prevClose, pctFromClose, open: firstPositive(row.open), marketTime: asString(row.market_time) || null };
     } catch {
       out[ticker] = { ticker, last: null, prevClose: null, pctFromClose: null };
     }
