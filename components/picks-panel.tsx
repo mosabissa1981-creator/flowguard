@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ConvictionMeter } from "@/components/conviction-meter";
+import { GapChaseBadge } from "@/components/gap-chase";
 import { HoldWindowCopy } from "@/components/hold-window-copy";
 import { PickWatchControls } from "@/components/pick-watch-controls";
 import { cn } from "@/lib/utils";
@@ -104,6 +105,7 @@ export function PicksPanel({
                         {formatStrike(pick.alert.strike)} {formatExpiry(pick.alert.expiry)} ·{" "}
                         {formatDte(pick.dte)}
                       </span>
+                      <GapChaseBadge contract={pick.alert.option_chain} />
                     </div>
                     <div className="mt-1 font-mono text-xs text-amber-200">
                       {formatPremium(pick.alert.total_premium)} premium

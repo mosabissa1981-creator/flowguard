@@ -159,6 +159,25 @@ Next.js App Router, TypeScript, Tailwind CSS, shadcn/ui.
 - Yields: official Treasury daily par-curve CSV first (prior close + 5-session trend, bear-steepening flag);
   Yahoo only supplies the intraday last before Treasury posts the day's close.
 
+## Gap-up chase checker (TEST / shadow)
+
+`GET /api/shadow/gap-chase` · card "Gap-up chase check" under Shadow signals, plus an orange dashed
+`test · gap-up chase` badge on flagged Picks / Premove / Morning / AI picks. **Flags only — never filters,
+re-ranks or changes live picks, the AI review or paper fills.**
+
+- Gap-up day = SPY or QQQ regular open ≥ +0.3% vs prior close (frozen at the first market-hours check).
+- On a gap-up day a call printed 9:30–11:00 ET needs a 2nd ask-side print on the same contract (session tape)
+  or a ≥0.3% pullback before it counts; a call whose stock was already ≥ +2% at the print gets a shadow penalty
+  (−6; −10 at ≥ +3%).
+- Verdicts + change log are stored per day (`flowguard/shadow/gap-chase-<day>.json`, 45 days);
+  `GET /api/shadow/gap-chase?day=YYYY-MM-DD` returns a past day. Score against the study book with
+  `python3 scripts/study/gap-chase-score.py YYYY-MM-DD` (writes `study/gap-chase-<day>.json` + `study/gap-chase-scores.json`).
+- Backtest (`scripts/study/gap-chase-backtest.py`, results `study/gap-chase-backtest.json`): 2-year replay,
+  1,802 gap-up-morning call candidates — flagged 40.4% win (495W/729L/111F) vs kept 46.5% (198W/228L/41F),
+  baseline 42.0%. It cuts ~76% of losers but ~71% of winners, so it stays a flag. Oct 6 2026: all 11 morning
+  calls on the book would have been flagged (5 losers, 6 flat, 0 winners).
+- UW: SPY/QQQ + pick tickers `stock-state` (12-min cache), recomputed at most every 3 min in market hours.
+
 ## Paper account (test mode — fake money)
 
 `GET /api/paper` · card "Paper account" under AI picks. **Paper / test mode, not real money, not financial advice.**

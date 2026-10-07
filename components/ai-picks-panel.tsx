@@ -5,6 +5,7 @@ import { Bot, RefreshCw } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { GapChaseBadge } from "@/components/gap-chase";
 import { cn } from "@/lib/utils";
 import type { AiPicksResponse } from "@/lib/types";
 import { formatDte, formatExpiry, formatStrike } from "@/lib/format";
@@ -123,6 +124,9 @@ export function AiPicksPanel({
                   {pick.alert.ticker} {formatStrike(pick.alert.strike)}
                   {pick.alert.type === "call" ? "C" : "P"} {formatExpiry(pick.alert.expiry)}
                   <span className="ml-2 text-xs font-normal text-muted-foreground">{formatDte(pick.dte)}</span>
+                  <span className="ml-2 inline-block align-middle">
+                    <GapChaseBadge contract={pick.alert.option_chain} />
+                  </span>
                 </div>
                 <Badge
                   className={cn(

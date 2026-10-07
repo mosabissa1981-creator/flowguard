@@ -13,6 +13,7 @@ import { RegimeBanner } from "@/components/regime-banner";
 import { MorningPanel } from "@/components/morning-panel";
 import { AiPicksPanel } from "@/components/ai-picks-panel";
 import { ShadowPanel } from "@/components/shadow-panel";
+import { GapChasePanel, GapChaseProvider } from "@/components/gap-chase";
 import { PaperPanel } from "@/components/paper-panel";
 import { PanelBoundary } from "@/components/panel-boundary";
 import { PremoveAiPanel } from "@/components/premove-ai-panel";
@@ -530,6 +531,7 @@ export function Screener({
   }
 
   return (
+    <GapChaseProvider>
     <div className="mx-auto flex w-full max-w-[1400px] flex-1 flex-col gap-4 px-4 py-4 sm:px-6">
       <header className="flex flex-col gap-4 rounded-xl border border-border/80 bg-card/80 p-4">
         <div className="flex flex-wrap items-start justify-between gap-4">
@@ -638,6 +640,10 @@ export function Screener({
 
       <PanelBoundary name="Shadow signals">
         <ShadowPanel />
+      </PanelBoundary>
+
+      <PanelBoundary name="Gap-up chase (test)">
+        <GapChasePanel />
       </PanelBoundary>
 
       <MorningPanel
@@ -836,5 +842,6 @@ export function Screener({
         onSavePriceWatch={savePriceWatch}
       />
     </div>
+    </GapChaseProvider>
   );
 }
