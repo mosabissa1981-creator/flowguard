@@ -17,7 +17,8 @@ const HARD_CAP = 39_000;
 export const STOP_AT = Math.min(Number(process.env.UW_STOP_AT || 35_000), HARD_CAP - 1_500);
 const RUN_MAX = Number(process.env.UW_RUN_MAX || 1e9);
 
-export const budget = { tokenCountToday: 0, runCalls: 0, errors: 0, stopped: "" as string };
+/** UW_SEED_COUNT: start from the site count (tokenCount at /api/uw-usage) when UW omits the daily header. */
+export const budget = { tokenCountToday: Number(process.env.UW_SEED_COUNT) || 0, runCalls: 0, errors: 0, stopped: "" as string };
 
 const realFetch: typeof fetch = globalThis.fetch.bind(globalThis);
 export function rawFetch(input: RequestInfo | URL, init?: RequestInit) {
@@ -63,7 +64,9 @@ export async function uwJson<T = unknown>(pathAndQuery: string): Promise<T> {
       continue;
     }
     const c = Number(res.headers.get("x-uw-daily-req-count"));
+    // UW stopped sending the daily-count header (Oct 7 2026): count locally so the stop still works.
     if (Number.isFinite(c) && c > 0) budget.tokenCountToday = c;
+    else budget.tokenCountToday += 1;
     if (res.ok) return (await res.json()) as T;
     const body = (await res.text()).slice(0, 300);
     budget.errors += 1;
