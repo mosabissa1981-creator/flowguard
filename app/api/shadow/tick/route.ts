@@ -1,7 +1,7 @@
 import { runShadowTick } from "@/lib/shadow/tick";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 120;
+export const maxDuration = 300;
 
 /** Drives the TEST / SHADOW intraday jobs (fade-watch, follow-through, chain scan). Self-throttled; safe to hit often. */
 export async function GET() {
