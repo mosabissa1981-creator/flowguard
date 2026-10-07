@@ -14,6 +14,7 @@ import { MorningPanel } from "@/components/morning-panel";
 import { AiPicksPanel } from "@/components/ai-picks-panel";
 import { ShadowPanel } from "@/components/shadow-panel";
 import { GapChasePanel, GapChaseProvider } from "@/components/gap-chase";
+import { IntradayShadowPanel } from "@/components/intraday-shadow";
 import { PaperPanel } from "@/components/paper-panel";
 import { PanelBoundary } from "@/components/panel-boundary";
 import { PremoveAiPanel } from "@/components/premove-ai-panel";
@@ -644,6 +645,7 @@ export function Screener({
 
       <PanelBoundary name="Gap-up chase (test)">
         <GapChasePanel />
+        <IntradayShadowPanel />
       </PanelBoundary>
 
       <MorningPanel

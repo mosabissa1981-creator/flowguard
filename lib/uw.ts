@@ -4,6 +4,7 @@ import type { FlowAlert, NetPremTick, TideSnapshot, WatchQuote } from "@/lib/typ
 import type { HistoricBar } from "@/lib/follow-through";
 import { tideFromPremiums, toBool, toNumber } from "@/lib/numbers";
 import { loadStoredUwKey, saveStoredUwKey } from "@/lib/uw-key-store";
+import { UwBudgetError, currentUwJob, recordUwCall, uwJobBudgetOk } from "@/lib/uw-usage";
 import {
   CHAIN_TTL_MS,
   FLOW_TTL_MS,
@@ -150,6 +151,10 @@ async function uwRequest<T>(url: URL, ttlMs = 0, bust = false, opts: UwRequestOp
       if (!key) {
         throw new Error("UNUSUAL_WHALES_API_KEY is not set");
       }
+      // Shadow/test jobs back off near the daily ceiling (the live site keeps its reserve).
+      if (currentUwJob() !== "site" && !(await uwJobBudgetOk())) {
+        throw new UwBudgetError(`UW job budget reached (${currentUwJob()}); jobs pause until the 8 PM ET reset.`);
+      }
       for (let attempt = 0; ; attempt += 1) {
         await acquireUwSlot();
         let response: Response;
@@ -172,6 +177,7 @@ async function uwRequest<T>(url: URL, ttlMs = 0, bust = false, opts: UwRequestOp
         } finally {
           releaseUwSlot();
         }
+        recordUwCall(Number(response.headers.get("x-uw-daily-req-count")) || null);
         if (response.ok) return json as T;
         if (isConcurrencyHttp(response.status, body)) {
           if (attempt < UW_CONCURRENCY_RETRIES) {
@@ -431,6 +437,24 @@ function tradeAsAlert(raw: Record<string, unknown>, chain: string): FlowAlert {
   };
 }
 
+/** Raw option trades on one contract since `newerThanSec` (UW tags include bid_side/ask_side/sweep). Throws on UW errors. */
+export async function fetchContractTradesRaw(optionChain: string, newerThanSec: number, ttlMs = 150_000, limit = 200): Promise<Record<string, unknown>[]> {
+  const url = buildUrl("/api/option-trades", { limit, newer_than: Math.floor(newerThanSec) });
+  url.searchParams.append("option_contracts[]", optionChain.trim());
+  const payload = await uwRequest<{ data?: Record<string, unknown>[] }>(url, ttlMs);
+  return payload.data ?? [];
+}
+
+/** Whole-chain snapshot (strike-level volume/OI/ask-bid volume), top 500 non-zero-volume contracts. Throws on UW errors. */
+export async function fetchChainSnapshot(ticker: string, ttlMs = 600_000): Promise<Record<string, unknown>[]> {
+  const url = buildUrl(`/api/stock/${encodeURIComponent(ticker.trim().toUpperCase())}/option-contracts`, {
+    limit: 500,
+    exclude_zero_vol_chains: true,
+  });
+  const payload = await uwRequest<{ data?: Record<string, unknown>[] }>(url, ttlMs);
+  return payload.data ?? [];
+}
+
 /** Best-effort later prints on one chain. Failures return []. Option-trades lookback is short. */
 export async function fetchChainTrades(optionChain: string, newerThanIso: string): Promise<FlowAlert[]> {
   const chain = optionChain.trim();
@@ -643,6 +667,7 @@ export async function fetchTickerOptionQuotes(
   ticker: string,
   symbols: string[],
   flowPrints: Record<string, number | undefined> = {},
+  opts: { ttlMs?: number } = {},
 ): Promise<{ quotes: Record<string, WatchQuote | null>; calls: number }> {
   const name = ticker.trim().toUpperCase();
   const wanted = [...new Set(symbols.map((s) => s.trim()).filter(Boolean))].sort();
@@ -657,7 +682,7 @@ export async function fetchTickerOptionQuotes(
     const url = buildUrl(`/api/stock/${encodeURIComponent(name)}/option-contracts`, { limit: Math.min(500, Math.max(5, wanted.length * 2)) });
     for (const s of wanted) url.searchParams.append("option_symbol[]", s);
     calls += 1;
-    const payload = await uwRequest<{ data?: Record<string, unknown>[] }>(url, QUOTE_TTL_MS, false, {
+    const payload = await uwRequest<{ data?: Record<string, unknown>[] }>(url, opts.ttlMs ?? QUOTE_TTL_MS, false, {
       keep: (p) => (p.data ?? []).some((row) => wanted.includes(asString(row.option_symbol))),
     });
     for (const row of payload.data ?? []) {

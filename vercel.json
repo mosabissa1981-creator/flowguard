@@ -13,6 +13,358 @@
     {
       "path": "/api/paper?tick=1&slot=est",
       "schedule": "40 20 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/tick?c=1300",
+      "schedule": "0 13 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/tick?c=1305",
+      "schedule": "5 13 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/tick?c=1311",
+      "schedule": "11 13 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/tick?c=1316",
+      "schedule": "16 13 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/tick?c=1322",
+      "schedule": "22 13 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/tick?c=1327",
+      "schedule": "27 13 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/tick?c=1333",
+      "schedule": "33 13 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/tick?c=1338",
+      "schedule": "38 13 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/tick?c=1344",
+      "schedule": "44 13 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/tick?c=1349",
+      "schedule": "49 13 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/tick?c=1355",
+      "schedule": "55 13 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/tick?c=1400",
+      "schedule": "0 14 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/tick?c=1405",
+      "schedule": "5 14 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/tick?c=1411",
+      "schedule": "11 14 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/tick?c=1416",
+      "schedule": "16 14 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/tick?c=1422",
+      "schedule": "22 14 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/tick?c=1427",
+      "schedule": "27 14 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/tick?c=1433",
+      "schedule": "33 14 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/tick?c=1438",
+      "schedule": "38 14 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/tick?c=1444",
+      "schedule": "44 14 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/tick?c=1449",
+      "schedule": "49 14 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/tick?c=1455",
+      "schedule": "55 14 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/tick?c=1500",
+      "schedule": "0 15 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/tick?c=1505",
+      "schedule": "5 15 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/tick?c=1511",
+      "schedule": "11 15 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/tick?c=1516",
+      "schedule": "16 15 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/tick?c=1522",
+      "schedule": "22 15 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/tick?c=1527",
+      "schedule": "27 15 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/tick?c=1533",
+      "schedule": "33 15 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/tick?c=1538",
+      "schedule": "38 15 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/tick?c=1544",
+      "schedule": "44 15 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/tick?c=1549",
+      "schedule": "49 15 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/tick?c=1555",
+      "schedule": "55 15 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/tick?c=1600",
+      "schedule": "0 16 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/tick?c=1605",
+      "schedule": "5 16 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/tick?c=1611",
+      "schedule": "11 16 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/tick?c=1616",
+      "schedule": "16 16 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/tick?c=1622",
+      "schedule": "22 16 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/tick?c=1627",
+      "schedule": "27 16 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/tick?c=1633",
+      "schedule": "33 16 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/tick?c=1638",
+      "schedule": "38 16 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/tick?c=1644",
+      "schedule": "44 16 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/tick?c=1649",
+      "schedule": "49 16 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/tick?c=1655",
+      "schedule": "55 16 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/tick?c=1700",
+      "schedule": "0 17 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/tick?c=1705",
+      "schedule": "5 17 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/tick?c=1711",
+      "schedule": "11 17 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/tick?c=1716",
+      "schedule": "16 17 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/tick?c=1722",
+      "schedule": "22 17 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/tick?c=1727",
+      "schedule": "27 17 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/tick?c=1733",
+      "schedule": "33 17 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/tick?c=1738",
+      "schedule": "38 17 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/tick?c=1744",
+      "schedule": "44 17 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/tick?c=1749",
+      "schedule": "49 17 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/tick?c=1755",
+      "schedule": "55 17 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/tick?c=1800",
+      "schedule": "0 18 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/tick?c=1805",
+      "schedule": "5 18 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/tick?c=1811",
+      "schedule": "11 18 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/tick?c=1816",
+      "schedule": "16 18 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/tick?c=1822",
+      "schedule": "22 18 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/tick?c=1827",
+      "schedule": "27 18 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/tick?c=1833",
+      "schedule": "33 18 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/tick?c=1838",
+      "schedule": "38 18 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/tick?c=1844",
+      "schedule": "44 18 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/tick?c=1849",
+      "schedule": "49 18 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/tick?c=1855",
+      "schedule": "55 18 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/tick?c=1900",
+      "schedule": "0 19 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/tick?c=1905",
+      "schedule": "5 19 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/tick?c=1911",
+      "schedule": "11 19 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/tick?c=1916",
+      "schedule": "16 19 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/tick?c=1922",
+      "schedule": "22 19 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/tick?c=1927",
+      "schedule": "27 19 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/tick?c=1933",
+      "schedule": "33 19 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/tick?c=1938",
+      "schedule": "38 19 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/tick?c=1944",
+      "schedule": "44 19 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/tick?c=1949",
+      "schedule": "49 19 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/tick?c=1955",
+      "schedule": "55 19 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/tick?c=2000",
+      "schedule": "0 20 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/tick?c=2005",
+      "schedule": "5 20 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/tick?c=2011",
+      "schedule": "11 20 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/tick?c=2016",
+      "schedule": "16 20 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/tick?c=2022",
+      "schedule": "22 20 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/tick?c=2027",
+      "schedule": "27 20 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/tick?c=2033",
+      "schedule": "33 20 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/tick?c=2038",
+      "schedule": "38 20 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/tick?c=2044",
+      "schedule": "44 20 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/tick?c=2049",
+      "schedule": "49 20 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/tick?c=2055",
+      "schedule": "55 20 * * 1-5"
     }
   ]
 }
