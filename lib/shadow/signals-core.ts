@@ -39,6 +39,16 @@ export type GexSignal = {
   /** TEST: "below" / "above" = spot vs the flip level (null when no crossing). Logged for scoring only. */
   spotVsFlip?: "below" | "above" | null;
   netNegative?: boolean;
+  /** TEST (walls study): % distance spot → call wall (above) / put wall (below), and wall size / total gross |GEX|. */
+  callWallPct?: number | null;
+  putWallPct?: number | null;
+  callWallShare?: number | null;
+  putWallShare?: number | null;
+  /** TEST: biggest negative net-GEX strike within ±25% (the "big red bar") and its signed % from spot. */
+  negWall?: number | null;
+  negWallPct?: number | null;
+  /** TEST: % from spot to the trade's own-side wall (calls: call wall, puts: put wall); same as roomPct, kept explicit. */
+  ownWallPct?: number | null;
 };
 
 /** Gamma flip level: cumulative net (call+put) GEX from the lowest strike up; zero crossing nearest spot (±25% preferred). */
@@ -103,8 +113,12 @@ export function gexSignal(rows: GexStrike[], spot: number, side: "call" | "put",
   let callMax = 0;
   let putWall: number | null = null;
   let putMax = 0;
+  let negWall: number | null = null;
+  let negMin = 0;
+  let gross = 0;
   for (const r of rows) {
     net += r.callGex + r.putGex;
+    gross += Math.abs(r.callGex) + Math.abs(r.putGex);
     // Only strikes within ±25% of spot define walls.
     if (Math.abs(r.strike - spot) / spot > 0.25) continue;
     if (r.strike >= spot && r.callGex > callMax) {
@@ -115,7 +129,15 @@ export function gexSignal(rows: GexStrike[], spot: number, side: "call" | "put",
       putMax = Math.abs(r.putGex);
       putWall = r.strike;
     }
+    if (r.callGex + r.putGex < negMin) {
+      negMin = r.callGex + r.putGex;
+      negWall = r.strike;
+    }
   }
+  const pct1 = (x: number) => Math.round(x * 1000) / 10;
+  const callWallPct = callWall != null ? pct1(callWall / spot - 1) : null;
+  const putWallPct = putWall != null ? pct1(1 - putWall / spot) : null;
+  const share = (x: number) => (gross > 0 ? Math.round((x / gross) * 1000) / 1000 : null);
   const scale = rows.reduce((m, r) => Math.max(m, Math.abs(r.callGex), Math.abs(r.putGex)), 0) || 1;
   const regime: GexSignal["regime"] = Math.abs(net) < scale * 0.05 ? "flat" : net < 0 ? "negative" : "positive";
   const wall = side === "call" ? callWall : putWall;
@@ -126,7 +148,25 @@ export function gexSignal(rows: GexStrike[], spot: number, side: "call" | "put",
   else if (regime === "positive" && (strikeBeyondWall || (roomPct != null && roomPct < 1))) verdict = "conflict";
   const flipLevel = gammaFlipLevel(rows, spot);
   const spotVsFlip = flipLevel == null ? null : spot < flipLevel ? "below" : "above";
-  return { netGex: Math.round(net), regime, callWall, putWall, roomPct, strikeBeyondWall, verdict, flipLevel, spotVsFlip, netNegative: net < 0 };
+  return {
+    netGex: Math.round(net),
+    regime,
+    callWall,
+    putWall,
+    roomPct,
+    strikeBeyondWall,
+    verdict,
+    flipLevel,
+    spotVsFlip,
+    netNegative: net < 0,
+    callWallPct,
+    putWallPct,
+    callWallShare: callWall != null ? share(callMax) : null,
+    putWallShare: putWall != null ? share(putMax) : null,
+    negWall,
+    negWallPct: negWall != null ? pct1(negWall / spot - 1) : null,
+    ownWallPct: side === "call" ? callWallPct : putWallPct,
+  };
 }
 
 /**
