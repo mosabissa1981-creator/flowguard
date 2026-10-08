@@ -1,4 +1,5 @@
 import { SINGLE_STOCK_PUT_REASON, blockedByPutsRule } from "@/lib/puts-rule";
+import { RISK_OFF_PUT_REASON, blockedByRiskOffPuts, type RiskOffSnapshot } from "@/lib/risk-off";
 
 /**
  * LIVE spread gate (approved by Mosab 10/8/2026): live candidates whose option bid-ask spread is over
@@ -31,7 +32,7 @@ export type SpreadSkip = {
   ticker: string;
   reason: string;
   /** Which live rule skipped it (missing on older rows = spread). */
-  rule?: "spread" | "puts";
+  rule?: "spread" | "puts" | "risk-off";
   spread: SpreadInfo;
   /** List the name was evaluated for (picks, premove, morning, lane id, paper book…). */
   list?: string;
@@ -120,12 +121,18 @@ export function splitBySpread<T>(
  * Both LIVE rules in one pass (order preserved): single-stock puts → skipped ("ETF/index puts only",
  * see lib/puts-rule.ts), then wide spread → skipped; ok / unknown → kept (annotated with `spread`).
  */
+/**
+ * LIVE rules in one pass (order preserved): single-stock puts → skipped; PRIMARY risk-off ETF/index puts →
+ * skipped; wide spread → skipped; ok / unknown → kept (annotated with `spread`).
+ * Pass `riskOff` from loadRiskOff(); when null/unknown, the risk-off rule does not block.
+ */
 export function splitByLiveRules<T>(
   rows: T[],
   spreadOf: (row: T) => SpreadInfo,
   keyOf: (row: T) => { option_chain: string; ticker: string },
   putOf: (row: T) => { side: string | null | undefined; ticker: string | null | undefined; issueType?: string | null },
   list?: string,
+  riskOff?: Pick<RiskOffSnapshot, "blockEtfPuts"> | null,
 ): { kept: Array<T & { spread: SpreadInfo }>; skipped: SpreadSkip[] } {
   const kept: Array<T & { spread: SpreadInfo }> = [];
   const skipped: SpreadSkip[] = [];
@@ -133,6 +140,10 @@ export function splitByLiveRules<T>(
     const p = putOf(row);
     if (blockedByPutsRule(p.side, p.ticker, p.issueType)) {
       skipped.push({ ...keyOf(row), reason: SINGLE_STOCK_PUT_REASON, rule: "puts", spread: spreadOf(row), ...(list ? { list } : {}) });
+      continue;
+    }
+    if (blockedByRiskOffPuts(p.side, p.ticker, p.issueType, riskOff)) {
+      skipped.push({ ...keyOf(row), reason: RISK_OFF_PUT_REASON, rule: "risk-off", spread: spreadOf(row), ...(list ? { list } : {}) });
       continue;
     }
     const spread = spreadOf(row);

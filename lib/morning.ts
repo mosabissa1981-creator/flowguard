@@ -11,6 +11,7 @@ import { loadRegimeSafe, regimeBrief, regimeCaps, regimeListCap, toActionableReg
 import { compareActionable, contractKey, withActionableAdjustments } from "@/lib/scoring";
 import { resolveSpread } from "@/lib/spread-core";
 import { SINGLE_STOCK_PUT_REASON, blockedByPutsRule } from "@/lib/puts-rule";
+import { RISK_OFF_PUT_REASON, blockedByRiskOffPuts, loadRiskOff, unknownRiskOff, type RiskOffSnapshot } from "@/lib/risk-off";
 import { gateRankedRows } from "@/lib/spread-gate";
 import type { MorningShortlistResponse } from "@/lib/types";
 import {
@@ -46,6 +47,32 @@ function applyPutsRuleToFrozen(snap: MorningShortlistResponse): MorningShortlist
   return { ...snap, picks: snap.picks.filter((r) => !blocked(r)), spreadSkips: [...(snap.spreadSkips ?? []), ...added] };
 }
 
+/** LIVE risk-off: drop ETF/index puts from a frozen morning snapshot when the flag is primary. */
+function applyRiskOffToFrozen(snap: MorningShortlistResponse, flag: RiskOffSnapshot): MorningShortlistResponse {
+  if (!flag.blockEtfPuts) return { ...snap, riskOff: flag };
+  const blocked = (r: MorningShortlistResponse["picks"][number]) =>
+    blockedByRiskOffPuts(r.alert.type, r.alert.ticker, r.alert.issue_type, flag);
+  const out = snap.picks.filter(blocked);
+  if (out.length === 0) return { ...snap, riskOff: flag };
+  const have = new Set((snap.spreadSkips ?? []).map((s) => s.option_chain));
+  const added = out
+    .filter((r) => !have.has(contractKey(r)))
+    .map((r) => ({
+      option_chain: contractKey(r),
+      ticker: r.alert.ticker,
+      reason: RISK_OFF_PUT_REASON,
+      rule: "risk-off" as const,
+      spread: r.spread ?? resolveSpread(null, { bid: r.alert.bid, ask: r.alert.ask }),
+      list: "morning",
+    }));
+  return {
+    ...snap,
+    riskOff: flag,
+    picks: snap.picks.filter((r) => !blocked(r)),
+    spreadSkips: [...(snap.spreadSkips ?? []), ...added],
+  };
+}
+
 /**
  * LIVE exit rule on a frozen snapshot saved by an older build (+40/3-session plans): rewrite target / time stop to
  * +30% / 2 sessions and show the 2-session hold window. Entry, ranking and event notes stay as frozen.
@@ -63,7 +90,8 @@ export async function loadMorningShortlist(): Promise<MorningShortlistResponse> 
 
   const stored = await loadMorningSnapshot<MorningShortlistResponse>(today);
   if (stored?.picks && morningWindowClosed() && stored.source !== "mock") {
-    return applyLiveExitToFrozen(applyPutsRuleToFrozen({ ...stored, snapshotLabel: stored.snapshotLabel || label, frozen: true }), today);
+    const flag = await loadRiskOff().catch(() => unknownRiskOff(today));
+    return applyRiskOffToFrozen(applyLiveExitToFrozen(applyPutsRuleToFrozen({ ...stored, snapshotLabel: stored.snapshotLabel || label, frozen: true }), today), flag);
   }
 
   if (!sessionHasOpened()) {
@@ -85,7 +113,11 @@ export async function loadMorningShortlist(): Promise<MorningShortlistResponse> 
     strictAntiFade: true,
   });
 
-  const [premove, regime] = await Promise.all([loadPremoveContext(), loadRegimeSafe(ranked.tide)]);
+  const [premove, regime, riskOff] = await Promise.all([
+    loadPremoveContext(),
+    loadRegimeSafe(ranked.tide),
+    loadRiskOff().catch(() => unknownRiskOff(today)),
+  ]);
   const morningAlerts = withActionableAdjustments(
     ranked.items.filter((row) => isInMorningWindow(row.alert.created_at)),
     premove.keys,
@@ -132,6 +164,7 @@ export async function loadMorningShortlist(): Promise<MorningShortlistResponse> 
     quotaBlocked: ranked.quotaBlocked,
     authFailed: ranked.authFailed,
     regime: regimeBrief(regime),
+    riskOff,
     capDrops: dropped,
     spreadSkips: gate.skipped,
     warning:

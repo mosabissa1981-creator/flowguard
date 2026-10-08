@@ -158,7 +158,23 @@ export type RegimeBrief = {
   dayRating?: RegimeSnapshot["dayRating"];
 };
 
+/** Attached by boards that load the LIVE risk-off flag (lib/risk-off.ts). */
+export type RiskOffBrief = {
+  day: string;
+  level: "primary" | "soft" | "none" | "unknown";
+  provisional: boolean;
+  oil: boolean;
+  yield: boolean;
+  qqqWeak: boolean;
+  nSignals: number;
+  banner: string | null;
+  blockEtfPuts: boolean;
+  note: string;
+};
+
 export type PicksResponse = {
+  /** LIVE risk-off morning flag (when the board loaded it). */
+  riskOff?: RiskOffBrief;
   source: TapeSource;
   fetchedAt: string;
   picks: DailyPick[];
@@ -387,6 +403,8 @@ export type StudySummaryBrief = {
 };
 
 export type AiPicksResponse = {
+  /** LIVE risk-off morning flag. */
+  riskOff?: RiskOffBrief;
   source: TapeSource;
   fetchedAt: string;
   generatedAt: string;

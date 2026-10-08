@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { CloudLightning, Sun, TriangleAlert } from "lucide-react";
 
 import { cn } from "@/lib/utils";
-import type { RegimeSnapshot, YieldMove } from "@/lib/types";
+import type { RegimeSnapshot, RiskOffBrief, YieldMove } from "@/lib/types";
 
 const POLL_MS = 15 * 60_000;
 
@@ -26,7 +26,7 @@ function fmtEventTime(iso: string): string {
 }
 
 export function RegimeBanner() {
-  const [regime, setRegime] = useState<RegimeSnapshot | null>(null);
+  const [regime, setRegime] = useState<(RegimeSnapshot & { riskOff?: RiskOffBrief }) | null>(null);
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
@@ -35,7 +35,7 @@ export function RegimeBanner() {
       try {
         const response = await fetch("/api/regime", { cache: "no-store" });
         if (!response.ok) throw new Error(String(response.status));
-        const payload = (await response.json()) as RegimeSnapshot;
+        const payload = (await response.json()) as RegimeSnapshot & { riskOff?: RiskOffBrief };
         if (alive) {
           setRegime(payload);
           setFailed(false);
@@ -65,7 +65,31 @@ export function RegimeBanner() {
   const title =
     regime.label === "report-day" ? "Report day" : regime.label === "risky" ? "Risky macro day" : "Calm macro day";
 
+  const riskOff = regime.riskOff;
+  const riskOffPrimary = riskOff?.level === "primary";
+
   return (
+    <div className="space-y-2">
+    {riskOffPrimary ? (
+      <div
+        className="rounded-lg border border-rose-400/60 bg-rose-950/50 px-3 py-2 text-sm text-rose-50"
+        data-risk-off="primary"
+        data-provisional={riskOff?.provisional ? "1" : "0"}
+      >
+        <div className="flex items-center gap-2 font-semibold tracking-wide">
+          <TriangleAlert className="size-4" />
+          {riskOff?.banner ?? "Risk-off morning (oil/yields/QQQ): stay light or sit out"}
+          {riskOff?.provisional ? <span className="text-[10px] font-normal text-rose-200/80">(provisional)</span> : null}
+        </div>
+        <p className="mt-1 text-[11px] text-rose-100/80">
+          ETF/index puts held back on live boards
+          {riskOff
+            ? ` · signals: ${[riskOff.oil && "oil", riskOff.yield && "yields", riskOff.qqqWeak && "QQQ"].filter(Boolean).join(", ") || "—"}`
+            : ""}
+          . Calls unaffected.
+        </p>
+      </div>
+    ) : null}
     <div
       className={cn(
         "rounded-lg border p-3 text-sm",
@@ -134,6 +158,7 @@ export function RegimeBanner() {
         </div>
       ) : null}
       <p className="mt-1 text-[10px] opacity-60">Options-flow context only, not financial advice. ET times.</p>
+    </div>
     </div>
   );
 }
