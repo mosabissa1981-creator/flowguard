@@ -6,7 +6,7 @@ import { loadPremoveShortlist } from "@/lib/premove";
 import { applyConcentrationCaps, issuerKey, sectorOf } from "@/lib/issuers";
 import { lockoutWarning, loadRegimeSafe, regimeBrief, regimeCaps } from "@/lib/regime";
 import { compareActionable, contractKey } from "@/lib/scoring";
-import { buildExitPlan } from "@/lib/exit-plan";
+import { buildExitPlan, LIVE_HOLD_WINDOW, withLiveExitRule } from "@/lib/exit-plan";
 import { loadStudySummary, studyBrief } from "@/lib/study-summary";
 import { askShare, toNumber } from "@/lib/numbers";
 import { tradingDateET } from "@/lib/session";
@@ -407,7 +407,21 @@ export async function reviewCandidates(
   regime: RegimeSnapshot | null,
   opts: { force?: boolean; persist?: boolean; brief?: string | null } = {},
 ): Promise<AiPicksResponse> {
-  return applyLivePutsRule(await reviewCandidatesInner(gathered, regime, opts));
+  return applyLiveExitRule(applyLivePutsRule(await reviewCandidatesInner(gathered, regime, opts)));
+}
+
+/**
+ * LIVE exit rule (+30% / −25% / 2 sessions) on the finished answer: a stored/throttled LLM answer saved by an older
+ * build can still carry +40/+50% / 3–5 session plans — rewrite them (entry and event notes kept).
+ */
+export function applyLiveExitRule(value: AiPicksResponse): AiPicksResponse {
+  const day = tradingDateET(value.generatedAt ? new Date(value.generatedAt) : new Date());
+  const fix = (p: AiPick): AiPick => ({ ...p, exitPlan: withLiveExitRule(p.exitPlan, day, p.alert.expiry) ?? p.exitPlan, holdWindow: { ...LIVE_HOLD_WINDOW } });
+  return {
+    ...value,
+    picks: (value.picks ?? []).map(fix),
+    ...(value.premove ? { premove: { ...value.premove, picks: value.premove.picks.map(fix) } } : {}),
+  };
 }
 
 /**

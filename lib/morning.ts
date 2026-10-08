@@ -6,7 +6,7 @@ import { PICKS_FILTERS } from "@/lib/filters";
 import { MAX_PICKS } from "@/lib/picks";
 import { loadPremoveContext } from "@/lib/premove";
 import { applyConcentrationCaps } from "@/lib/issuers";
-import { buildExitPlan } from "@/lib/exit-plan";
+import { buildExitPlan, LIVE_HOLD_WINDOW, withLiveExitRule } from "@/lib/exit-plan";
 import { loadRegimeSafe, regimeBrief, regimeCaps, regimeListCap, toActionableRegime } from "@/lib/regime";
 import { compareActionable, contractKey, withActionableAdjustments } from "@/lib/scoring";
 import { resolveSpread } from "@/lib/spread-core";
@@ -46,13 +46,24 @@ function applyPutsRuleToFrozen(snap: MorningShortlistResponse): MorningShortlist
   return { ...snap, picks: snap.picks.filter((r) => !blocked(r)), spreadSkips: [...(snap.spreadSkips ?? []), ...added] };
 }
 
+/**
+ * LIVE exit rule on a frozen snapshot saved by an older build (+40/3-session plans): rewrite target / time stop to
+ * +30% / 2 sessions and show the 2-session hold window. Entry, ranking and event notes stay as frozen.
+ */
+function applyLiveExitToFrozen(snap: MorningShortlistResponse, day: string): MorningShortlistResponse {
+  return {
+    ...snap,
+    picks: snap.picks.map((p) => ({ ...p, exitPlan: withLiveExitRule(p.exitPlan, day, p.alert.expiry), holdWindow: { ...LIVE_HOLD_WINDOW } })),
+  };
+}
+
 export async function loadMorningShortlist(): Promise<MorningShortlistResponse> {
   const today = tradingDateET();
   const label = `Morning shortlist — frozen ${today} 9:30–10:00 ET`;
 
   const stored = await loadMorningSnapshot<MorningShortlistResponse>(today);
   if (stored?.picks && morningWindowClosed() && stored.source !== "mock") {
-    return applyPutsRuleToFrozen({ ...stored, snapshotLabel: stored.snapshotLabel || label, frozen: true });
+    return applyLiveExitToFrozen(applyPutsRuleToFrozen({ ...stored, snapshotLabel: stored.snapshotLabel || label, frozen: true }), today);
   }
 
   if (!sessionHasOpened()) {

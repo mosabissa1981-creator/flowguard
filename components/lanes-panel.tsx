@@ -126,7 +126,7 @@ export function LanesPanel() {
             <div>
               <p className="mb-2 text-xs text-muted-foreground">
                 <span className="font-medium text-foreground">{active.lane.title}.</span> {active.lane.rules} Max {active.lane.maxPerDay}/day, 1 per
-                issuer. Exit +40% / −25%.
+                issuer. Exit +30% / −25%, time stop 2:30 PM CT on the 2nd session (entries before 10/8/2026: +40%, 3–5 sessions).
               </p>
               {picks.length === 0 ? (
                 <p className="text-sm text-muted-foreground">

@@ -1,6 +1,7 @@
 import regimeDaysJson from "@/study/regime-days.json";
 import candidateHistoryJson from "@/study/candidate-history.json";
 import { bsPrice, impliedVol, sessionsToCalendarDays, spotForPremium } from "@/lib/shadow/bs";
+import { HOLD_SESSIONS, TARGET_PCT } from "@/lib/exit-plan";
 import type {
   ContractBar,
   EarningsHistoryRow,
@@ -113,13 +114,14 @@ function isoDaysBack(day: string, n: number): string {
 }
 
 // ---------------------------------------------------------------- worth_the_price
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function worthThePrice(c: ShadowCandidate, vol: VolStats | null, riskyRegime: boolean): ShadowVerdict {
   const S = c.underlying;
   const T = Math.max(1, c.dte) / 365;
   const ivPrint = impliedVol(c.optionPrint, S, c.strike, T, c.side) ?? vol?.iv ?? null;
   if (!ivPrint || !(S > 0)) return verdict("worth_the_price", "skip", null, 0, "Could not derive IV from the print.");
-  const targetPct = c.exitPlan ? c.exitPlan.targetPct / 100 : riskyRegime ? 0.3 : 0.4;
-  const sessions = c.exitPlan?.sessions ?? Math.max(1, Math.min(riskyRegime ? 3 : 5, Math.floor(c.dte / 2)));
+  const targetPct = c.exitPlan ? c.exitPlan.targetPct / 100 : TARGET_PCT;
+  const sessions = c.exitPlan?.sessions ?? HOLD_SESSIONS;
   const Texit = Math.max(1, c.dte - sessionsToCalendarDays(sessions)) / 365;
   const target = c.optionPrint * (1 + targetPct);
   const Sstar = spotForPremium(target, S, c.strike, Texit, ivPrint, c.side);

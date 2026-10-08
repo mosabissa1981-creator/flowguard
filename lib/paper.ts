@@ -5,7 +5,7 @@ import { loadAiPicksState } from "@/lib/ai-picks-state";
 import { LANES, loadBook } from "@/lib/lanes";
 import { loadLotteryBook } from "@/lib/lottery";
 import { loadPutsBook } from "@/lib/puts";
-import { addSessions } from "@/lib/exit-plan";
+import { addSessions, liveTimeStopDate, STOP_PCT_WHOLE, TARGET_PCT_WHOLE, HOLD_SESSIONS } from "@/lib/exit-plan";
 import { toNumber } from "@/lib/numbers";
 import { tradingDateET } from "@/lib/session";
 import { etClock } from "@/lib/shadow/budget";
@@ -239,9 +239,15 @@ async function gatherCandidates(today: string, startedAt: string): Promise<Candi
     const st = await loadAiPicksState();
     main = mainPicksFrom(st?.day === today ? st.value : null, today);
   }
+  // LIVE exit rule for NEW entries (10/8/2026): +30% / −25% / time stop 2:30 PM CT on the 2nd session, whatever plan
+  // the hand-over doc carried (older builds stored +40/+50% and 3–5 sessions). Already-open positions keep their levels.
+  const lvl = (entry: number | undefined | null) =>
+    entry && entry > 0
+      ? { entry, target: Math.round(entry * (1 + TARGET_PCT_WHOLE / 100) * 100) / 100, stop: Math.round(entry * (1 + STOP_PCT_WHOLE / 100) * 100) / 100 }
+      : null;
   for (const p of main?.picks ?? []) {
-    const targetPct = p.plan?.targetPct ?? 40;
-    const stopPct = p.plan?.stopPct ?? -25;
+    const targetPct = TARGET_PCT_WHOLE;
+    const stopPct = STOP_PCT_WHOLE;
     out.push({
       book: "main",
       source: p.source,
@@ -254,8 +260,8 @@ async function gatherCandidates(today: string, startedAt: string): Promise<Candi
       alertPrice: p.alertPrice,
       targetPct,
       stopPct,
-      timeStopDate: p.plan?.timeStopDate ?? addSessions(today, 3),
-      planLevels: p.plan ? { entry: p.plan.entry, target: p.plan.target, stop: p.plan.stop } : null,
+      timeStopDate: liveTimeStopDate(today, p.expiry),
+      planLevels: lvl(p.plan?.entry),
       confidence: p.confidence,
       alertBid: p.alertBid ?? null,
       alertAsk: p.alertAsk ?? null,
@@ -298,9 +304,10 @@ async function gatherCandidates(today: string, startedAt: string): Promise<Candi
       out.push({
         book: "lanes", source: lane.id, day: e.day, contract: e.contract, ticker: e.ticker, side: e.side,
         strike: e.strike, expiry: e.expiry.slice(0, 10), alertPrice: e.entry || e.price,
-        targetPct: e.exitPlan?.targetPct ?? 40, stopPct: e.exitPlan?.stopPct ?? -25,
-        timeStopDate: addSessions(e.day, e.exitPlan?.timeStopSessions ?? lane.timeStopSessions),
-        planLevels: e.exitPlan ? { entry: e.exitPlan.entry, target: e.exitPlan.target, stop: e.exitPlan.stop } : null,
+        // LIVE exit rule for new entries; an earnings lane's shorter cap (exit before the report) still wins.
+        targetPct: TARGET_PCT_WHOLE, stopPct: STOP_PCT_WHOLE,
+        timeStopDate: liveTimeStopDate(e.day, e.expiry, Math.min(HOLD_SESSIONS, e.exitPlan?.timeStopSessions ?? lane.timeStopSessions)),
+        planLevels: lvl(e.exitPlan?.entry),
         loggedAt: e.loggedAt,
         alertBid: e.alertBid ?? null, alertAsk: e.alertAsk ?? null,
         issueType: e.issueType ?? null,
