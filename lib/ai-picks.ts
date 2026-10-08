@@ -17,6 +17,7 @@ import { estimateCost } from "@/lib/shadow/llm";
 import type { AiPick, AiPicksResponse, AiPremoveReview, AiSkip, DailyPick, RegimeSnapshot } from "@/lib/types";
 import { resolveSpread } from "@/lib/spread-core";
 import { SINGLE_STOCK_PUT_REASON, blockedByPutsRule } from "@/lib/puts-rule";
+import { RISK_OFF_PUT_REASON, blockedByRiskOffPuts, loadRiskOff, unknownRiskOff, type RiskOffSnapshot } from "@/lib/risk-off";
 
 const MAX_CANDIDATES = 8;
 /** Premove ("Before the move") lane candidates sent to the same LLM call for a separate review. */
@@ -407,7 +408,8 @@ export async function reviewCandidates(
   regime: RegimeSnapshot | null,
   opts: { force?: boolean; persist?: boolean; brief?: string | null } = {},
 ): Promise<AiPicksResponse> {
-  return applyLiveExitRule(applyLivePutsRule(await reviewCandidatesInner(gathered, regime, opts)));
+  const riskOff = await loadRiskOff().catch(() => unknownRiskOff());
+  return applyLiveRiskOffRule(applyLiveExitRule(applyLivePutsRule(await reviewCandidatesInner(gathered, regime, opts))), riskOff);
 }
 
 /**
@@ -748,6 +750,39 @@ async function reviewCandidatesInner(
 }
 
 /** AI review of the top actionable candidates. Zero extra UW calls: re-uses the shared tape lists. */
+/**
+ * LIVE risk-off: drop ETF/index puts from a stored/throttled AI answer when the morning is PRIMARY risk-off.
+ * Calls untouched. Single-stock puts already removed by applyLivePutsRule.
+ */
+export function applyLiveRiskOffRule(value: AiPicksResponse, flag: RiskOffSnapshot): AiPicksResponse {
+  const withFlag = { ...value, riskOff: flag };
+  if (!flag.blockEtfPuts) return withFlag;
+  const blocked = (p: AiPick) => blockedByRiskOffPuts(p.alert.type, p.alert.ticker, p.alert.issue_type, flag);
+  const dropped = [...(value.picks ?? []), ...(value.premove?.picks ?? [])].filter(blocked);
+  if (dropped.length === 0) return withFlag;
+  const skips = new Map((value.spreadSkips ?? []).map((sk) => [sk.option_chain, sk] as const));
+  for (const p of dropped) {
+    const k = contractKey(p);
+    if (!skips.has(k)) {
+      skips.set(k, {
+        option_chain: k,
+        ticker: p.alert.ticker,
+        reason: RISK_OFF_PUT_REASON,
+        rule: "risk-off",
+        spread: p.spread ?? resolveSpread(null, { bid: p.alert.bid, ask: p.alert.ask }),
+        list: "ai-picks",
+      });
+    }
+  }
+  return {
+    ...withFlag,
+    picks: (value.picks ?? []).filter((p) => !blocked(p)),
+    ...(value.premove ? { premove: { ...value.premove, picks: value.premove.picks.filter((p) => !blocked(p)) } } : {}),
+    spreadSkips: [...skips.values()],
+  };
+}
+
+
 export async function loadAiPicks(opts: { force?: boolean } = {}): Promise<AiPicksResponse> {
   const k = opts.force ? "force" : "normal";
   if (inflight?.key === k) return inflight.promise;

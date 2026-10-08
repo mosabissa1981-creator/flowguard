@@ -12,8 +12,9 @@ import { isUwBlocked } from "@/lib/uw-quota";
 import { freshSpreadQuotes } from "@/lib/spread-gate";
 import { resolveSpread, spreadSkipReason, type SpreadInfo, type SpreadSkip } from "@/lib/spread-core";
 import { SINGLE_STOCK_PUT_REASON, blockedByPutsRule } from "@/lib/puts-rule";
+import { RISK_OFF_PUT_REASON, blockedByRiskOffPuts, loadRiskOff, unknownRiskOff } from "@/lib/risk-off";
 import { HOLD_SESSIONS, LIVE_EXIT_RULE_TEXT, STOP_PCT_WHOLE, TARGET_PCT_WHOLE } from "@/lib/exit-plan";
-import type { FlowFilters, RankedFlow, TideBias } from "@/lib/types";
+import type { FlowFilters, RankedFlow, RiskOffBrief, TideBias } from "@/lib/types";
 
 /**
  * Setup lanes — TEST / SHADOW mode. Six rule-based lanes sharing one pass over the cached session tape.
@@ -192,6 +193,7 @@ export type LaneResult = {
 };
 
 export type LanesResponse = {
+  riskOff?: RiskOffBrief;
   mode: "test";
   day: string;
   source: string;
@@ -597,7 +599,10 @@ async function compute(): Promise<LanesResponse> {
   const locked = lockoutWarning(regime);
   // LIVE spread gate for the setup / earnings run-up lanes: fresh UW NBBO in session (one batched call per
   // ticker, memoized), else the alert's bid/ask; wide → not logged and shown as "Skipped: wide spread X%".
-  const allCands = results.flatMap((r) => r.candidates).filter((c) => !blockedByPutsRule(c.side, c.ticker, c.issueType));
+  const riskOff = await loadRiskOff().catch(() => unknownRiskOff(day));
+  const livePutBlocked = (c: { side: string; ticker: string; issueType?: string | null }) =>
+    blockedByPutsRule(c.side, c.ticker, c.issueType) || blockedByRiskOffPuts(c.side, c.ticker, c.issueType, riskOff);
+  const allCands = results.flatMap((r) => r.candidates).filter((c) => !livePutBlocked(c));
   const fresh = live
     ? await freshSpreadQuotes(allCands.map((c) => ({ ticker: c.ticker, contract: c.contract }))).catch(() => new Map())
     : new Map();
@@ -609,11 +614,13 @@ async function compute(): Promise<LanesResponse> {
     }));
     // LIVE puts rule: single-stock puts are not logged (ETF/index puts only); shown as skipped.
     res.spreadSkips = res.candidates
-      .filter((c) => blockedByPutsRule(c.side, c.ticker, c.issueType) || c.spread?.status === "wide")
+      .filter((c) => livePutBlocked(c) || c.spread?.status === "wide")
       .map((c) =>
         blockedByPutsRule(c.side, c.ticker, c.issueType)
           ? { option_chain: c.contract, ticker: c.ticker, reason: SINGLE_STOCK_PUT_REASON, rule: "puts" as const, spread: c.spread!, list: res.lane.id }
-          : { option_chain: c.contract, ticker: c.ticker, reason: spreadSkipReason(c.spread!), rule: "spread" as const, spread: c.spread!, list: res.lane.id },
+          : blockedByRiskOffPuts(c.side, c.ticker, c.issueType, riskOff)
+            ? { option_chain: c.contract, ticker: c.ticker, reason: RISK_OFF_PUT_REASON, rule: "risk-off" as const, spread: c.spread!, list: res.lane.id }
+            : { option_chain: c.contract, ticker: c.ticker, reason: spreadSkipReason(c.spread!), rule: "spread" as const, spread: c.spread!, list: res.lane.id },
       );
   }
   for (const res of results) {
@@ -625,7 +632,7 @@ async function compute(): Promise<LanesResponse> {
       for (const c of pool) {
         if (todays.length >= res.lane.maxPerDay) break;
         if (c.spread?.status === "wide") continue;
-        if (blockedByPutsRule(c.side, c.ticker, c.issueType)) continue;
+        if (livePutBlocked(c)) continue;
         if (todays.some((e) => e.contract === c.contract || e.issuer === c.issuer)) continue;
         const entry: LaneEntry = { ...c, day, loggedAt: new Date().toISOString(), entry: c.price, regimeLabel: regime?.label ?? null };
         todays.push(entry);
@@ -649,6 +656,7 @@ async function compute(): Promise<LanesResponse> {
     source: tape.source,
     fetchedAt: tape.fetchedAt,
     generatedAt: new Date().toISOString(),
+    riskOff,
     lanes: results,
     context: {
       marketTide: tape.tide?.bias ?? null,

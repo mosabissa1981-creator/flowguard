@@ -52,6 +52,15 @@ export function MorningPanel({
             Frozen pre-open tape snapshot. This list does not update mid-session — the live Picks of
             the Day below continues to reflect the current tape in real time.
           </p>
+            {morning?.riskOff?.level === "primary" ? (
+              <div
+                className="mt-2 rounded-md border border-rose-400/50 bg-rose-950/40 px-2.5 py-1.5 text-xs text-rose-50"
+                data-risk-off="primary"
+              >
+                {morning.riskOff.banner ?? "Risk-off morning (oil/yields/QQQ): stay light or sit out"}
+                {morning.riskOff.provisional ? " (provisional)" : ""} — ETF/index puts held back.
+              </div>
+            ) : null}
         </div>
         <div className="flex items-center gap-2">
           <Badge className="rounded-md bg-sky-500/15 text-sky-200">

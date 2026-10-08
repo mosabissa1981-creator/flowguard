@@ -10,6 +10,8 @@ import { toNumber } from "@/lib/numbers";
 import { applyConcentrationCaps } from "@/lib/issuers";
 import { buildExitPlan } from "@/lib/exit-plan";
 import { lockoutWarning, loadRegimeSafe, regimeBrief, regimeCaps, regimeListCap, toActionableRegime } from "@/lib/regime";
+import { loadRiskOff, unknownRiskOff } from "@/lib/risk-off";
+import { tradingDateET } from "@/lib/session";
 import {
   contractKey,
   dtePreference,
@@ -169,7 +171,10 @@ export async function loadPremoveShortlist(opts?: { forceFresh?: boolean }): Pro
     loadPremoveQualifying(opts),
     loadPickContractKeys(opts),
   ]);
-  const regime = await loadRegimeSafe(ranked.tide);
+  const [regime, riskOff] = await Promise.all([
+    loadRegimeSafe(ranked.tide),
+    loadRiskOff().catch(() => unknownRiskOff(tradingDateET())),
+  ]);
 
   const adjusted = withActionableAdjustments(rows, pickKeys, undefined, {
     spots,
@@ -211,6 +216,7 @@ export async function loadPremoveShortlist(opts?: { forceFresh?: boolean }): Pro
     authFailed: ranked.authFailed,
     regime: regimeBrief(regime),
     capDrops: dropped,
+    riskOff,
     spreadSkips: gate.skipped,
   };
 }

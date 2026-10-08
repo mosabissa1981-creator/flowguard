@@ -5,6 +5,7 @@ import { contractKey } from "@/lib/scoring";
 import { etClock } from "@/lib/shadow/budget";
 import { resolveSpread, splitByLiveRules, type SpreadInfo, type SpreadSkip } from "@/lib/spread-core";
 import { blockedByPutsRule } from "@/lib/puts-rule";
+import { blockedByRiskOffPuts, loadRiskOff, unknownRiskOff } from "@/lib/risk-off";
 import { fetchTickerOptionQuotes, hasUnusualWhalesKey } from "@/lib/uw";
 import { isUwBlocked } from "@/lib/uw-quota";
 import { runAsUwJob, uwTokenCount, UW_DAY_CEILING } from "@/lib/uw-usage";
@@ -114,9 +115,14 @@ export async function gateRankedRows<T extends RankedFlow>(
   opts: { freshTop?: number; now?: Date } = {},
 ): Promise<{ kept: Array<T & { spread: SpreadInfo }>; skipped: SpreadSkip[] }> {
   const now = opts.now ?? new Date();
+  const riskOff = await loadRiskOff({ now }).catch(() => unknownRiskOff());
   const top = rows.slice(0, opts.freshTop ?? DEFAULT_FRESH_TOP);
-  // Single-stock puts are skipped by the LIVE puts rule anyway: never spend a fresh UW quote on them.
-  const quotable = top.filter((r) => !blockedByPutsRule(r.alert.type, r.alert.ticker, r.alert.issue_type));
+  // Single-stock puts / risk-off ETF puts are skipped anyway: never spend a fresh UW quote on them.
+  const quotable = top.filter(
+    (r) =>
+      !blockedByPutsRule(r.alert.type, r.alert.ticker, r.alert.issue_type) &&
+      !blockedByRiskOffPuts(r.alert.type, r.alert.ticker, r.alert.issue_type, riskOff),
+  );
   const fresh = await freshSpreadQuotes(quotable.map((r) => ({ ticker: r.alert.ticker, contract: contractKey(r) })), now).catch(
     () => new Map<string, Pair | null>(),
   );
@@ -127,6 +133,7 @@ export async function gateRankedRows<T extends RankedFlow>(
     (r) => ({ option_chain: contractKey(r), ticker: r.alert.ticker }),
     (r) => ({ side: r.alert.type, ticker: r.alert.ticker, issueType: r.alert.issue_type }),
     list,
+    riskOff,
   );
   // Desk shows skips near the top of the list (the names that would have made it); deeper rows are
   // still filtered but not listed. Dedupe by contract.

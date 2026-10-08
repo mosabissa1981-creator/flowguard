@@ -11,7 +11,8 @@
     "rescore-book": "npx tsx scripts/rescore-book.ts",
     "paper-check": "npx tsx scripts/paper-check.ts",
     "spread-gate-check": "npx tsx scripts/spread-gate-check.ts",
-    "exit-plan-check": "npx tsx --conditions=react-server scripts/exit-plan-check.ts"
+    "exit-plan-check": "npx tsx --conditions=react-server scripts/exit-plan-check.ts",
+    "risk-off-check": "npx tsx --conditions=react-server scripts/risk-off-check.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

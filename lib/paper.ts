@@ -6,6 +6,7 @@ import { LANES, loadBook } from "@/lib/lanes";
 import { loadLotteryBook } from "@/lib/lottery";
 import { loadPutsBook } from "@/lib/puts";
 import { addSessions, liveTimeStopDate, STOP_PCT_WHOLE, TARGET_PCT_WHOLE, HOLD_SESSIONS } from "@/lib/exit-plan";
+import { blockedByRiskOffPuts, loadRiskOff, unknownRiskOff } from "@/lib/risk-off";
 import { toNumber } from "@/lib/numbers";
 import { tradingDateET } from "@/lib/session";
 import { etClock } from "@/lib/shadow/budget";
@@ -232,6 +233,9 @@ async function gatherCandidates(today: string, startedAt: string): Promise<Candi
   const out: Candidate[] = [];
   const startMs = Date.parse(startedAt);
   const after = (iso?: string) => !iso || Date.parse(iso) >= startMs;
+  const riskOff = await loadRiskOff().catch(() => unknownRiskOff(today));
+  const blockLivePut = (side: string, ticker: string, issueType?: string | null) =>
+    blockedByPutsRule(side, ticker, issueType) || blockedByRiskOffPuts(side, ticker, issueType, riskOff);
 
   // Main: taken AI/rules picks + premove picks (hand-over doc, else the stored LLM answer).
   let main = await kvGet<MainPicksDoc>(K_MAIN, { maxAgeMs: 30_000 });
@@ -246,6 +250,7 @@ async function gatherCandidates(today: string, startedAt: string): Promise<Candi
       ? { entry, target: Math.round(entry * (1 + TARGET_PCT_WHOLE / 100) * 100) / 100, stop: Math.round(entry * (1 + STOP_PCT_WHOLE / 100) * 100) / 100 }
       : null;
   for (const p of main?.picks ?? []) {
+    if (blockLivePut(p.side, p.ticker, p.issueType)) continue; // LIVE puts + risk-off: not opened on paper main
     const targetPct = TARGET_PCT_WHOLE;
     const stopPct = STOP_PCT_WHOLE;
     out.push({
@@ -301,6 +306,7 @@ async function gatherCandidates(today: string, startedAt: string): Promise<Candi
     const lane = LANES[i];
     for (const e of book?.entries ?? []) {
       if (e.day !== today || !after(e.loggedAt)) continue;
+      if (blockLivePut(e.side, e.ticker, e.issueType)) continue;
       out.push({
         book: "lanes", source: lane.id, day: e.day, contract: e.contract, ticker: e.ticker, side: e.side,
         strike: e.strike, expiry: e.expiry.slice(0, 10), alertPrice: e.entry || e.price,

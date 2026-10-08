@@ -6,7 +6,9 @@ import { compareActionable, withActionableAdjustments } from "@/lib/scoring";
 import { applyConcentrationCaps } from "@/lib/issuers";
 import { buildExitPlan } from "@/lib/exit-plan";
 import { lockoutWarning, loadRegimeSafe, regimeBrief, regimeCaps, regimeListCap, toActionableRegime } from "@/lib/regime";
+import { loadRiskOff, unknownRiskOff } from "@/lib/risk-off";
 import { gateRankedRows } from "@/lib/spread-gate";
+import { tradingDateET } from "@/lib/session";
 import type { PicksResponse } from "@/lib/types";
 
 export { PICKS_FILTERS };
@@ -18,7 +20,10 @@ export async function loadDailyPicks(opts?: { forceFresh?: boolean }): Promise<P
     loadRankedFlow(PICKS_FILTERS, opts),
     loadPremoveContext(opts),
   ]);
-  const regime = await loadRegimeSafe(ranked.tide);
+  const [regime, riskOff] = await Promise.all([
+    loadRegimeSafe(ranked.tide),
+    loadRiskOff().catch(() => unknownRiskOff(tradingDateET())),
+  ]);
 
   const adjusted = withActionableAdjustments(ranked.items, premove.keys, undefined, {
     spots: premove.spots,
@@ -55,6 +60,7 @@ export async function loadDailyPicks(opts?: { forceFresh?: boolean }): Promise<P
     quotaBlocked: ranked.quotaBlocked,
     authFailed: ranked.authFailed,
     regime: regimeBrief(regime),
+    riskOff,
     capDrops: dropped,
     spreadSkips: gate.skipped,
   };
