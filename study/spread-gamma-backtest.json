@@ -1,0 +1,3116 @@
+{
+ "generated": "2026-10-08T05:22:18.812428+00:00",
+ "window": "2024-10-07..2026-10-06 (replay)",
+ "outcome_rule": "winner +40% before -25% within 3 sessions; loser -25% first; flat scored at t3",
+ "return_rule": "net = buy at ask, sell at bid (same relative spread at exit), print price as mid",
+ "notes": [
+  "Earnings-calendar spread lane has no 2-year history (started live Oct 2026) \u2014 not scored.",
+  "Spread = alert NBBO at the print (UW flow alert bid/ask), matched within 2 min."
+ ],
+ "spread_gate": {
+  "candidates_pool": {
+   "universe": "Picks+Premove candidate pools (candidates.csv)",
+   "n_total": 14965,
+   "n_with_spread": 14897,
+   "baseline": {
+    "n": 14897,
+    "W": 5354,
+    "L": 8186,
+    "F": 1357,
+    "win_pct": 39.5,
+    "avg_gross_pct": 0.9,
+    "avg_net_pct": -4.8,
+    "median_spread_pct": 2.8
+   },
+   "cutoffs": {
+    ">5%": {
+     "flagged": {
+      "n": 4935,
+      "W": 1701,
+      "L": 2684,
+      "F": 550,
+      "win_pct": 38.8,
+      "avg_gross_pct": 0.5,
+      "avg_net_pct": -13.0,
+      "median_spread_pct": 10.1
+     },
+     "kept": {
+      "n": 9962,
+      "W": 3653,
+      "L": 5502,
+      "F": 807,
+      "win_pct": 39.9,
+      "avg_gross_pct": 1.1,
+      "avg_net_pct": -0.8,
+      "median_spread_pct": 1.6
+     },
+     "flagged_share_pct": 33.1
+    },
+    ">10%": {
+     "flagged": {
+      "n": 2497,
+      "W": 846,
+      "L": 1353,
+      "F": 298,
+      "win_pct": 38.5,
+      "avg_gross_pct": 0.3,
+      "avg_net_pct": -19.6,
+      "median_spread_pct": 16.5
+     },
+     "kept": {
+      "n": 12400,
+      "W": 4508,
+      "L": 6833,
+      "F": 1059,
+      "win_pct": 39.7,
+      "avg_gross_pct": 1.0,
+      "avg_net_pct": -1.9,
+      "median_spread_pct": 2.1
+     },
+     "flagged_share_pct": 16.8
+    },
+    ">15%": {
+     "flagged": {
+      "n": 1446,
+      "W": 489,
+      "L": 784,
+      "F": 173,
+      "win_pct": 38.4,
+      "avg_gross_pct": 0.2,
+      "avg_net_pct": -25.7,
+      "median_spread_pct": 23.3
+     },
+     "kept": {
+      "n": 13451,
+      "W": 4865,
+      "L": 7402,
+      "F": 1184,
+      "win_pct": 39.7,
+      "avg_gross_pct": 1.0,
+      "avg_net_pct": -2.6,
+      "median_spread_pct": 2.4
+     },
+     "flagged_share_pct": 9.7
+    }
+   }
+  },
+  "logged_entries_all": {
+   "universe": "All logged lane entries (entries.csv)",
+   "n_total": 10003,
+   "n_with_spread": 9904,
+   "baseline": {
+    "n": 9904,
+    "W": 3490,
+    "L": 5730,
+    "F": 684,
+    "win_pct": 37.9,
+    "avg_gross_pct": -0.2,
+    "avg_net_pct": -9.4,
+    "median_spread_pct": 4.5
+   },
+   "cutoffs": {
+    ">5%": {
+     "flagged": {
+      "n": 4655,
+      "W": 1647,
+      "L": 2669,
+      "F": 339,
+      "win_pct": 38.2,
+      "avg_gross_pct": 0.1,
+      "avg_net_pct": -17.1,
+      "median_spread_pct": 12.3
+     },
+     "kept": {
+      "n": 5249,
+      "W": 1843,
+      "L": 3061,
+      "F": 345,
+      "win_pct": 37.6,
+      "avg_gross_pct": -0.4,
+      "avg_net_pct": -2.5,
+      "median_spread_pct": 1.9
+     },
+     "flagged_share_pct": 47.0
+    },
+    ">10%": {
+     "flagged": {
+      "n": 2816,
+      "W": 992,
+      "L": 1640,
+      "F": 184,
+      "win_pct": 37.7,
+      "avg_gross_pct": -0.3,
+      "avg_net_pct": -24.2,
+      "median_spread_pct": 19.8
+     },
+     "kept": {
+      "n": 7088,
+      "W": 2498,
+      "L": 4090,
+      "F": 500,
+      "win_pct": 37.9,
+      "avg_gross_pct": -0.1,
+      "avg_net_pct": -3.5,
+      "median_spread_pct": 2.8
+     },
+     "flagged_share_pct": 28.4
+    },
+    ">15%": {
+     "flagged": {
+      "n": 1908,
+      "W": 692,
+      "L": 1100,
+      "F": 116,
+      "win_pct": 38.6,
+      "avg_gross_pct": 0.3,
+      "avg_net_pct": -29.6,
+      "median_spread_pct": 26.4
+     },
+     "kept": {
+      "n": 7996,
+      "W": 2798,
+      "L": 4630,
+      "F": 568,
+      "win_pct": 37.7,
+      "avg_gross_pct": -0.3,
+      "avg_net_pct": -4.5,
+      "median_spread_pct": 3.2
+     },
+     "flagged_share_pct": 19.3
+    }
+   }
+  },
+  "by_lane": {
+   "earnings run-up/run-down lanes": {
+    "universe": "earnings run-up/run-down lanes",
+    "n_total": 604,
+    "n_with_spread": 603,
+    "baseline": {
+     "n": 603,
+     "W": 201,
+     "L": 311,
+     "F": 91,
+     "win_pct": 39.3,
+     "avg_gross_pct": 0.8,
+     "avg_net_pct": -7.3,
+     "median_spread_pct": 5.6
+    },
+    "cutoffs": {
+     ">5%": {
+      "flagged": {
+       "n": 338,
+       "W": 109,
+       "L": 174,
+       "F": 55,
+       "win_pct": 38.5,
+       "avg_gross_pct": 0.4,
+       "avg_net_pct": -12.2,
+       "median_spread_pct": 9.6
+      },
+      "kept": {
+       "n": 265,
+       "W": 92,
+       "L": 137,
+       "F": 36,
+       "win_pct": 40.2,
+       "avg_gross_pct": 1.4,
+       "avg_net_pct": -1.1,
+       "median_spread_pct": 2.5
+      },
+      "flagged_share_pct": 56.1
+     },
+     ">10%": {
+      "flagged": {
+       "n": 158,
+       "W": 46,
+       "L": 85,
+       "F": 27,
+       "win_pct": 35.1,
+       "avg_gross_pct": -1.6,
+       "avg_net_pct": -20.4,
+       "median_spread_pct": 15.6
+      },
+      "kept": {
+       "n": 445,
+       "W": 155,
+       "L": 226,
+       "F": 64,
+       "win_pct": 40.7,
+       "avg_gross_pct": 1.7,
+       "avg_net_pct": -2.7,
+       "median_spread_pct": 4.1
+      },
+      "flagged_share_pct": 26.2
+     },
+     ">15%": {
+      "flagged": {
+       "n": 82,
+       "W": 28,
+       "L": 43,
+       "F": 11,
+       "win_pct": 39.4,
+       "avg_gross_pct": 0.8,
+       "avg_net_pct": -25.0,
+       "median_spread_pct": 23.6
+      },
+      "kept": {
+       "n": 521,
+       "W": 173,
+       "L": 268,
+       "F": 80,
+       "win_pct": 39.2,
+       "avg_gross_pct": 0.8,
+       "avg_net_pct": -4.5,
+       "median_spread_pct": 4.8
+      },
+      "flagged_share_pct": 13.6
+     }
+    }
+   },
+   "lottery": {
+    "universe": "lottery",
+    "n_total": 1482,
+    "n_with_spread": 1464,
+    "baseline": {
+     "n": 1464,
+     "W": 594,
+     "L": 870,
+     "F": 0,
+     "win_pct": 40.6,
+     "avg_gross_pct": 1.4,
+     "avg_net_pct": -20.7,
+     "median_spread_pct": 16.1
+    },
+    "cutoffs": {
+     ">5%": {
+      "flagged": {
+       "n": 1234,
+       "W": 503,
+       "L": 731,
+       "F": 0,
+       "win_pct": 40.8,
+       "avg_gross_pct": 1.5,
+       "avg_net_pct": -24.1,
+       "median_spread_pct": 20.0
+      },
+      "kept": {
+       "n": 230,
+       "W": 91,
+       "L": 139,
+       "F": 0,
+       "win_pct": 39.6,
+       "avg_gross_pct": 0.7,
+       "avg_net_pct": -2.3,
+       "median_spread_pct": 3.2
+      },
+      "flagged_share_pct": 84.3
+     },
+     ">10%": {
+      "flagged": {
+       "n": 971,
+       "W": 389,
+       "L": 582,
+       "F": 0,
+       "win_pct": 40.1,
+       "avg_gross_pct": 1.0,
+       "avg_net_pct": -29.5,
+       "median_spread_pct": 26.2
+      },
+      "kept": {
+       "n": 493,
+       "W": 205,
+       "L": 288,
+       "F": 0,
+       "win_pct": 41.6,
+       "avg_gross_pct": 2.0,
+       "avg_net_pct": -3.3,
+       "median_spread_pct": 5.3
+      },
+      "flagged_share_pct": 66.3
+     },
+     ">15%": {
+      "flagged": {
+       "n": 765,
+       "W": 312,
+       "L": 453,
+       "F": 0,
+       "win_pct": 40.8,
+       "avg_gross_pct": 1.5,
+       "avg_net_pct": -34.2,
+       "median_spread_pct": 33.3
+      },
+      "kept": {
+       "n": 699,
+       "W": 282,
+       "L": 417,
+       "F": 0,
+       "win_pct": 40.3,
+       "avg_gross_pct": 1.2,
+       "avg_net_pct": -5.9,
+       "median_spread_pct": 7.0
+      },
+      "flagged_share_pct": 52.3
+     }
+    }
+   },
+   "main picks": {
+    "universe": "main picks",
+    "n_total": 1499,
+    "n_with_spread": 1461,
+    "baseline": {
+     "n": 1461,
+     "W": 523,
+     "L": 814,
+     "F": 124,
+     "win_pct": 39.1,
+     "avg_gross_pct": 0.6,
+     "avg_net_pct": -5.3,
+     "median_spread_pct": 2.8
+    },
+    "cutoffs": {
+     ">5%": {
+      "flagged": {
+       "n": 505,
+       "W": 164,
+       "L": 287,
+       "F": 54,
+       "win_pct": 36.4,
+       "avg_gross_pct": -0.8,
+       "avg_net_pct": -14.5,
+       "median_spread_pct": 9.9
+      },
+      "kept": {
+       "n": 956,
+       "W": 359,
+       "L": 527,
+       "F": 70,
+       "win_pct": 40.5,
+       "avg_gross_pct": 1.3,
+       "avg_net_pct": -0.5,
+       "median_spread_pct": 1.4
+      },
+      "flagged_share_pct": 34.6
+     },
+     ">10%": {
+      "flagged": {
+       "n": 247,
+       "W": 77,
+       "L": 139,
+       "F": 31,
+       "win_pct": 35.6,
+       "avg_gross_pct": -1.0,
+       "avg_net_pct": -21.8,
+       "median_spread_pct": 18.7
+      },
+      "kept": {
+       "n": 1214,
+       "W": 446,
+       "L": 675,
+       "F": 93,
+       "win_pct": 39.8,
+       "avg_gross_pct": 0.9,
+       "avg_net_pct": -2.0,
+       "median_spread_pct": 1.9
+      },
+      "flagged_share_pct": 16.9
+     },
+     ">15%": {
+      "flagged": {
+       "n": 158,
+       "W": 48,
+       "L": 90,
+       "F": 20,
+       "win_pct": 34.8,
+       "avg_gross_pct": -1.8,
+       "avg_net_pct": -27.7,
+       "median_spread_pct": 23.7
+      },
+      "kept": {
+       "n": 1303,
+       "W": 475,
+       "L": 724,
+       "F": 104,
+       "win_pct": 39.6,
+       "avg_gross_pct": 0.9,
+       "avg_net_pct": -2.6,
+       "median_spread_pct": 2.2
+      },
+      "flagged_share_pct": 10.8
+     }
+    }
+   },
+   "premove": {
+    "universe": "premove",
+    "n_total": 1497,
+    "n_with_spread": 1465,
+    "baseline": {
+     "n": 1465,
+     "W": 539,
+     "L": 819,
+     "F": 107,
+     "win_pct": 39.7,
+     "avg_gross_pct": 0.9,
+     "avg_net_pct": -4.0,
+     "median_spread_pct": 2.0
+    },
+    "cutoffs": {
+     ">5%": {
+      "flagged": {
+       "n": 384,
+       "W": 137,
+       "L": 212,
+       "F": 35,
+       "win_pct": 39.3,
+       "avg_gross_pct": 0.6,
+       "avg_net_pct": -13.1,
+       "median_spread_pct": 9.8
+      },
+      "kept": {
+       "n": 1081,
+       "W": 402,
+       "L": 607,
+       "F": 72,
+       "win_pct": 39.8,
+       "avg_gross_pct": 1.0,
+       "avg_net_pct": -0.7,
+       "median_spread_pct": 1.3
+      },
+      "flagged_share_pct": 26.2
+     },
+     ">10%": {
+      "flagged": {
+       "n": 186,
+       "W": 65,
+       "L": 102,
+       "F": 19,
+       "win_pct": 38.9,
+       "avg_gross_pct": 0.5,
+       "avg_net_pct": -20.3,
+       "median_spread_pct": 18.2
+      },
+      "kept": {
+       "n": 1279,
+       "W": 474,
+       "L": 717,
+       "F": 88,
+       "win_pct": 39.8,
+       "avg_gross_pct": 0.9,
+       "avg_net_pct": -1.6,
+       "median_spread_pct": 1.6
+      },
+      "flagged_share_pct": 12.7
+     },
+     ">15%": {
+      "flagged": {
+       "n": 117,
+       "W": 44,
+       "L": 61,
+       "F": 12,
+       "win_pct": 41.9,
+       "avg_gross_pct": 1.9,
+       "avg_net_pct": -24.5,
+       "median_spread_pct": 23.0
+      },
+      "kept": {
+       "n": 1348,
+       "W": 495,
+       "L": 758,
+       "F": 95,
+       "win_pct": 39.5,
+       "avg_gross_pct": 0.8,
+       "avg_net_pct": -2.2,
+       "median_spread_pct": 1.8
+      },
+      "flagged_share_pct": 8.0
+     }
+    }
+   },
+   "puts": {
+    "universe": "puts",
+    "n_total": 1498,
+    "n_with_spread": 1496,
+    "baseline": {
+     "n": 1496,
+     "W": 461,
+     "L": 916,
+     "F": 119,
+     "win_pct": 33.5,
+     "avg_gross_pct": -2.8,
+     "avg_net_pct": -11.7,
+     "median_spread_pct": 5.4
+    },
+    "cutoffs": {
+     ">5%": {
+      "flagged": {
+       "n": 783,
+       "W": 246,
+       "L": 461,
+       "F": 76,
+       "win_pct": 34.8,
+       "avg_gross_pct": -1.9,
+       "avg_net_pct": -16.8,
+       "median_spread_pct": 12.4
+      },
+      "kept": {
+       "n": 713,
+       "W": 215,
+       "L": 455,
+       "F": 43,
+       "win_pct": 32.1,
+       "avg_gross_pct": -3.8,
+       "avg_net_pct": -6.1,
+       "median_spread_pct": 2.2
+      },
+      "flagged_share_pct": 52.3
+     },
+     ">10%": {
+      "flagged": {
+       "n": 479,
+       "W": 151,
+       "L": 283,
+       "F": 45,
+       "win_pct": 34.8,
+       "avg_gross_pct": -2.0,
+       "avg_net_pct": -22.0,
+       "median_spread_pct": 18.0
+      },
+      "kept": {
+       "n": 1017,
+       "W": 310,
+       "L": 633,
+       "F": 74,
+       "win_pct": 32.9,
+       "avg_gross_pct": -3.2,
+       "avg_net_pct": -6.9,
+       "median_spread_pct": 3.2
+      },
+      "flagged_share_pct": 32.0
+     },
+     ">15%": {
+      "flagged": {
+       "n": 304,
+       "W": 95,
+       "L": 177,
+       "F": 32,
+       "win_pct": 34.9,
+       "avg_gross_pct": -1.8,
+       "avg_net_pct": -26.8,
+       "median_spread_pct": 24.1
+      },
+      "kept": {
+       "n": 1192,
+       "W": 366,
+       "L": 739,
+       "F": 87,
+       "win_pct": 33.1,
+       "avg_gross_pct": -3.1,
+       "avg_net_pct": -7.9,
+       "median_spread_pct": 3.9
+      },
+      "flagged_share_pct": 20.3
+     }
+    }
+   },
+   "setup lanes": {
+    "universe": "setup lanes",
+    "n_total": 3423,
+    "n_with_spread": 3415,
+    "baseline": {
+     "n": 3415,
+     "W": 1172,
+     "L": 2000,
+     "F": 243,
+     "win_pct": 36.9,
+     "avg_gross_pct": -0.6,
+     "avg_net_pct": -7.9,
+     "median_spread_pct": 3.9
+    },
+    "cutoffs": {
+     ">5%": {
+      "flagged": {
+       "n": 1411,
+       "W": 488,
+       "L": 804,
+       "F": 119,
+       "win_pct": 37.8,
+       "avg_gross_pct": 0.0,
+       "avg_net_pct": -14.5,
+       "median_spread_pct": 10.7
+      },
+      "kept": {
+       "n": 2004,
+       "W": 684,
+       "L": 1196,
+       "F": 124,
+       "win_pct": 36.4,
+       "avg_gross_pct": -1.1,
+       "avg_net_pct": -3.3,
+       "median_spread_pct": 2.2
+      },
+      "flagged_share_pct": 41.3
+     },
+     ">10%": {
+      "flagged": {
+       "n": 775,
+       "W": 264,
+       "L": 449,
+       "F": 62,
+       "win_pct": 37.0,
+       "avg_gross_pct": -0.5,
+       "avg_net_pct": -21.3,
+       "median_spread_pct": 17.8
+      },
+      "kept": {
+       "n": 2640,
+       "W": 908,
+       "L": 1551,
+       "F": 181,
+       "win_pct": 36.9,
+       "avg_gross_pct": -0.6,
+       "avg_net_pct": -4.0,
+       "median_spread_pct": 2.9
+      },
+      "flagged_share_pct": 22.7
+     },
+     ">15%": {
+      "flagged": {
+       "n": 482,
+       "W": 165,
+       "L": 276,
+       "F": 41,
+       "win_pct": 37.4,
+       "avg_gross_pct": -0.3,
+       "avg_net_pct": -26.9,
+       "median_spread_pct": 24.4
+      },
+      "kept": {
+       "n": 2933,
+       "W": 1007,
+       "L": 1724,
+       "F": 202,
+       "win_pct": 36.9,
+       "avg_gross_pct": -0.6,
+       "avg_net_pct": -4.8,
+       "median_spread_pct": 3.2
+      },
+      "flagged_share_pct": 14.1
+     }
+    }
+   }
+  }
+ },
+ "gamma_flip_gate": {
+  "data": "UW /api/stock/{T}/greek-exposure/strike?date=D per-strike GEX, cached for logged-entry ticker-days only (7.6k files). Daily (end-of-day) values for the entry day, so there is some same-day look-ahead vs an intraday entry.",
+  "flip_method": "cumulative net (call+put) GEX from the lowest strike up; flip = zero crossing nearest spot (\u00b125%).",
+  "logged_entries": {
+   "universe": "logged lane entries",
+   "n_with_gex": 9957,
+   "n_with_flip": 7851,
+   "days_covered": 500,
+   "first_day": "2024-10-07",
+   "last_day": "2026-10-06",
+   "baseline": {
+    "n": 9957,
+    "W": 3517,
+    "L": 5766,
+    "F": 674,
+    "win_pct": 37.9,
+    "avg_gross_pct": -0.1
+   },
+   "flip_gate": {
+    "flagged (call below flip / put above flip)": {
+     "n": 3567,
+     "W": 1247,
+     "L": 2055,
+     "F": 265,
+     "win_pct": 37.8,
+     "avg_gross_pct": -0.2
+    },
+    "kept": {
+     "n": 4284,
+     "W": 1567,
+     "L": 2450,
+     "F": 267,
+     "win_pct": 39.0,
+     "avg_gross_pct": 0.5
+    },
+    "call": {
+     "flagged": {
+      "n": 1774,
+      "W": 666,
+      "L": 984,
+      "F": 124,
+      "win_pct": 40.4,
+      "avg_gross_pct": 1.4
+     },
+     "kept": {
+      "n": 2206,
+      "W": 877,
+      "L": 1238,
+      "F": 91,
+      "win_pct": 41.5,
+      "avg_gross_pct": 2.1
+     }
+    },
+    "put": {
+     "flagged": {
+      "n": 1793,
+      "W": 581,
+      "L": 1071,
+      "F": 141,
+      "win_pct": 35.2,
+      "avg_gross_pct": -1.9
+     },
+     "kept": {
+      "n": 2078,
+      "W": 690,
+      "L": 1212,
+      "F": 176,
+      "win_pct": 36.3,
+      "avg_gross_pct": -1.1
+     }
+    }
+   },
+   "net_gex_negative": {
+    "negative": {
+     "n": 2960,
+     "W": 1015,
+     "L": 1749,
+     "F": 196,
+     "win_pct": 36.7,
+     "avg_gross_pct": -0.8
+    },
+    "positive_or_flat": {
+     "n": 6997,
+     "W": 2502,
+     "L": 4017,
+     "F": 478,
+     "win_pct": 38.4,
+     "avg_gross_pct": 0.1
+    }
+   },
+   "flip_and_negative": {
+    "flagged+neg": {
+     "n": 507,
+     "W": 164,
+     "L": 298,
+     "F": 45,
+     "win_pct": 35.5,
+     "avg_gross_pct": -1.3
+    },
+    "flagged+pos": {
+     "n": 3060,
+     "W": 1083,
+     "L": 1757,
+     "F": 220,
+     "win_pct": 38.1,
+     "avg_gross_pct": -0.0
+    },
+    "kept+neg": {
+     "n": 369,
+     "W": 158,
+     "L": 201,
+     "F": 10,
+     "win_pct": 44.0,
+     "avg_gross_pct": 3.6
+    },
+    "kept+pos": {
+     "n": 3915,
+     "W": 1409,
+     "L": 2249,
+     "F": 257,
+     "win_pct": 38.5,
+     "avg_gross_pct": 0.2
+    }
+   }
+  },
+  "candidates_pool": {
+   "universe": "Picks+Premove candidates on ticker-days with GEX",
+   "n_with_gex": 7135,
+   "n_with_flip": 5267,
+   "days_covered": 500,
+   "first_day": "2024-10-07",
+   "last_day": "2026-10-06",
+   "baseline": {
+    "n": 7135,
+    "W": 2612,
+    "L": 3947,
+    "F": 576,
+    "win_pct": 39.8,
+    "avg_gross_pct": 1.0
+   },
+   "flip_gate": {
+    "flagged (call below flip / put above flip)": {
+     "n": 2356,
+     "W": 815,
+     "L": 1338,
+     "F": 203,
+     "win_pct": 37.9,
+     "avg_gross_pct": -0.2
+    },
+    "kept": {
+     "n": 2911,
+     "W": 1114,
+     "L": 1557,
+     "F": 240,
+     "win_pct": 41.7,
+     "avg_gross_pct": 2.2
+    },
+    "call": {
+     "flagged": {
+      "n": 1497,
+      "W": 531,
+      "L": 851,
+      "F": 115,
+      "win_pct": 38.4,
+      "avg_gross_pct": 0.2
+     },
+     "kept": {
+      "n": 1555,
+      "W": 601,
+      "L": 839,
+      "F": 115,
+      "win_pct": 41.7,
+      "avg_gross_pct": 2.4
+     }
+    },
+    "put": {
+     "flagged": {
+      "n": 859,
+      "W": 284,
+      "L": 487,
+      "F": 88,
+      "win_pct": 36.8,
+      "avg_gross_pct": -0.9
+     },
+     "kept": {
+      "n": 1356,
+      "W": 513,
+      "L": 718,
+      "F": 125,
+      "win_pct": 41.7,
+      "avg_gross_pct": 2.0
+     }
+    }
+   },
+   "net_gex_negative": {
+    "negative": {
+     "n": 2406,
+     "W": 893,
+     "L": 1334,
+     "F": 179,
+     "win_pct": 40.1,
+     "avg_gross_pct": 1.1
+    },
+    "positive_or_flat": {
+     "n": 4729,
+     "W": 1719,
+     "L": 2613,
+     "F": 397,
+     "win_pct": 39.7,
+     "avg_gross_pct": 0.9
+    }
+   },
+   "flip_and_negative": {
+    "flagged+neg": {
+     "n": 233,
+     "W": 87,
+     "L": 120,
+     "F": 26,
+     "win_pct": 42.0,
+     "avg_gross_pct": 1.9
+    },
+    "flagged+pos": {
+     "n": 2123,
+     "W": 728,
+     "L": 1218,
+     "F": 177,
+     "win_pct": 37.4,
+     "avg_gross_pct": -0.5
+    },
+    "kept+neg": {
+     "n": 309,
+     "W": 123,
+     "L": 165,
+     "F": 21,
+     "win_pct": 42.7,
+     "avg_gross_pct": 2.9
+    },
+    "kept+pos": {
+     "n": 2602,
+     "W": 991,
+     "L": 1392,
+     "F": 219,
+     "win_pct": 41.6,
+     "avg_gross_pct": 2.1
+    }
+   }
+  },
+  "by_lane": {
+   "earnings run-up/run-down lanes": {
+    "universe": "earnings run-up/run-down lanes",
+    "n_with_gex": 598,
+    "n_with_flip": 512,
+    "days_covered": 273,
+    "first_day": "2024-10-07",
+    "last_day": "2026-10-02",
+    "baseline": {
+     "n": 598,
+     "W": 202,
+     "L": 309,
+     "F": 87,
+     "win_pct": 39.5,
+     "avg_gross_pct": 0.9
+    },
+    "flip_gate": {
+     "flagged (call below flip / put above flip)": {
+      "n": 256,
+      "W": 85,
+      "L": 132,
+      "F": 39,
+      "win_pct": 39.2,
+      "avg_gross_pct": 0.9
+     },
+     "kept": {
+      "n": 256,
+      "W": 85,
+      "L": 131,
+      "F": 40,
+      "win_pct": 39.4,
+      "avg_gross_pct": 1.0
+     },
+     "call": {
+      "flagged": {
+       "n": 157,
+       "W": 55,
+       "L": 79,
+       "F": 23,
+       "win_pct": 41.0,
+       "avg_gross_pct": 2.5
+      },
+      "kept": {
+       "n": 128,
+       "W": 50,
+       "L": 62,
+       "F": 16,
+       "win_pct": 44.6,
+       "avg_gross_pct": 3.8
+      }
+     },
+     "put": {
+      "flagged": {
+       "n": 99,
+       "W": 30,
+       "L": 53,
+       "F": 16,
+       "win_pct": 36.1,
+       "avg_gross_pct": -1.7
+      },
+      "kept": {
+       "n": 128,
+       "W": 35,
+       "L": 69,
+       "F": 24,
+       "win_pct": 33.7,
+       "avg_gross_pct": -1.8
+      }
+     }
+    },
+    "net_gex_negative": {
+     "negative": {
+      "n": 157,
+      "W": 57,
+      "L": 86,
+      "F": 14,
+      "win_pct": 39.9,
+      "avg_gross_pct": 0.7
+     },
+     "positive_or_flat": {
+      "n": 441,
+      "W": 145,
+      "L": 223,
+      "F": 73,
+      "win_pct": 39.4,
+      "avg_gross_pct": 1.0
+     }
+    },
+    "flip_and_negative": {
+     "flagged+neg": {
+      "n": 28,
+      "W": 8,
+      "L": 16,
+      "F": 4,
+      "win_pct": 33.3,
+      "avg_gross_pct": -1.6
+     },
+     "flagged+pos": {
+      "n": 228,
+      "W": 77,
+      "L": 116,
+      "F": 35,
+      "win_pct": 39.9,
+      "avg_gross_pct": 1.2
+     },
+     "kept+neg": {
+      "n": 44,
+      "W": 18,
+      "L": 24,
+      "F": 2,
+      "win_pct": 42.9,
+      "avg_gross_pct": 2.7
+     },
+     "kept+pos": {
+      "n": 212,
+      "W": 67,
+      "L": 107,
+      "F": 38,
+      "win_pct": 38.5,
+      "avg_gross_pct": 0.7
+     }
+    }
+   },
+   "lottery": {
+    "universe": "lottery",
+    "n_with_gex": 1467,
+    "n_with_flip": 1200,
+    "days_covered": 497,
+    "first_day": "2024-10-07",
+    "last_day": "2026-10-02",
+    "baseline": {
+     "n": 1467,
+     "W": 595,
+     "L": 872,
+     "F": 0,
+     "win_pct": 40.6,
+     "avg_gross_pct": 1.4
+    },
+    "flip_gate": {
+     "flagged (call below flip / put above flip)": {
+      "n": 531,
+      "W": 223,
+      "L": 308,
+      "F": 0,
+      "win_pct": 42.0,
+      "avg_gross_pct": 2.3
+     },
+     "kept": {
+      "n": 669,
+      "W": 274,
+      "L": 395,
+      "F": 0,
+      "win_pct": 41.0,
+      "avg_gross_pct": 1.6
+     },
+     "call": {
+      "flagged": {
+       "n": 285,
+       "W": 134,
+       "L": 151,
+       "F": 0,
+       "win_pct": 47.0,
+       "avg_gross_pct": 5.6
+      },
+      "kept": {
+       "n": 451,
+       "W": 196,
+       "L": 255,
+       "F": 0,
+       "win_pct": 43.5,
+       "avg_gross_pct": 3.2
+      }
+     },
+     "put": {
+      "flagged": {
+       "n": 246,
+       "W": 89,
+       "L": 157,
+       "F": 0,
+       "win_pct": 36.2,
+       "avg_gross_pct": -1.5
+      },
+      "kept": {
+       "n": 218,
+       "W": 78,
+       "L": 140,
+       "F": 0,
+       "win_pct": 35.8,
+       "avg_gross_pct": -1.7
+      }
+     }
+    },
+    "net_gex_negative": {
+     "negative": {
+      "n": 343,
+      "W": 122,
+      "L": 221,
+      "F": 0,
+      "win_pct": 35.6,
+      "avg_gross_pct": -1.9
+     },
+     "positive_or_flat": {
+      "n": 1124,
+      "W": 473,
+      "L": 651,
+      "F": 0,
+      "win_pct": 42.1,
+      "avg_gross_pct": 2.4
+     }
+    },
+    "flip_and_negative": {
+     "flagged+neg": {
+      "n": 38,
+      "W": 8,
+      "L": 30,
+      "F": 0,
+      "win_pct": 21.1,
+      "avg_gross_pct": -11.3
+     },
+     "flagged+pos": {
+      "n": 493,
+      "W": 215,
+      "L": 278,
+      "F": 0,
+      "win_pct": 43.6,
+      "avg_gross_pct": 3.3
+     },
+     "kept+neg": {
+      "n": 54,
+      "W": 24,
+      "L": 30,
+      "F": 0,
+      "win_pct": 44.4,
+      "avg_gross_pct": 3.9
+     },
+     "kept+pos": {
+      "n": 615,
+      "W": 250,
+      "L": 365,
+      "F": 0,
+      "win_pct": 40.7,
+      "avg_gross_pct": 1.4
+     }
+    }
+   },
+   "main picks": {
+    "universe": "main picks",
+    "n_with_gex": 1493,
+    "n_with_flip": 1145,
+    "days_covered": 500,
+    "first_day": "2024-10-07",
+    "last_day": "2026-10-06",
+    "baseline": {
+     "n": 1493,
+     "W": 539,
+     "L": 832,
+     "F": 122,
+     "win_pct": 39.3,
+     "avg_gross_pct": 0.7
+    },
+    "flip_gate": {
+     "flagged (call below flip / put above flip)": {
+      "n": 559,
+      "W": 199,
+      "L": 306,
+      "F": 54,
+      "win_pct": 39.4,
+      "avg_gross_pct": 0.8
+     },
+     "kept": {
+      "n": 586,
+      "W": 211,
+      "L": 333,
+      "F": 42,
+      "win_pct": 38.8,
+      "avg_gross_pct": 0.6
+     },
+     "call": {
+      "flagged": {
+       "n": 371,
+       "W": 142,
+       "L": 199,
+       "F": 30,
+       "win_pct": 41.6,
+       "avg_gross_pct": 2.2
+      },
+      "kept": {
+       "n": 304,
+       "W": 108,
+       "L": 177,
+       "F": 19,
+       "win_pct": 37.9,
+       "avg_gross_pct": 0.1
+      }
+     },
+     "put": {
+      "flagged": {
+       "n": 188,
+       "W": 57,
+       "L": 107,
+       "F": 24,
+       "win_pct": 34.8,
+       "avg_gross_pct": -1.9
+      },
+      "kept": {
+       "n": 282,
+       "W": 103,
+       "L": 156,
+       "F": 23,
+       "win_pct": 39.8,
+       "avg_gross_pct": 1.1
+      }
+     }
+    },
+    "net_gex_negative": {
+     "negative": {
+      "n": 453,
+      "W": 175,
+      "L": 247,
+      "F": 31,
+      "win_pct": 41.5,
+      "avg_gross_pct": 1.9
+     },
+     "positive_or_flat": {
+      "n": 1040,
+      "W": 364,
+      "L": 585,
+      "F": 91,
+      "win_pct": 38.4,
+      "avg_gross_pct": 0.2
+     }
+    },
+    "flip_and_negative": {
+     "flagged+neg": {
+      "n": 38,
+      "W": 16,
+      "L": 18,
+      "F": 4,
+      "win_pct": 47.1,
+      "avg_gross_pct": 5.7
+     },
+     "flagged+pos": {
+      "n": 521,
+      "W": 183,
+      "L": 288,
+      "F": 50,
+      "win_pct": 38.9,
+      "avg_gross_pct": 0.4
+     },
+     "kept+neg": {
+      "n": 69,
+      "W": 30,
+      "L": 37,
+      "F": 2,
+      "win_pct": 44.8,
+      "avg_gross_pct": 4.3
+     },
+     "kept+pos": {
+      "n": 517,
+      "W": 181,
+      "L": 296,
+      "F": 40,
+      "win_pct": 37.9,
+      "avg_gross_pct": 0.1
+     }
+    }
+   },
+   "premove": {
+    "universe": "premove",
+    "n_with_gex": 1491,
+    "n_with_flip": 1113,
+    "days_covered": 499,
+    "first_day": "2024-10-07",
+    "last_day": "2026-10-05",
+    "baseline": {
+     "n": 1491,
+     "W": 552,
+     "L": 833,
+     "F": 106,
+     "win_pct": 39.9,
+     "avg_gross_pct": 1.0
+    },
+    "flip_gate": {
+     "flagged (call below flip / put above flip)": {
+      "n": 531,
+      "W": 187,
+      "L": 303,
+      "F": 41,
+      "win_pct": 38.2,
+      "avg_gross_pct": -0.1
+     },
+     "kept": {
+      "n": 582,
+      "W": 238,
+      "L": 312,
+      "F": 32,
+      "win_pct": 43.3,
+      "avg_gross_pct": 3.0
+     },
+     "call": {
+      "flagged": {
+       "n": 354,
+       "W": 122,
+       "L": 206,
+       "F": 26,
+       "win_pct": 37.2,
+       "avg_gross_pct": -0.5
+      },
+      "kept": {
+       "n": 322,
+       "W": 137,
+       "L": 168,
+       "F": 17,
+       "win_pct": 44.9,
+       "avg_gross_pct": 4.2
+      }
+     },
+     "put": {
+      "flagged": {
+       "n": 177,
+       "W": 65,
+       "L": 97,
+       "F": 15,
+       "win_pct": 40.1,
+       "avg_gross_pct": 0.8
+      },
+      "kept": {
+       "n": 260,
+       "W": 101,
+       "L": 144,
+       "F": 15,
+       "win_pct": 41.2,
+       "avg_gross_pct": 1.6
+      }
+     }
+    },
+    "net_gex_negative": {
+     "negative": {
+      "n": 510,
+      "W": 183,
+      "L": 288,
+      "F": 39,
+      "win_pct": 38.9,
+      "avg_gross_pct": 0.5
+     },
+     "positive_or_flat": {
+      "n": 981,
+      "W": 369,
+      "L": 545,
+      "F": 67,
+      "win_pct": 40.4,
+      "avg_gross_pct": 1.2
+     }
+    },
+    "flip_and_negative": {
+     "flagged+neg": {
+      "n": 56,
+      "W": 25,
+      "L": 28,
+      "F": 3,
+      "win_pct": 47.2,
+      "avg_gross_pct": 5.3
+     },
+     "flagged+pos": {
+      "n": 475,
+      "W": 162,
+      "L": 275,
+      "F": 38,
+      "win_pct": 37.1,
+      "avg_gross_pct": -0.7
+     },
+     "kept+neg": {
+      "n": 76,
+      "W": 31,
+      "L": 42,
+      "F": 3,
+      "win_pct": 42.5,
+      "avg_gross_pct": 3.1
+     },
+     "kept+pos": {
+      "n": 506,
+      "W": 207,
+      "L": 270,
+      "F": 29,
+      "win_pct": 43.4,
+      "avg_gross_pct": 3.0
+     }
+    }
+   },
+   "puts": {
+    "universe": "puts",
+    "n_with_gex": 1490,
+    "n_with_flip": 1199,
+    "days_covered": 500,
+    "first_day": "2024-10-07",
+    "last_day": "2026-10-06",
+    "baseline": {
+     "n": 1490,
+     "W": 458,
+     "L": 915,
+     "F": 117,
+     "win_pct": 33.4,
+     "avg_gross_pct": -2.9
+    },
+    "flip_gate": {
+     "flagged (call below flip / put above flip)": {
+      "n": 581,
+      "W": 179,
+      "L": 360,
+      "F": 42,
+      "win_pct": 33.2,
+      "avg_gross_pct": -3.1
+     },
+     "kept": {
+      "n": 618,
+      "W": 187,
+      "L": 377,
+      "F": 54,
+      "win_pct": 33.2,
+      "avg_gross_pct": -3.2
+     },
+     "call": {
+      "flagged": {
+       "n": 0,
+       "W": 0,
+       "L": 0,
+       "F": 0,
+       "win_pct": null
+      },
+      "kept": {
+       "n": 0,
+       "W": 0,
+       "L": 0,
+       "F": 0,
+       "win_pct": null
+      }
+     },
+     "put": {
+      "flagged": {
+       "n": 581,
+       "W": 179,
+       "L": 360,
+       "F": 42,
+       "win_pct": 33.2,
+       "avg_gross_pct": -3.1
+      },
+      "kept": {
+       "n": 618,
+       "W": 187,
+       "L": 377,
+       "F": 54,
+       "win_pct": 33.2,
+       "avg_gross_pct": -3.2
+      }
+     }
+    },
+    "net_gex_negative": {
+     "negative": {
+      "n": 424,
+      "W": 129,
+      "L": 261,
+      "F": 34,
+      "win_pct": 33.1,
+      "avg_gross_pct": -2.6
+     },
+     "positive_or_flat": {
+      "n": 1066,
+      "W": 329,
+      "L": 654,
+      "F": 83,
+      "win_pct": 33.5,
+      "avg_gross_pct": -3.0
+     }
+    },
+    "flip_and_negative": {
+     "flagged+neg": {
+      "n": 132,
+      "W": 37,
+      "L": 82,
+      "F": 13,
+      "win_pct": 31.1,
+      "avg_gross_pct": -4.0
+     },
+     "flagged+pos": {
+      "n": 449,
+      "W": 142,
+      "L": 278,
+      "F": 29,
+      "win_pct": 33.8,
+      "avg_gross_pct": -2.8
+     },
+     "kept+neg": {
+      "n": 1,
+      "W": 0,
+      "L": 1,
+      "F": 0,
+      "win_pct": 0.0,
+      "avg_gross_pct": -25.0
+     },
+     "kept+pos": {
+      "n": 617,
+      "W": 187,
+      "L": 376,
+      "F": 54,
+      "win_pct": 33.2,
+      "avg_gross_pct": -3.2
+     }
+    }
+   },
+   "setup lanes": {
+    "universe": "setup lanes",
+    "n_with_gex": 3418,
+    "n_with_flip": 2682,
+    "days_covered": 499,
+    "first_day": "2024-10-07",
+    "last_day": "2026-10-06",
+    "baseline": {
+     "n": 3418,
+     "W": 1171,
+     "L": 2005,
+     "F": 242,
+     "win_pct": 36.9,
+     "avg_gross_pct": -0.7
+    },
+    "flip_gate": {
+     "flagged (call below flip / put above flip)": {
+      "n": 1109,
+      "W": 374,
+      "L": 646,
+      "F": 89,
+      "win_pct": 36.7,
+      "avg_gross_pct": -0.8
+     },
+     "kept": {
+      "n": 1573,
+      "W": 572,
+      "L": 902,
+      "F": 99,
+      "win_pct": 38.8,
+      "avg_gross_pct": 0.5
+     },
+     "call": {
+      "flagged": {
+       "n": 607,
+       "W": 213,
+       "L": 349,
+       "F": 45,
+       "win_pct": 37.9,
+       "avg_gross_pct": -0.1
+      },
+      "kept": {
+       "n": 1001,
+       "W": 386,
+       "L": 576,
+       "F": 39,
+       "win_pct": 40.1,
+       "avg_gross_pct": 1.3
+      }
+     },
+     "put": {
+      "flagged": {
+       "n": 502,
+       "W": 161,
+       "L": 297,
+       "F": 44,
+       "win_pct": 35.2,
+       "avg_gross_pct": -1.6
+      },
+      "kept": {
+       "n": 572,
+       "W": 186,
+       "L": 326,
+       "F": 60,
+       "win_pct": 36.3,
+       "avg_gross_pct": -0.9
+      }
+     }
+    },
+    "net_gex_negative": {
+     "negative": {
+      "n": 1073,
+      "W": 349,
+      "L": 646,
+      "F": 78,
+      "win_pct": 35.1,
+      "avg_gross_pct": -1.7
+     },
+     "positive_or_flat": {
+      "n": 2345,
+      "W": 822,
+      "L": 1359,
+      "F": 164,
+      "win_pct": 37.7,
+      "avg_gross_pct": -0.2
+     }
+    },
+    "flip_and_negative": {
+     "flagged+neg": {
+      "n": 215,
+      "W": 70,
+      "L": 124,
+      "F": 21,
+      "win_pct": 36.1,
+      "avg_gross_pct": -0.8
+     },
+     "flagged+pos": {
+      "n": 894,
+      "W": 304,
+      "L": 522,
+      "F": 68,
+      "win_pct": 36.8,
+      "avg_gross_pct": -0.8
+     },
+     "kept+neg": {
+      "n": 125,
+      "W": 55,
+      "L": 67,
+      "F": 3,
+      "win_pct": 45.1,
+      "avg_gross_pct": 4.0
+     },
+     "kept+pos": {
+      "n": 1448,
+      "W": 517,
+      "L": 835,
+      "F": 96,
+      "win_pct": 38.2,
+      "avg_gross_pct": 0.2
+     }
+    }
+   }
+  }
+ },
+ "robustness": {
+  "spread>10% candidates_pool": {
+   "z_win_rate_kept_minus_flagged": 1.12,
+   "by_year": {
+    "2024-10..2025-09": {
+     "flagged": {
+      "n": 944,
+      "W": 333,
+      "L": 498,
+      "F": 113,
+      "win_pct": 40.1,
+      "avg_gross_pct": 1.2
+     },
+     "kept": {
+      "n": 6138,
+      "W": 2288,
+      "L": 3332,
+      "F": 518,
+      "win_pct": 40.7,
+      "avg_gross_pct": 1.6
+     },
+     "z_kept_minus_flagged": 0.35
+    },
+    "2025-10..2026-10": {
+     "flagged": {
+      "n": 1553,
+      "W": 513,
+      "L": 855,
+      "F": 185,
+      "win_pct": 37.5,
+      "avg_gross_pct": -0.3
+     },
+     "kept": {
+      "n": 6262,
+      "W": 2220,
+      "L": 3501,
+      "F": 541,
+      "win_pct": 38.8,
+      "avg_gross_pct": 0.4
+     },
+     "z_kept_minus_flagged": 0.89
+    }
+   }
+  },
+  "spread>10% logged_entries": {
+   "z_win_rate_kept_minus_flagged": 0.2,
+   "by_year": {
+    "2024-10..2025-09": {
+     "flagged": {
+      "n": 1265,
+      "W": 448,
+      "L": 739,
+      "F": 78,
+      "win_pct": 37.7,
+      "avg_gross_pct": -0.3
+     },
+     "kept": {
+      "n": 3474,
+      "W": 1272,
+      "L": 1961,
+      "F": 241,
+      "win_pct": 39.3,
+      "avg_gross_pct": 0.7
+     },
+     "z_kept_minus_flagged": 0.97
+    },
+    "2025-10..2026-10": {
+     "flagged": {
+      "n": 1551,
+      "W": 544,
+      "L": 901,
+      "F": 106,
+      "win_pct": 37.6,
+      "avg_gross_pct": -0.2
+     },
+     "kept": {
+      "n": 3614,
+      "W": 1226,
+      "L": 2129,
+      "F": 259,
+      "win_pct": 36.5,
+      "avg_gross_pct": -0.9
+     },
+     "z_kept_minus_flagged": -0.73
+    }
+   }
+  },
+  "gamma_flip candidates_pool": {
+   "z_win_rate_kept_minus_flagged": 2.72,
+   "by_year": {
+    "2024-10..2025-09": {
+     "flagged": {
+      "n": 1207,
+      "W": 443,
+      "L": 668,
+      "F": 96,
+      "win_pct": 39.9,
+      "avg_gross_pct": 1.1
+     },
+     "kept": {
+      "n": 1634,
+      "W": 616,
+      "L": 883,
+      "F": 135,
+      "win_pct": 41.1,
+      "avg_gross_pct": 1.7
+     },
+     "z_kept_minus_flagged": 0.63
+    },
+    "2025-10..2026-10": {
+     "flagged": {
+      "n": 1149,
+      "W": 372,
+      "L": 670,
+      "F": 107,
+      "win_pct": 35.7,
+      "avg_gross_pct": -1.6
+     },
+     "kept": {
+      "n": 1277,
+      "W": 498,
+      "L": 674,
+      "F": 105,
+      "win_pct": 42.5,
+      "avg_gross_pct": 2.8
+     },
+     "z_kept_minus_flagged": 3.27
+    }
+   }
+  },
+  "gamma_flip logged_entries": {
+   "z_win_rate_kept_minus_flagged": 1.09,
+   "by_year": {
+    "2024-10..2025-09": {
+     "flagged": {
+      "n": 1721,
+      "W": 647,
+      "L": 947,
+      "F": 127,
+      "win_pct": 40.6,
+      "avg_gross_pct": 1.4
+     },
+     "kept": {
+      "n": 2224,
+      "W": 794,
+      "L": 1288,
+      "F": 142,
+      "win_pct": 38.1,
+      "avg_gross_pct": -0.0
+     },
+     "z_kept_minus_flagged": -1.51
+    },
+    "2025-10..2026-10": {
+     "flagged": {
+      "n": 1846,
+      "W": 600,
+      "L": 1108,
+      "F": 138,
+      "win_pct": 35.1,
+      "avg_gross_pct": -1.8
+     },
+     "kept": {
+      "n": 2060,
+      "W": 773,
+      "L": 1162,
+      "F": 125,
+      "win_pct": 39.9,
+      "avg_gross_pct": 1.1
+     },
+     "z_kept_minus_flagged": 3.0
+    }
+   }
+  }
+ },
+ "gate_metrics": {
+  "spread": {
+   "candidates_pool": {
+    ">5%": {
+     "n": 14897,
+     "flagged": {
+      "n": 4935,
+      "W": 1701,
+      "L": 2684,
+      "F": 550,
+      "win_pct": 38.8,
+      "avg_gross_pct": 0.5,
+      "avg_ev_net_pct": -13.0,
+      "avg_loss_net_pct": -34.9
+     },
+     "kept": {
+      "n": 9962,
+      "W": 3653,
+      "L": 5502,
+      "F": 807,
+      "win_pct": 39.9,
+      "avg_gross_pct": 1.1,
+      "avg_ev_net_pct": -0.8,
+      "avg_loss_net_pct": -26.4
+     },
+     "dropped_pct_of_setups": 33.1,
+     "winners_kept_pct": 68.2,
+     "z_win_kept_minus_flagged": 1.24,
+     "meets_target (drop 20-30%, keep >80% winners, kept win% > flagged)": false
+    },
+    ">10%": {
+     "n": 14897,
+     "flagged": {
+      "n": 2497,
+      "W": 846,
+      "L": 1353,
+      "F": 298,
+      "win_pct": 38.5,
+      "avg_gross_pct": 0.3,
+      "avg_ev_net_pct": -19.6,
+      "avg_loss_net_pct": -39.7
+     },
+     "kept": {
+      "n": 12400,
+      "W": 4508,
+      "L": 6833,
+      "F": 1059,
+      "win_pct": 39.7,
+      "avg_gross_pct": 1.0,
+      "avg_ev_net_pct": -1.9,
+      "avg_loss_net_pct": -27.1
+     },
+     "dropped_pct_of_setups": 16.8,
+     "winners_kept_pct": 84.2,
+     "z_win_kept_minus_flagged": 1.12,
+     "meets_target (drop 20-30%, keep >80% winners, kept win% > flagged)": false
+    },
+    ">15%": {
+     "n": 14897,
+     "flagged": {
+      "n": 1446,
+      "W": 489,
+      "L": 784,
+      "F": 173,
+      "win_pct": 38.4,
+      "avg_gross_pct": 0.2,
+      "avg_ev_net_pct": -25.7,
+      "avg_loss_net_pct": -44.2
+     },
+     "kept": {
+      "n": 13451,
+      "W": 4865,
+      "L": 7402,
+      "F": 1184,
+      "win_pct": 39.7,
+      "avg_gross_pct": 1.0,
+      "avg_ev_net_pct": -2.6,
+      "avg_loss_net_pct": -27.6
+     },
+     "dropped_pct_of_setups": 9.7,
+     "winners_kept_pct": 90.9,
+     "z_win_kept_minus_flagged": 0.87,
+     "meets_target (drop 20-30%, keep >80% winners, kept win% > flagged)": false
+    }
+   },
+   "logged_entries": {
+    ">5%": {
+     "n": 9904,
+     "flagged": {
+      "n": 4655,
+      "W": 1647,
+      "L": 2669,
+      "F": 339,
+      "win_pct": 38.2,
+      "avg_gross_pct": 0.1,
+      "avg_ev_net_pct": -17.1,
+      "avg_loss_net_pct": -37.7
+     },
+     "kept": {
+      "n": 5249,
+      "W": 1843,
+      "L": 3061,
+      "F": 345,
+      "win_pct": 37.6,
+      "avg_gross_pct": -0.4,
+      "avg_ev_net_pct": -2.5,
+      "avg_loss_net_pct": -26.6
+     },
+     "dropped_pct_of_setups": 47.0,
+     "winners_kept_pct": 52.8,
+     "z_win_kept_minus_flagged": -0.57,
+     "meets_target (drop 20-30%, keep >80% winners, kept win% > flagged)": false
+    },
+    ">10%": {
+     "n": 9904,
+     "flagged": {
+      "n": 2816,
+      "W": 992,
+      "L": 1640,
+      "F": 184,
+      "win_pct": 37.7,
+      "avg_gross_pct": -0.3,
+      "avg_ev_net_pct": -24.2,
+      "avg_loss_net_pct": -42.5
+     },
+     "kept": {
+      "n": 7088,
+      "W": 2498,
+      "L": 4090,
+      "F": 500,
+      "win_pct": 37.9,
+      "avg_gross_pct": -0.1,
+      "avg_ev_net_pct": -3.5,
+      "avg_loss_net_pct": -27.5
+     },
+     "dropped_pct_of_setups": 28.4,
+     "winners_kept_pct": 71.6,
+     "z_win_kept_minus_flagged": 0.2,
+     "meets_target (drop 20-30%, keep >80% winners, kept win% > flagged)": false
+    },
+    ">15%": {
+     "n": 9904,
+     "flagged": {
+      "n": 1908,
+      "W": 692,
+      "L": 1100,
+      "F": 116,
+      "win_pct": 38.6,
+      "avg_gross_pct": 0.3,
+      "avg_ev_net_pct": -29.6,
+      "avg_loss_net_pct": -46.8
+     },
+     "kept": {
+      "n": 7996,
+      "W": 2798,
+      "L": 4630,
+      "F": 568,
+      "win_pct": 37.7,
+      "avg_gross_pct": -0.3,
+      "avg_ev_net_pct": -4.5,
+      "avg_loss_net_pct": -28.2
+     },
+     "dropped_pct_of_setups": 19.3,
+     "winners_kept_pct": 80.2,
+     "z_win_kept_minus_flagged": -0.74,
+     "meets_target (drop 20-30%, keep >80% winners, kept win% > flagged)": false
+    }
+   },
+   "by_lane_10pct": {
+    "earnings run-up/run-down lanes": {
+     "n": 603,
+     "flagged": {
+      "n": 158,
+      "W": 46,
+      "L": 85,
+      "F": 27,
+      "win_pct": 35.1,
+      "avg_gross_pct": -1.6,
+      "avg_ev_net_pct": -20.4,
+      "avg_loss_net_pct": -39.4
+     },
+     "kept": {
+      "n": 445,
+      "W": 155,
+      "L": 226,
+      "F": 64,
+      "win_pct": 40.7,
+      "avg_gross_pct": 1.7,
+      "avg_ev_net_pct": -2.7,
+      "avg_loss_net_pct": -28.2
+     },
+     "dropped_pct_of_setups": 26.2,
+     "winners_kept_pct": 77.1,
+     "z_win_kept_minus_flagged": 1.13,
+     "meets_target (drop 20-30%, keep >80% winners, kept win% > flagged)": false
+    },
+    "lottery": {
+     "n": 1464,
+     "flagged": {
+      "n": 971,
+      "W": 389,
+      "L": 582,
+      "F": 0,
+      "win_pct": 40.1,
+      "avg_gross_pct": 1.0,
+      "avg_ev_net_pct": -29.5,
+      "avg_loss_net_pct": -47.0
+     },
+     "kept": {
+      "n": 493,
+      "W": 205,
+      "L": 288,
+      "F": 0,
+      "win_pct": 41.6,
+      "avg_gross_pct": 2.0,
+      "avg_ev_net_pct": -3.3,
+      "avg_loss_net_pct": -28.9
+     },
+     "dropped_pct_of_setups": 66.3,
+     "winners_kept_pct": 34.5,
+     "z_win_kept_minus_flagged": 0.56,
+     "meets_target (drop 20-30%, keep >80% winners, kept win% > flagged)": false
+    },
+    "main picks": {
+     "n": 1461,
+     "flagged": {
+      "n": 247,
+      "W": 77,
+      "L": 139,
+      "F": 31,
+      "win_pct": 35.6,
+      "avg_gross_pct": -1.0,
+      "avg_ev_net_pct": -21.8,
+      "avg_loss_net_pct": -40.3
+     },
+     "kept": {
+      "n": 1214,
+      "W": 446,
+      "L": 675,
+      "F": 93,
+      "win_pct": 39.8,
+      "avg_gross_pct": 0.9,
+      "avg_ev_net_pct": -2.0,
+      "avg_loss_net_pct": -27.1
+     },
+     "dropped_pct_of_setups": 16.9,
+     "winners_kept_pct": 85.3,
+     "z_win_kept_minus_flagged": 1.14,
+     "meets_target (drop 20-30%, keep >80% winners, kept win% > flagged)": false
+    },
+    "premove": {
+     "n": 1465,
+     "flagged": {
+      "n": 186,
+      "W": 65,
+      "L": 102,
+      "F": 19,
+      "win_pct": 38.9,
+      "avg_gross_pct": 0.5,
+      "avg_ev_net_pct": -20.3,
+      "avg_loss_net_pct": -39.5
+     },
+     "kept": {
+      "n": 1279,
+      "W": 474,
+      "L": 717,
+      "F": 88,
+      "win_pct": 39.8,
+      "avg_gross_pct": 0.9,
+      "avg_ev_net_pct": -1.6,
+      "avg_loss_net_pct": -26.9
+     },
+     "dropped_pct_of_setups": 12.7,
+     "winners_kept_pct": 87.9,
+     "z_win_kept_minus_flagged": 0.22,
+     "meets_target (drop 20-30%, keep >80% winners, kept win% > flagged)": false
+    },
+    "puts": {
+     "n": 1496,
+     "flagged": {
+      "n": 479,
+      "W": 151,
+      "L": 283,
+      "F": 45,
+      "win_pct": 34.8,
+      "avg_gross_pct": -2.0,
+      "avg_ev_net_pct": -22.0,
+      "avg_loss_net_pct": -39.8
+     },
+     "kept": {
+      "n": 1017,
+      "W": 310,
+      "L": 633,
+      "F": 74,
+      "win_pct": 32.9,
+      "avg_gross_pct": -3.2,
+      "avg_ev_net_pct": -6.9,
+      "avg_loss_net_pct": -27.7
+     },
+     "dropped_pct_of_setups": 32.0,
+     "winners_kept_pct": 67.2,
+     "z_win_kept_minus_flagged": -0.7,
+     "meets_target (drop 20-30%, keep >80% winners, kept win% > flagged)": false
+    },
+    "setup lanes": {
+     "n": 3415,
+     "flagged": {
+      "n": 775,
+      "W": 264,
+      "L": 449,
+      "F": 62,
+      "win_pct": 37.0,
+      "avg_gross_pct": -0.5,
+      "avg_ev_net_pct": -21.3,
+      "avg_loss_net_pct": -40.2
+     },
+     "kept": {
+      "n": 2640,
+      "W": 908,
+      "L": 1551,
+      "F": 181,
+      "win_pct": 36.9,
+      "avg_gross_pct": -0.6,
+      "avg_ev_net_pct": -4.0,
+      "avg_loss_net_pct": -27.5
+     },
+     "dropped_pct_of_setups": 22.7,
+     "winners_kept_pct": 77.5,
+     "z_win_kept_minus_flagged": -0.05,
+     "meets_target (drop 20-30%, keep >80% winners, kept win% > flagged)": false
+    }
+   }
+  },
+  "gamma": {
+   "candidates_pool": {
+    "A: calls below flip + puts above flip flagged": {
+     "n": 5267,
+     "flagged": {
+      "n": 2356,
+      "W": 815,
+      "L": 1338,
+      "F": 203,
+      "win_pct": 37.9,
+      "avg_gross_pct": -0.2,
+      "avg_ev_net_pct": -4.9,
+      "avg_loss_net_pct": -28.5
+     },
+     "kept": {
+      "n": 2911,
+      "W": 1114,
+      "L": 1557,
+      "F": 240,
+      "win_pct": 41.7,
+      "avg_gross_pct": 2.2,
+      "avg_ev_net_pct": -2.3,
+      "avg_loss_net_pct": -28.6
+     },
+     "dropped_pct_of_setups": 44.7,
+     "winners_kept_pct": 57.8,
+     "z_win_kept_minus_flagged": 2.72,
+     "meets_target (drop 20-30%, keep >80% winners, kept win% > flagged)": false
+    },
+    "B: calls above flip + puts below flip flagged": {
+     "n": 5267,
+     "flagged": {
+      "n": 2911,
+      "W": 1114,
+      "L": 1557,
+      "F": 240,
+      "win_pct": 41.7,
+      "avg_gross_pct": 2.2,
+      "avg_ev_net_pct": -2.3,
+      "avg_loss_net_pct": -28.6
+     },
+     "kept": {
+      "n": 2356,
+      "W": 815,
+      "L": 1338,
+      "F": 203,
+      "win_pct": 37.9,
+      "avg_gross_pct": -0.2,
+      "avg_ev_net_pct": -4.9,
+      "avg_loss_net_pct": -28.5
+     },
+     "dropped_pct_of_setups": 55.3,
+     "winners_kept_pct": 42.2,
+     "z_win_kept_minus_flagged": -2.72,
+     "meets_target (drop 20-30%, keep >80% winners, kept win% > flagged)": false
+    },
+    "calls below flip flagged": {
+     "n": 3052,
+     "flagged": {
+      "n": 1497,
+      "W": 531,
+      "L": 851,
+      "F": 115,
+      "win_pct": 38.4,
+      "avg_gross_pct": 0.2,
+      "avg_ev_net_pct": -4.3,
+      "avg_loss_net_pct": -28.3
+     },
+     "kept": {
+      "n": 1555,
+      "W": 601,
+      "L": 839,
+      "F": 115,
+      "win_pct": 41.7,
+      "avg_gross_pct": 2.4,
+      "avg_ev_net_pct": -2.7,
+      "avg_loss_net_pct": -29.1
+     },
+     "dropped_pct_of_setups": 49.0,
+     "winners_kept_pct": 53.1,
+     "z_win_kept_minus_flagged": 1.8,
+     "meets_target (drop 20-30%, keep >80% winners, kept win% > flagged)": false
+    },
+    "calls above flip flagged": {
+     "n": 3052,
+     "flagged": {
+      "n": 1555,
+      "W": 601,
+      "L": 839,
+      "F": 115,
+      "win_pct": 41.7,
+      "avg_gross_pct": 2.4,
+      "avg_ev_net_pct": -2.7,
+      "avg_loss_net_pct": -29.1
+     },
+     "kept": {
+      "n": 1497,
+      "W": 531,
+      "L": 851,
+      "F": 115,
+      "win_pct": 38.4,
+      "avg_gross_pct": 0.2,
+      "avg_ev_net_pct": -4.3,
+      "avg_loss_net_pct": -28.3
+     },
+     "dropped_pct_of_setups": 51.0,
+     "winners_kept_pct": 46.9,
+     "z_win_kept_minus_flagged": -1.8,
+     "meets_target (drop 20-30%, keep >80% winners, kept win% > flagged)": false
+    },
+    "puts above flip flagged": {
+     "n": 2215,
+     "flagged": {
+      "n": 859,
+      "W": 284,
+      "L": 487,
+      "F": 88,
+      "win_pct": 36.8,
+      "avg_gross_pct": -0.9,
+      "avg_ev_net_pct": -6.0,
+      "avg_loss_net_pct": -28.9
+     },
+     "kept": {
+      "n": 1356,
+      "W": 513,
+      "L": 718,
+      "F": 125,
+      "win_pct": 41.7,
+      "avg_gross_pct": 2.0,
+      "avg_ev_net_pct": -2.0,
+      "avg_loss_net_pct": -28.0
+     },
+     "dropped_pct_of_setups": 38.8,
+     "winners_kept_pct": 64.4,
+     "z_win_kept_minus_flagged": 2.15,
+     "meets_target (drop 20-30%, keep >80% winners, kept win% > flagged)": false
+    },
+    "puts below flip flagged": {
+     "n": 2215,
+     "flagged": {
+      "n": 1356,
+      "W": 513,
+      "L": 718,
+      "F": 125,
+      "win_pct": 41.7,
+      "avg_gross_pct": 2.0,
+      "avg_ev_net_pct": -2.0,
+      "avg_loss_net_pct": -28.0
+     },
+     "kept": {
+      "n": 859,
+      "W": 284,
+      "L": 487,
+      "F": 88,
+      "win_pct": 36.8,
+      "avg_gross_pct": -0.9,
+      "avg_ev_net_pct": -6.0,
+      "avg_loss_net_pct": -28.9
+     },
+     "dropped_pct_of_setups": 61.2,
+     "winners_kept_pct": 35.6,
+     "z_win_kept_minus_flagged": -2.15,
+     "meets_target (drop 20-30%, keep >80% winners, kept win% > flagged)": false
+    },
+    "net GEX negative flagged": {
+     "n": 7135,
+     "flagged": {
+      "n": 2406,
+      "W": 893,
+      "L": 1334,
+      "F": 179,
+      "win_pct": 40.1,
+      "avg_gross_pct": 1.1,
+      "avg_ev_net_pct": -2.3,
+      "avg_loss_net_pct": -27.4
+     },
+     "kept": {
+      "n": 4729,
+      "W": 1719,
+      "L": 2613,
+      "F": 397,
+      "win_pct": 39.7,
+      "avg_gross_pct": 0.9,
+      "avg_ev_net_pct": -3.6,
+      "avg_loss_net_pct": -28.5
+     },
+     "dropped_pct_of_setups": 33.7,
+     "winners_kept_pct": 65.8,
+     "z_win_kept_minus_flagged": -0.33,
+     "meets_target (drop 20-30%, keep >80% winners, kept win% > flagged)": false
+    },
+    "net GEX positive flagged": {
+     "n": 7135,
+     "flagged": {
+      "n": 4729,
+      "W": 1719,
+      "L": 2613,
+      "F": 397,
+      "win_pct": 39.7,
+      "avg_gross_pct": 0.9,
+      "avg_ev_net_pct": -3.6,
+      "avg_loss_net_pct": -28.5
+     },
+     "kept": {
+      "n": 2406,
+      "W": 893,
+      "L": 1334,
+      "F": 179,
+      "win_pct": 40.1,
+      "avg_gross_pct": 1.1,
+      "avg_ev_net_pct": -2.3,
+      "avg_loss_net_pct": -27.4
+     },
+     "dropped_pct_of_setups": 66.3,
+     "winners_kept_pct": 34.2,
+     "z_win_kept_minus_flagged": 0.33,
+     "meets_target (drop 20-30%, keep >80% winners, kept win% > flagged)": false
+    },
+    "A: calls below flip + puts above flip flagged \u2014 by year": {
+     "2024-10..2025-09": {
+      "flagged": {
+       "n": 1207,
+       "W": 443,
+       "L": 668,
+       "F": 96,
+       "win_pct": 39.9,
+       "avg_gross_pct": 1.1
+      },
+      "kept": {
+       "n": 1634,
+       "W": 616,
+       "L": 883,
+       "F": 135,
+       "win_pct": 41.1,
+       "avg_gross_pct": 1.7
+      },
+      "z_kept_minus_flagged": 0.63
+     },
+     "2025-10..2026-10": {
+      "flagged": {
+       "n": 1149,
+       "W": 372,
+       "L": 670,
+       "F": 107,
+       "win_pct": 35.7,
+       "avg_gross_pct": -1.6
+      },
+      "kept": {
+       "n": 1277,
+       "W": 498,
+       "L": 674,
+       "F": 105,
+       "win_pct": 42.5,
+       "avg_gross_pct": 2.8
+      },
+      "z_kept_minus_flagged": 3.27
+     }
+    },
+    "B: calls above flip + puts below flip flagged \u2014 by year": {
+     "2024-10..2025-09": {
+      "flagged": {
+       "n": 1634,
+       "W": 616,
+       "L": 883,
+       "F": 135,
+       "win_pct": 41.1,
+       "avg_gross_pct": 1.7
+      },
+      "kept": {
+       "n": 1207,
+       "W": 443,
+       "L": 668,
+       "F": 96,
+       "win_pct": 39.9,
+       "avg_gross_pct": 1.1
+      },
+      "z_kept_minus_flagged": -0.63
+     },
+     "2025-10..2026-10": {
+      "flagged": {
+       "n": 1277,
+       "W": 498,
+       "L": 674,
+       "F": 105,
+       "win_pct": 42.5,
+       "avg_gross_pct": 2.8
+      },
+      "kept": {
+       "n": 1149,
+       "W": 372,
+       "L": 670,
+       "F": 107,
+       "win_pct": 35.7,
+       "avg_gross_pct": -1.6
+      },
+      "z_kept_minus_flagged": -3.27
+     }
+    }
+   },
+   "logged_entries": {
+    "A: calls below flip + puts above flip flagged": {
+     "n": 7851,
+     "flagged": {
+      "n": 3567,
+      "W": 1247,
+      "L": 2055,
+      "F": 265,
+      "win_pct": 37.8,
+      "avg_gross_pct": -0.2,
+      "avg_ev_net_pct": -9.7,
+      "avg_loss_net_pct": -32.1
+     },
+     "kept": {
+      "n": 4284,
+      "W": 1567,
+      "L": 2450,
+      "F": 267,
+      "win_pct": 39.0,
+      "avg_gross_pct": 0.5,
+      "avg_ev_net_pct": -9.1,
+      "avg_loss_net_pct": -32.2
+     },
+     "dropped_pct_of_setups": 45.4,
+     "winners_kept_pct": 55.7,
+     "z_win_kept_minus_flagged": 1.09,
+     "meets_target (drop 20-30%, keep >80% winners, kept win% > flagged)": false
+    },
+    "B: calls above flip + puts below flip flagged": {
+     "n": 7851,
+     "flagged": {
+      "n": 4284,
+      "W": 1567,
+      "L": 2450,
+      "F": 267,
+      "win_pct": 39.0,
+      "avg_gross_pct": 0.5,
+      "avg_ev_net_pct": -9.1,
+      "avg_loss_net_pct": -32.2
+     },
+     "kept": {
+      "n": 3567,
+      "W": 1247,
+      "L": 2055,
+      "F": 265,
+      "win_pct": 37.8,
+      "avg_gross_pct": -0.2,
+      "avg_ev_net_pct": -9.7,
+      "avg_loss_net_pct": -32.1
+     },
+     "dropped_pct_of_setups": 54.6,
+     "winners_kept_pct": 44.3,
+     "z_win_kept_minus_flagged": -1.09,
+     "meets_target (drop 20-30%, keep >80% winners, kept win% > flagged)": false
+    },
+    "calls below flip flagged": {
+     "n": 3980,
+     "flagged": {
+      "n": 1774,
+      "W": 666,
+      "L": 984,
+      "F": 124,
+      "win_pct": 40.4,
+      "avg_gross_pct": 1.4,
+      "avg_ev_net_pct": -7.4,
+      "avg_loss_net_pct": -31.5
+     },
+     "kept": {
+      "n": 2206,
+      "W": 877,
+      "L": 1238,
+      "F": 91,
+      "win_pct": 41.5,
+      "avg_gross_pct": 2.1,
+      "avg_ev_net_pct": -8.8,
+      "avg_loss_net_pct": -33.0
+     },
+     "dropped_pct_of_setups": 44.6,
+     "winners_kept_pct": 56.8,
+     "z_win_kept_minus_flagged": 0.68,
+     "meets_target (drop 20-30%, keep >80% winners, kept win% > flagged)": false
+    },
+    "calls above flip flagged": {
+     "n": 3980,
+     "flagged": {
+      "n": 2206,
+      "W": 877,
+      "L": 1238,
+      "F": 91,
+      "win_pct": 41.5,
+      "avg_gross_pct": 2.1,
+      "avg_ev_net_pct": -8.8,
+      "avg_loss_net_pct": -33.0
+     },
+     "kept": {
+      "n": 1774,
+      "W": 666,
+      "L": 984,
+      "F": 124,
+      "win_pct": 40.4,
+      "avg_gross_pct": 1.4,
+      "avg_ev_net_pct": -7.4,
+      "avg_loss_net_pct": -31.5
+     },
+     "dropped_pct_of_setups": 55.4,
+     "winners_kept_pct": 43.2,
+     "z_win_kept_minus_flagged": -0.68,
+     "meets_target (drop 20-30%, keep >80% winners, kept win% > flagged)": false
+    },
+    "puts above flip flagged": {
+     "n": 3871,
+     "flagged": {
+      "n": 1793,
+      "W": 581,
+      "L": 1071,
+      "F": 141,
+      "win_pct": 35.2,
+      "avg_gross_pct": -1.9,
+      "avg_ev_net_pct": -11.9,
+      "avg_loss_net_pct": -32.6
+     },
+     "kept": {
+      "n": 2078,
+      "W": 690,
+      "L": 1212,
+      "F": 176,
+      "win_pct": 36.3,
+      "avg_gross_pct": -1.1,
+      "avg_ev_net_pct": -9.4,
+      "avg_loss_net_pct": -31.4
+     },
+     "dropped_pct_of_setups": 46.3,
+     "winners_kept_pct": 54.3,
+     "z_win_kept_minus_flagged": 0.69,
+     "meets_target (drop 20-30%, keep >80% winners, kept win% > flagged)": false
+    },
+    "puts below flip flagged": {
+     "n": 3871,
+     "flagged": {
+      "n": 2078,
+      "W": 690,
+      "L": 1212,
+      "F": 176,
+      "win_pct": 36.3,
+      "avg_gross_pct": -1.1,
+      "avg_ev_net_pct": -9.4,
+      "avg_loss_net_pct": -31.4
+     },
+     "kept": {
+      "n": 1793,
+      "W": 581,
+      "L": 1071,
+      "F": 141,
+      "win_pct": 35.2,
+      "avg_gross_pct": -1.9,
+      "avg_ev_net_pct": -11.9,
+      "avg_loss_net_pct": -32.6
+     },
+     "dropped_pct_of_setups": 53.7,
+     "winners_kept_pct": 45.7,
+     "z_win_kept_minus_flagged": -0.69,
+     "meets_target (drop 20-30%, keep >80% winners, kept win% > flagged)": false
+    },
+    "net GEX negative flagged": {
+     "n": 9957,
+     "flagged": {
+      "n": 2960,
+      "W": 1015,
+      "L": 1749,
+      "F": 196,
+      "win_pct": 36.7,
+      "avg_gross_pct": -0.8,
+      "avg_ev_net_pct": -9.0,
+      "avg_loss_net_pct": -31.0
+     },
+     "kept": {
+      "n": 6997,
+      "W": 2502,
+      "L": 4017,
+      "F": 478,
+      "win_pct": 38.4,
+      "avg_gross_pct": 0.1,
+      "avg_ev_net_pct": -9.4,
+      "avg_loss_net_pct": -32.1
+     },
+     "dropped_pct_of_setups": 29.7,
+     "winners_kept_pct": 71.1,
+     "z_win_kept_minus_flagged": 1.51,
+     "meets_target (drop 20-30%, keep >80% winners, kept win% > flagged)": false
+    },
+    "net GEX positive flagged": {
+     "n": 9957,
+     "flagged": {
+      "n": 6997,
+      "W": 2502,
+      "L": 4017,
+      "F": 478,
+      "win_pct": 38.4,
+      "avg_gross_pct": 0.1,
+      "avg_ev_net_pct": -9.4,
+      "avg_loss_net_pct": -32.1
+     },
+     "kept": {
+      "n": 2960,
+      "W": 1015,
+      "L": 1749,
+      "F": 196,
+      "win_pct": 36.7,
+      "avg_gross_pct": -0.8,
+      "avg_ev_net_pct": -9.0,
+      "avg_loss_net_pct": -31.0
+     },
+     "dropped_pct_of_setups": 70.3,
+     "winners_kept_pct": 28.9,
+     "z_win_kept_minus_flagged": -1.51,
+     "meets_target (drop 20-30%, keep >80% winners, kept win% > flagged)": false
+    },
+    "A: calls below flip + puts above flip flagged \u2014 by year": {
+     "2024-10..2025-09": {
+      "flagged": {
+       "n": 1721,
+       "W": 647,
+       "L": 947,
+       "F": 127,
+       "win_pct": 40.6,
+       "avg_gross_pct": 1.4
+      },
+      "kept": {
+       "n": 2224,
+       "W": 794,
+       "L": 1288,
+       "F": 142,
+       "win_pct": 38.1,
+       "avg_gross_pct": -0.0
+      },
+      "z_kept_minus_flagged": -1.51
+     },
+     "2025-10..2026-10": {
+      "flagged": {
+       "n": 1846,
+       "W": 600,
+       "L": 1108,
+       "F": 138,
+       "win_pct": 35.1,
+       "avg_gross_pct": -1.8
+      },
+      "kept": {
+       "n": 2060,
+       "W": 773,
+       "L": 1162,
+       "F": 125,
+       "win_pct": 39.9,
+       "avg_gross_pct": 1.1
+      },
+      "z_kept_minus_flagged": 3.0
+     }
+    },
+    "B: calls above flip + puts below flip flagged \u2014 by year": {
+     "2024-10..2025-09": {
+      "flagged": {
+       "n": 2224,
+       "W": 794,
+       "L": 1288,
+       "F": 142,
+       "win_pct": 38.1,
+       "avg_gross_pct": -0.0
+      },
+      "kept": {
+       "n": 1721,
+       "W": 647,
+       "L": 947,
+       "F": 127,
+       "win_pct": 40.6,
+       "avg_gross_pct": 1.4
+      },
+      "z_kept_minus_flagged": 1.51
+     },
+     "2025-10..2026-10": {
+      "flagged": {
+       "n": 2060,
+       "W": 773,
+       "L": 1162,
+       "F": 125,
+       "win_pct": 39.9,
+       "avg_gross_pct": 1.1
+      },
+      "kept": {
+       "n": 1846,
+       "W": 600,
+       "L": 1108,
+       "F": 138,
+       "win_pct": 35.1,
+       "avg_gross_pct": -1.8
+      },
+      "z_kept_minus_flagged": -3.0
+     }
+    }
+   },
+   "by_lane_variant_A": {
+    "earnings run-up/run-down lanes": {
+     "n": 512,
+     "flagged": {
+      "n": 256,
+      "W": 85,
+      "L": 132,
+      "F": 39,
+      "win_pct": 39.2,
+      "avg_gross_pct": 0.9,
+      "avg_ev_net_pct": -7.0,
+      "avg_loss_net_pct": -30.9
+     },
+     "kept": {
+      "n": 256,
+      "W": 85,
+      "L": 131,
+      "F": 40,
+      "win_pct": 39.4,
+      "avg_gross_pct": 1.0,
+      "avg_ev_net_pct": -7.2,
+      "avg_loss_net_pct": -31.8
+     },
+     "dropped_pct_of_setups": 50.0,
+     "winners_kept_pct": 50.0,
+     "z_win_kept_minus_flagged": 0.04,
+     "meets_target (drop 20-30%, keep >80% winners, kept win% > flagged)": false
+    },
+    "lottery": {
+     "n": 1200,
+     "flagged": {
+      "n": 531,
+      "W": 223,
+      "L": 308,
+      "F": 0,
+      "win_pct": 42.0,
+      "avg_gross_pct": 2.3,
+      "avg_ev_net_pct": -19.0,
+      "avg_loss_net_pct": -41.8
+     },
+     "kept": {
+      "n": 669,
+      "W": 274,
+      "L": 395,
+      "F": 0,
+      "win_pct": 41.0,
+      "avg_gross_pct": 1.6,
+      "avg_ev_net_pct": -21.5,
+      "avg_loss_net_pct": -41.4
+     },
+     "dropped_pct_of_setups": 44.2,
+     "winners_kept_pct": 55.1,
+     "z_win_kept_minus_flagged": -0.36,
+     "meets_target (drop 20-30%, keep >80% winners, kept win% > flagged)": false
+    },
+    "main picks": {
+     "n": 1145,
+     "flagged": {
+      "n": 559,
+      "W": 199,
+      "L": 306,
+      "F": 54,
+      "win_pct": 39.4,
+      "avg_gross_pct": 0.8,
+      "avg_ev_net_pct": -5.9,
+      "avg_loss_net_pct": -30.0
+     },
+     "kept": {
+      "n": 586,
+      "W": 211,
+      "L": 333,
+      "F": 42,
+      "win_pct": 38.8,
+      "avg_gross_pct": 0.6,
+      "avg_ev_net_pct": -5.5,
+      "avg_loss_net_pct": -29.5
+     },
+     "dropped_pct_of_setups": 48.8,
+     "winners_kept_pct": 51.5,
+     "z_win_kept_minus_flagged": -0.21,
+     "meets_target (drop 20-30%, keep >80% winners, kept win% > flagged)": false
+    },
+    "premove": {
+     "n": 1113,
+     "flagged": {
+      "n": 531,
+      "W": 187,
+      "L": 303,
+      "F": 41,
+      "win_pct": 38.2,
+      "avg_gross_pct": -0.1,
+      "avg_ev_net_pct": -5.9,
+      "avg_loss_net_pct": -28.8
+     },
+     "kept": {
+      "n": 582,
+      "W": 238,
+      "L": 312,
+      "F": 32,
+      "win_pct": 43.3,
+      "avg_gross_pct": 3.0,
+      "avg_ev_net_pct": -2.4,
+      "avg_loss_net_pct": -29.0
+     },
+     "dropped_pct_of_setups": 47.7,
+     "winners_kept_pct": 56.0,
+     "z_win_kept_minus_flagged": 1.67,
+     "meets_target (drop 20-30%, keep >80% winners, kept win% > flagged)": false
+    },
+    "puts": {
+     "n": 1199,
+     "flagged": {
+      "n": 581,
+      "W": 179,
+      "L": 360,
+      "F": 42,
+      "win_pct": 33.2,
+      "avg_gross_pct": -3.1,
+      "avg_ev_net_pct": -11.9,
+      "avg_loss_net_pct": -31.7
+     },
+     "kept": {
+      "n": 618,
+      "W": 187,
+      "L": 377,
+      "F": 54,
+      "win_pct": 33.2,
+      "avg_gross_pct": -3.2,
+      "avg_ev_net_pct": -11.8,
+      "avg_loss_net_pct": -31.4
+     },
+     "dropped_pct_of_setups": 48.5,
+     "winners_kept_pct": 51.1,
+     "z_win_kept_minus_flagged": -0.02,
+     "meets_target (drop 20-30%, keep >80% winners, kept win% > flagged)": false
+    },
+    "setup lanes": {
+     "n": 2682,
+     "flagged": {
+      "n": 1109,
+      "W": 374,
+      "L": 646,
+      "F": 89,
+      "win_pct": 36.7,
+      "avg_gross_pct": -0.8,
+      "avg_ev_net_pct": -8.2,
+      "avg_loss_net_pct": -30.3
+     },
+     "kept": {
+      "n": 1573,
+      "W": 572,
+      "L": 902,
+      "F": 99,
+      "win_pct": 38.8,
+      "avg_gross_pct": 0.5,
+      "avg_ev_net_pct": -6.9,
+      "avg_loss_net_pct": -30.7
+     },
+     "dropped_pct_of_setups": 41.3,
+     "winners_kept_pct": 60.5,
+     "z_win_kept_minus_flagged": 1.08,
+     "meets_target (drop 20-30%, keep >80% winners, kept win% > flagged)": false
+    }
+   },
+   "by_lane_variant_B": {
+    "earnings run-up/run-down lanes": {
+     "n": 512,
+     "flagged": {
+      "n": 256,
+      "W": 85,
+      "L": 131,
+      "F": 40,
+      "win_pct": 39.4,
+      "avg_gross_pct": 1.0,
+      "avg_ev_net_pct": -7.2,
+      "avg_loss_net_pct": -31.8
+     },
+     "kept": {
+      "n": 256,
+      "W": 85,
+      "L": 132,
+      "F": 39,
+      "win_pct": 39.2,
+      "avg_gross_pct": 0.9,
+      "avg_ev_net_pct": -7.0,
+      "avg_loss_net_pct": -30.9
+     },
+     "dropped_pct_of_setups": 50.0,
+     "winners_kept_pct": 50.0,
+     "z_win_kept_minus_flagged": -0.04,
+     "meets_target (drop 20-30%, keep >80% winners, kept win% > flagged)": false
+    },
+    "lottery": {
+     "n": 1200,
+     "flagged": {
+      "n": 669,
+      "W": 274,
+      "L": 395,
+      "F": 0,
+      "win_pct": 41.0,
+      "avg_gross_pct": 1.6,
+      "avg_ev_net_pct": -21.5,
+      "avg_loss_net_pct": -41.4
+     },
+     "kept": {
+      "n": 531,
+      "W": 223,
+      "L": 308,
+      "F": 0,
+      "win_pct": 42.0,
+      "avg_gross_pct": 2.3,
+      "avg_ev_net_pct": -19.0,
+      "avg_loss_net_pct": -41.8
+     },
+     "dropped_pct_of_setups": 55.8,
+     "winners_kept_pct": 44.9,
+     "z_win_kept_minus_flagged": 0.36,
+     "meets_target (drop 20-30%, keep >80% winners, kept win% > flagged)": false
+    },
+    "main picks": {
+     "n": 1145,
+     "flagged": {
+      "n": 586,
+      "W": 211,
+      "L": 333,
+      "F": 42,
+      "win_pct": 38.8,
+      "avg_gross_pct": 0.6,
+      "avg_ev_net_pct": -5.5,
+      "avg_loss_net_pct": -29.5
+     },
+     "kept": {
+      "n": 559,
+      "W": 199,
+      "L": 306,
+      "F": 54,
+      "win_pct": 39.4,
+      "avg_gross_pct": 0.8,
+      "avg_ev_net_pct": -5.9,
+      "avg_loss_net_pct": -30.0
+     },
+     "dropped_pct_of_setups": 51.2,
+     "winners_kept_pct": 48.5,
+     "z_win_kept_minus_flagged": 0.21,
+     "meets_target (drop 20-30%, keep >80% winners, kept win% > flagged)": false
+    },
+    "premove": {
+     "n": 1113,
+     "flagged": {
+      "n": 582,
+      "W": 238,
+      "L": 312,
+      "F": 32,
+      "win_pct": 43.3,
+      "avg_gross_pct": 3.0,
+      "avg_ev_net_pct": -2.4,
+      "avg_loss_net_pct": -29.0
+     },
+     "kept": {
+      "n": 531,
+      "W": 187,
+      "L": 303,
+      "F": 41,
+      "win_pct": 38.2,
+      "avg_gross_pct": -0.1,
+      "avg_ev_net_pct": -5.9,
+      "avg_loss_net_pct": -28.8
+     },
+     "dropped_pct_of_setups": 52.3,
+     "winners_kept_pct": 44.0,
+     "z_win_kept_minus_flagged": -1.67,
+     "meets_target (drop 20-30%, keep >80% winners, kept win% > flagged)": false
+    },
+    "puts": {
+     "n": 1199,
+     "flagged": {
+      "n": 618,
+      "W": 187,
+      "L": 377,
+      "F": 54,
+      "win_pct": 33.2,
+      "avg_gross_pct": -3.2,
+      "avg_ev_net_pct": -11.8,
+      "avg_loss_net_pct": -31.4
+     },
+     "kept": {
+      "n": 581,
+      "W": 179,
+      "L": 360,
+      "F": 42,
+      "win_pct": 33.2,
+      "avg_gross_pct": -3.1,
+      "avg_ev_net_pct": -11.9,
+      "avg_loss_net_pct": -31.7
+     },
+     "dropped_pct_of_setups": 51.5,
+     "winners_kept_pct": 48.9,
+     "z_win_kept_minus_flagged": 0.02,
+     "meets_target (drop 20-30%, keep >80% winners, kept win% > flagged)": false
+    },
+    "setup lanes": {
+     "n": 2682,
+     "flagged": {
+      "n": 1573,
+      "W": 572,
+      "L": 902,
+      "F": 99,
+      "win_pct": 38.8,
+      "avg_gross_pct": 0.5,
+      "avg_ev_net_pct": -6.9,
+      "avg_loss_net_pct": -30.7
+     },
+     "kept": {
+      "n": 1109,
+      "W": 374,
+      "L": 646,
+      "F": 89,
+      "win_pct": 36.7,
+      "avg_gross_pct": -0.8,
+      "avg_ev_net_pct": -8.2,
+      "avg_loss_net_pct": -30.3
+     },
+     "dropped_pct_of_setups": 58.7,
+     "winners_kept_pct": 39.5,
+     "z_win_kept_minus_flagged": -1.08,
+     "meets_target (drop 20-30%, keep >80% winners, kept win% > flagged)": false
+    }
+   }
+  }
+ }
+}

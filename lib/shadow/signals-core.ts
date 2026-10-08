@@ -34,7 +34,34 @@ export type GexSignal = {
   roomPct: number | null;
   strikeBeyondWall: boolean;
   verdict: "confirm" | "conflict" | "neutral";
+  /** TEST: gamma flip ≈ zero crossing of cumulative net GEX (low → high strikes) nearest spot. */
+  flipLevel?: number | null;
+  /** TEST: "below" / "above" = spot vs the flip level (null when no crossing). Logged for scoring only. */
+  spotVsFlip?: "below" | "above" | null;
+  netNegative?: boolean;
 };
+
+/** Gamma flip level: cumulative net (call+put) GEX from the lowest strike up; zero crossing nearest spot (±25% preferred). */
+export function gammaFlipLevel(rows: GexStrike[], spot: number): number | null {
+  const sorted = [...rows].sort((a, b) => a.strike - b.strike);
+  const xs: number[] = [];
+  let cum = 0;
+  let prevStrike: number | null = null;
+  let prevCum: number | null = null;
+  for (const r of sorted) {
+    cum += r.callGex + r.putGex;
+    if (prevCum != null && prevStrike != null && ((prevCum < 0 && cum >= 0) || (prevCum > 0 && cum <= 0))) {
+      const d = Math.abs(prevCum) + Math.abs(cum);
+      xs.push(prevStrike + (d ? Math.abs(prevCum) / d : 0) * (r.strike - prevStrike));
+    }
+    prevStrike = r.strike;
+    prevCum = cum;
+  }
+  if (!xs.length || !(spot > 0)) return null;
+  const near = xs.filter((x) => Math.abs(x - spot) / spot <= 0.25);
+  const pool = near.length ? near : xs;
+  return Math.round(pool.reduce((best, x) => (Math.abs(x - spot) < Math.abs(best - spot) ? x : best), pool[0]) * 100) / 100;
+}
 
 export type OiSignal = { oiPrintDay: number | null; oiNextDay: number | null; changePct: number | null; verdict: "confirm" | "conflict" | "neutral" | "pending" };
 
@@ -97,7 +124,9 @@ export function gexSignal(rows: GexStrike[], spot: number, side: "call" | "put",
   let verdict: GexSignal["verdict"] = "neutral";
   if (regime === "negative" && !strikeBeyondWall && (roomPct == null || roomPct >= 2)) verdict = "confirm";
   else if (regime === "positive" && (strikeBeyondWall || (roomPct != null && roomPct < 1))) verdict = "conflict";
-  return { netGex: Math.round(net), regime, callWall, putWall, roomPct, strikeBeyondWall, verdict };
+  const flipLevel = gammaFlipLevel(rows, spot);
+  const spotVsFlip = flipLevel == null ? null : spot < flipLevel ? "below" : "above";
+  return { netGex: Math.round(net), regime, callWall, putWall, roomPct, strikeBeyondWall, verdict, flipLevel, spotVsFlip, netNegative: net < 0 };
 }
 
 /**
