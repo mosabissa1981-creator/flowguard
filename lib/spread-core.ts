@@ -1,5 +1,5 @@
 import { SINGLE_STOCK_PUT_REASON, blockedByPutsRule } from "@/lib/puts-rule";
-import { RISK_OFF_PUT_REASON, blockedByRiskOffPuts, type RiskOffSnapshot } from "@/lib/risk-off";
+import { RISK_OFF_PUT_REASON, blockedByRiskOffPuts, type RiskOffSnapshot } from "@/lib/risk-off-core";
 
 /**
  * LIVE spread gate (approved by Mosab 10/8/2026): live candidates whose option bid-ask spread is over

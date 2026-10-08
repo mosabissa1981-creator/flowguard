@@ -10,7 +10,7 @@ import {
   RISK_OFF_PUT_REASON,
   blockedByRiskOffPuts,
   evaluateRiskOff,
-} from "@/lib/risk-off";
+} from "@/lib/risk-off-core";
 import { resolveSpread, splitByLiveRules } from "@/lib/spread-core";
 
 assert.equal(RISK_OFF_BLOCK_ETF_PUTS, true);
