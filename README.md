@@ -268,3 +268,10 @@ Backtest: `scripts/study/intraday-signals-backtest.py` → `study/intraday-signa
 
 Gap-down day (SPY or QQQ open ≤ −0.3%): puts printed 9:30–11:00 ET on stocks already down 1–3% are flagged (−6).
 Backtest `scripts/study/gap-down-put-backtest.py` → `study/gap-down-put-backtest.json`.
+
+### Spread gate + gamma flip (TEST, study only)
+
+`scripts/study/spread-gamma-backtest.py` → `study/spread-gamma-backtest.json` (also `/workspace/flowguard/study/`).
+Spread = alert NBBO at the print; EV = buy at ask, sell at bid. Gamma flip = zero crossing of cumulative per-strike
+net GEX (UW `greek-exposure/strike?date=`). The live shadow GEX signal now also logs `flipLevel`, `spotVsFlip` and
+`netNegative` for each new entry (same UW call as before) so the flip check is scored going forward. No effect on live picks.
