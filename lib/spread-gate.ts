@@ -3,7 +3,8 @@ import "server-only";
 import { kvGetMany, kvSet } from "@/lib/kv";
 import { contractKey } from "@/lib/scoring";
 import { etClock } from "@/lib/shadow/budget";
-import { resolveSpread, splitBySpread, type SpreadInfo, type SpreadSkip } from "@/lib/spread-core";
+import { resolveSpread, splitByLiveRules, type SpreadInfo, type SpreadSkip } from "@/lib/spread-core";
+import { blockedByPutsRule } from "@/lib/puts-rule";
 import { fetchTickerOptionQuotes, hasUnusualWhalesKey } from "@/lib/uw";
 import { isUwBlocked } from "@/lib/uw-quota";
 import { runAsUwJob, uwTokenCount, UW_DAY_CEILING } from "@/lib/uw-usage";
@@ -103,7 +104,8 @@ export async function freshSpreadQuotes(
 }
 
 /**
- * Apply the LIVE gate to a ranked, sorted list: wide (> SPREAD_MAX_PCT) → skipped with a desk reason;
+ * Apply the LIVE gates to a ranked, sorted list: single-stock put (ETF/index puts only) or wide
+ * (> SPREAD_MAX_PCT) → skipped with a desk reason;
  * ok / unknown → kept with `spread` attached. Only the top `freshTop` rows get a fresh quote.
  */
 export async function gateRankedRows<T extends RankedFlow>(
@@ -113,14 +115,17 @@ export async function gateRankedRows<T extends RankedFlow>(
 ): Promise<{ kept: Array<T & { spread: SpreadInfo }>; skipped: SpreadSkip[] }> {
   const now = opts.now ?? new Date();
   const top = rows.slice(0, opts.freshTop ?? DEFAULT_FRESH_TOP);
-  const fresh = await freshSpreadQuotes(top.map((r) => ({ ticker: r.alert.ticker, contract: contractKey(r) })), now).catch(
+  // Single-stock puts are skipped by the LIVE puts rule anyway: never spend a fresh UW quote on them.
+  const quotable = top.filter((r) => !blockedByPutsRule(r.alert.type, r.alert.ticker, r.alert.issue_type));
+  const fresh = await freshSpreadQuotes(quotable.map((r) => ({ ticker: r.alert.ticker, contract: contractKey(r) })), now).catch(
     () => new Map<string, Pair | null>(),
   );
   const at = now.toISOString();
-  const res = splitBySpread(
+  const res = splitByLiveRules(
     rows,
     (r) => resolveSpread(fresh.get(contractKey(r)), { bid: r.alert.bid, ask: r.alert.ask }, at),
     (r) => ({ option_chain: contractKey(r), ticker: r.alert.ticker }),
+    (r) => ({ side: r.alert.type, ticker: r.alert.ticker, issueType: r.alert.issue_type }),
     list,
   );
   // Desk shows skips near the top of the list (the names that would have made it); deeper rows are

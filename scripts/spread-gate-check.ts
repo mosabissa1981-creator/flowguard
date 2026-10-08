@@ -1,7 +1,8 @@
 /** Checks for the LIVE spread gate core (pure logic). Run: npm run spread-gate-check */
 import assert from "node:assert/strict";
 
-import { SPREAD_MAX_PCT, resolveSpread, splitBySpread, spreadFromPair, spreadSkipReason } from "@/lib/spread-core";
+import { SPREAD_MAX_PCT, resolveSpread, splitByLiveRules, splitBySpread, spreadFromPair, spreadSkipReason } from "@/lib/spread-core";
+import { ETF_INDEX_FALLBACK, PUTS_ALLOWED_UNDERLYING, SINGLE_STOCK_PUT_REASON, blockedByPutsRule, isEtfOrIndex } from "@/lib/puts-rule";
 
 const AT = "2026-10-08T14:00:00.000Z";
 
@@ -64,5 +65,58 @@ assert.equal(skipped.length, 1);
 assert.equal(skipped[0].option_chain, "B");
 assert.equal(skipped[0].reason, "Skipped: wide spread 40%");
 assert.equal(skipped[0].list, "picks");
+
+// ---- LIVE puts rule: ETF/index puts only (one config) ----
+assert.equal(PUTS_ALLOWED_UNDERLYING, "etf_index");
+assert.equal(SINGLE_STOCK_PUT_REASON, "Skipped: single-stock put (ETF/index puts only)");
+// issue_type wins when present.
+assert.equal(isEtfOrIndex("QQQ", "ETF"), true);
+assert.equal(isEtfOrIndex("SPX", "Index"), true);
+assert.equal(isEtfOrIndex("PLTR", "Common Stock"), false);
+assert.equal(isEtfOrIndex("BABA", "ADR"), false);
+assert.equal(isEtfOrIndex("XYZETF", "Common Stock"), false);
+// No issue_type → study ticker list.
+assert.equal(isEtfOrIndex("IBIT", ""), true);
+assert.equal(isEtfOrIndex("iwm", null), true);
+assert.equal(isEtfOrIndex("PLTR", undefined), false);
+for (const t of ["SPY", "QQQ", "IWM", "IBIT", "XLE", "SMH"]) assert.ok(ETF_INDEX_FALLBACK.has(t), t);
+// Puts: single stock blocked, ETF/index allowed. Calls never blocked.
+assert.equal(blockedByPutsRule("put", "PLTR", "Common Stock"), true);
+assert.equal(blockedByPutsRule("put", "PLTR", null), true);
+assert.equal(blockedByPutsRule("put", "QQQ", "ETF"), false);
+assert.equal(blockedByPutsRule("put", "IBIT", undefined), false);
+assert.equal(blockedByPutsRule("call", "PLTR", "Common Stock"), false);
+assert.equal(blockedByPutsRule("call", "NVDA", null), false);
+// Switch off → nothing blocked.
+assert.equal(blockedByPutsRule("put", "PLTR", "Common Stock", "all"), false);
+
+// Combined split (today's board shape): QQQ put + IBIT put kept, PLTR put skipped, PLTR call kept, wide call skipped.
+const board = [
+  { id: "QQQ261016P00758000", t: "QQQ", side: "put", it: "ETF", bid: 2.0, ask: 2.1 },
+  { id: "PLTR261016P00197500", t: "PLTR", side: "put", it: "Common Stock", bid: 3.0, ask: 3.1 },
+  { id: "IBIT261016P00043500", t: "IBIT", side: "put", it: "", bid: 0.5, ask: 0.52 },
+  { id: "PLTR261016C00210000", t: "PLTR", side: "call", it: "Common Stock", bid: 1.0, ask: 1.05 },
+  { id: "AMD261016C00200000", t: "AMD", side: "call", it: "Common Stock", bid: 1.0, ask: 1.5 },
+  { id: "TSLA261016P00400000", t: "TSLA", side: "put", it: "Common Stock", bid: 1.0, ask: 1.5 },
+];
+const live = splitByLiveRules(
+  board,
+  (r) => resolveSpread(null, { bid: r.bid, ask: r.ask }, AT),
+  (r) => ({ option_chain: r.id, ticker: r.t }),
+  (r) => ({ side: r.side, ticker: r.t, issueType: r.it }),
+  "picks",
+);
+assert.deepEqual(live.kept.map((r) => r.t + r.side), ["QQQput", "IBITput", "PLTRcall"]);
+assert.deepEqual(
+  live.skipped.map((s) => [s.ticker, s.rule, s.reason]),
+  [
+    ["PLTR", "puts", SINGLE_STOCK_PUT_REASON],
+    ["AMD", "spread", "Skipped: wide spread 40%"],
+    // Single-stock put with a wide spread → reported as the puts rule (checked first).
+    ["TSLA", "puts", SINGLE_STOCK_PUT_REASON],
+  ],
+);
+assert.equal(live.skipped[0].list, "picks");
+assert.equal(live.skipped[0].spread.status, "ok");
 
 console.log("spread-gate-check: all assertions passed");
