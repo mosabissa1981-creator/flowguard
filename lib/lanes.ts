@@ -12,6 +12,7 @@ import { isUwBlocked } from "@/lib/uw-quota";
 import { freshSpreadQuotes } from "@/lib/spread-gate";
 import { resolveSpread, spreadSkipReason, type SpreadInfo, type SpreadSkip } from "@/lib/spread-core";
 import { SINGLE_STOCK_PUT_REASON, blockedByPutsRule } from "@/lib/puts-rule";
+import { HOLD_SESSIONS, LIVE_EXIT_RULE_TEXT, STOP_PCT_WHOLE, TARGET_PCT_WHOLE } from "@/lib/exit-plan";
 import type { FlowFilters, RankedFlow, TideBias } from "@/lib/types";
 
 /**
@@ -47,16 +48,16 @@ export const LANES: LaneDef[] = [
     title: "Calls · Earnings run-up",
     side: "call",
     maxPerDay: 3,
-    timeStopSessions: 5,
+    timeStopSessions: HOLD_SESSIONS,
     rules:
-      "Call buying 5–15 trading days before the next earnings date, expiry after earnings; not extended (5-day ≤ +8%, ≤ 10% above 20-day average, today ≤ +3%). Time stop 5 sessions, always exit the session before the report.",
+      "Call buying 5–15 trading days before the next earnings date, expiry after earnings; not extended (5-day ≤ +8%, ≤ 10% above 20-day average, today ≤ +3%). Time stop 2 sessions (2:30 PM CT), always exit the session before the report.",
   },
   {
     id: "calls-breakout",
     title: "Calls · Breakout",
     side: "call",
     maxPerDay: 3,
-    timeStopSessions: 3,
+    timeStopSessions: HOLD_SESSIONS,
     rules:
       "Underlying at the print within 2% below (or ≤ 1% above) the prior 20- or 50-day high, heavy ask-side call buying (≥ 70% ask), bullish directional ticker tide required.",
   },
@@ -65,7 +66,7 @@ export const LANES: LaneDef[] = [
     title: "Calls · Sector wave",
     side: "call",
     maxPerDay: 2,
-    timeStopSessions: 3,
+    timeStopSessions: HOLD_SESSIONS,
     rules: "3+ distinct issuers in the same sector with qualifying ask-side call buying today; log the strongest 1–2.",
   },
   {
@@ -73,16 +74,16 @@ export const LANES: LaneDef[] = [
     title: "Puts · Earnings run-down",
     side: "put",
     maxPerDay: 3,
-    timeStopSessions: 5,
+    timeStopSessions: HOLD_SESSIONS,
     rules:
-      "Put buying 5–15 trading days before earnings, expiry after earnings, on weak relative strength (today ≤ −0.5% vs the stronger of SPY/QQQ, or 5-day ≤ −2% vs SPY). Time stop 5 sessions, exit before the report.",
+      "Put buying 5–15 trading days before earnings, expiry after earnings, on weak relative strength (today ≤ −0.5% vs the stronger of SPY/QQQ, or 5-day ≤ −2% vs SPY). Time stop 2 sessions (2:30 PM CT), exit before the report.",
   },
   {
     id: "puts-breakdown",
     title: "Puts · Breakdown",
     side: "put",
     maxPerDay: 3,
-    timeStopSessions: 3,
+    timeStopSessions: HOLD_SESSIONS,
     rules:
       "Underlying at the print within 2% above (or ≤ 2% below) the prior 20- or 50-day low, heavy ask-side put buying (≥ 70% ask); bullish directional ticker tide blocks.",
   },
@@ -91,7 +92,7 @@ export const LANES: LaneDef[] = [
     title: "Puts · Sector selloff",
     side: "put",
     maxPerDay: 2,
-    timeStopSessions: 3,
+    timeStopSessions: HOLD_SESSIONS,
     rules: "3+ distinct issuers in the same sector with qualifying ask-side put buying today; log the strongest 1–2.",
   },
 ];
@@ -109,7 +110,7 @@ export const LANE_COMMON_RULES = {
   minUnderlying: 10,
   minMarketCap: 5_000_000_000,
   maxPerIssuer: 1,
-  exit: { targetPct: 40, stopPct: -25 },
+  exit: { targetPct: TARGET_PCT_WHOLE, stopPct: STOP_PCT_WHOLE },
   notes:
     "Single-leg, ask-side ≥ 65%, opening (vol/OI ≥ 1 or all-opening), repeated/sweep, liquid (≥ $10 and ≥ $5B or ETF), no late (≥ 14:00 ET) or stale prints, no logging in pre-release lockouts, directional ticker tide against the trade blocks.",
 } as const;
@@ -699,7 +700,9 @@ export function trackFromBars(
     if (hi != null && (maxGain == null || hi > maxGain)) maxGain = hi;
     if (lo != null && (maxDd == null || lo < maxDd)) maxDd = lo;
   }
-  const { targetPct, stopPct } = LANE_COMMON_RULES.exit;
+  // Grade each entry by the plan it was logged with (entries before 10/8/2026: +40% / 3–5 sessions; after: +30% / 2).
+  const targetPct = entry.exitPlan?.targetPct ?? 40;
+  const stopPct = entry.exitPlan?.stopPct ?? LANE_COMMON_RULES.exit.stopPct;
   const ts = entry.exitPlan?.timeStopSessions ?? 3;
   let outcome: LaneTracking["outcome"] = "open";
   let outcomeSession: number | null = null;
@@ -788,7 +791,7 @@ export async function trackLanes(only?: LaneId) {
     generatedAt: new Date().toISOString(),
     today,
     definition:
-      "Entry = flow print price. T+1..T+5 = option close vs entry each session after the entry day. Within the lane time stop (5 sessions for earnings lanes, capped to exit before the report; 3 otherwise): winner = high ≥ +40% first, loser = low ≤ −25% first (same session both = loser), flat = neither.",
+      `Entry = flow print price. T+1..T+5 = option close vs entry each session after the entry day. Each entry is graded by the plan it was logged with: from 10/8/2026 ${LIVE_EXIT_RULE_TEXT} (earnings lanes capped to exit before the report); older entries +40% / −25% within 3 sessions (5 for earnings lanes). Winner = high ≥ target first, loser = low ≤ stop first (same session both = loser), flat = neither.`,
     lanes: books.map(({ id, book }) => ({
       lane: id,
       title: LANES.find((l) => l.id === id)?.title ?? id,

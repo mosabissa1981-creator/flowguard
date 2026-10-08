@@ -159,7 +159,7 @@ async function runLaneDebate(picks: LanePick[], regimeCtx: unknown, now: Date) {
     "BULL = the best case for THIS TRADE working (for a put: the case for the drop). BEAR = why this trade fails",
     "(for a put: support holds, squeeze, bullish catalyst, crowded hedge, IV crush; for a call: fade, extended, bad timing).",
     "MACRO = regime, long yields, scheduled events, sector rotation as they affect THIS direction. Each voice <=140 chars,",
-    "concrete to the facts. Exit plan is +40% target / -25% stop on option premium within the stated time stop.",
+    "concrete to the facts. Exit plan is +30% target / -25% stop on option premium within the stated time stop.",
     "Then VERDICT: take | skip with confidence 0-100 and a <=140 char why. Shadow study, not advice; be calibrated.",
     'Return JSON only: {"debates":[{"key":"","bull":"","bear":"","macro":"","verdict":"take|skip","confidence":0,"why":""}]}',
   ].join(" ");

@@ -1,3 +1,4 @@
+import { LIVE_HOLD_WINDOW } from "@/lib/exit-plan";
 import type { FlowAlert, RankedFlow, ScoreChip } from "@/lib/types";
 import { askShare, clamp, toNumber } from "@/lib/numbers";
 import { hoursSinceCreated } from "@/lib/session";
@@ -193,18 +194,7 @@ export function applyPremoveOverlay(
     rawScore: Math.round(score),
     chips,
     fadeProne,
-    holdWindow:
-      row.dte >= 30
-        ? {
-            label: "up to ~1–2 weeks",
-            line: "Hold window: up to ~1–2 weeks; cut by ~half DTE if thesis stalls",
-            exit: "Exit if thesis fails or by two weeks. Do not hold this option to expiry.",
-          }
-        : {
-            label: "2–7 sessions",
-            line: "Hold window: 2–7 sessions",
-            exit: "Exit if thesis fails or by seven sessions.",
-          },
+    holdWindow: { ...LIVE_HOLD_WINDOW },
   };
 }
 

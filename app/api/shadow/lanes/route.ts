@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 
 import { tradingDateET } from "@/lib/session";
+import { HOLD_SESSIONS } from "@/lib/exit-plan";
 import { adminOk } from "@/lib/shadow/admin";
 import { type LanePick, loadLaneDebate, refreshLaneDebate, sampleLaneDebate } from "@/lib/shadow/lane-debate";
 import { storeHealth } from "@/lib/shadow/store";
@@ -58,7 +59,7 @@ export async function POST(request: NextRequest) {
       volOi: Number(p.volOi) || 0,
       premiumUsd: Number(p.premiumUsd) || 0,
       reasons: Array.isArray(p.reasons) ? p.reasons.map(String).slice(0, 8) : [],
-      timeStopSessions: Number(p.timeStopSessions) || 3,
+      timeStopSessions: Number(p.timeStopSessions) || HOLD_SESSIONS,
     }));
     if (!picks.length || picks.some((p) => !p.contract || !p.ticker)) return Response.json({ error: "picks[] with contract + ticker required" }, { status: 400 });
     return Response.json(await sampleLaneDebate(picks), { headers: { "Cache-Control": "no-store" } });
