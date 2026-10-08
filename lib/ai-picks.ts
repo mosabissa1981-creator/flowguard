@@ -329,6 +329,8 @@ export async function gatherCandidates(): Promise<{
   fetchedAt: string;
   quotaBlocked?: boolean;
   warning?: string;
+  /** LIVE spread gate skips from the source lists (already excluded upstream). */
+  spreadSkips?: NonNullable<AiPicksResponse["spreadSkips"]>;
 }> {
   const [morning, picks, premove] = await Promise.all([
     loadMorningShortlist(),
@@ -364,7 +366,13 @@ export async function gatherCandidates(): Promise<{
     return { ...row, lanes: byKey.get(k)?.lanes ?? ["premove"] };
   });
   const premoveCands = applyConcentrationCaps([...premoveRows].sort(compareActionable), MAX_PREMOVE_CANDIDATES).kept;
+  const spreadSkips = new Map<string, NonNullable<AiPicksResponse["spreadSkips"]>[number]>();
+  for (const list of [morning, picks, premove]) {
+    if (list.source === "mock") continue;
+    for (const sk of list.spreadSkips ?? []) if (!spreadSkips.has(sk.option_chain)) spreadSkips.set(sk.option_chain, sk);
+  }
   return {
+    spreadSkips: [...spreadSkips.values()],
     cands: kept,
     premoveCands,
     premoveWarning: premove.warning,
@@ -421,6 +429,7 @@ export async function reviewCandidates(
     study: studyBrief(),
     quotaBlocked,
     disclaimer: DISCLAIMER,
+    spreadSkips: gathered.spreadSkips ?? [],
   };
 
   const toPick = (c: Candidate, confidence: number, reason: string): AiPick => ({

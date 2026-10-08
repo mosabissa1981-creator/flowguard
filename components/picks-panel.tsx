@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ConvictionMeter } from "@/components/conviction-meter";
 import { GapChaseBadge } from "@/components/gap-chase";
+import { SpreadBadge, SpreadSkips } from "@/components/spread-gate";
+import type { SpreadSkip } from "@/lib/spread-core";
 import { HoldWindowCopy } from "@/components/hold-window-copy";
 import { PickWatchControls } from "@/components/pick-watch-controls";
 import { cn } from "@/lib/utils";
@@ -26,7 +28,9 @@ export function PicksPanel({
   onDismiss,
   priceWatches,
   onSavePriceWatch,
+  spreadSkips,
 }: {
+  spreadSkips?: SpreadSkip[];
   picks: DailyPick[];
   loading: boolean;
   notes: ManagerNoteMap;
@@ -106,6 +110,7 @@ export function PicksPanel({
                         {formatDte(pick.dte)}
                       </span>
                       <GapChaseBadge contract={pick.alert.option_chain} />
+                      <SpreadBadge spread={pick.spread} />
                     </div>
                     <div className="mt-1 font-mono text-xs text-amber-200">
                       {formatPremium(pick.alert.total_premium)} premium
@@ -195,6 +200,7 @@ export function PicksPanel({
           })}
         </div>
       )}
+      <SpreadSkips skips={spreadSkips} />
     </section>
   );
 }

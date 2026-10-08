@@ -17,6 +17,7 @@ import {
   hasScoreChip,
   withActionableAdjustments,
 } from "@/lib/scoring";
+import { gateRankedRows } from "@/lib/spread-gate";
 import type { FlowAlert, FlowFilters, FlowResponse, PicksResponse, RankedFlow } from "@/lib/types";
 
 export const PREMOVE_FILTERS: FlowFilters = {
@@ -176,9 +177,12 @@ export async function loadPremoveShortlist(opts?: { forceFresh?: boolean }): Pro
   });
   adjusted.sort(comparePremove);
 
+  // LIVE spread gate (> SPREAD_MAX_PCT of mid → excluded, listed as "Skipped: wide spread X%").
+  const gate = await gateRankedRows(adjusted, "premove");
+
   // Issuer cap 2 (GOOG+GOOGL = one), sector cap 3, regime list cap.
   const { kept: unique, dropped } = applyConcentrationCaps(
-    adjusted,
+    gate.kept,
     regimeListCap(regime, MAX_PREMOVE),
     regimeCaps(regime),
   );
@@ -207,5 +211,6 @@ export async function loadPremoveShortlist(opts?: { forceFresh?: boolean }): Pro
     authFailed: ranked.authFailed,
     regime: regimeBrief(regime),
     capDrops: dropped,
+    spreadSkips: gate.skipped,
   };
 }

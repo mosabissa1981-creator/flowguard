@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { ConvictionMeter } from "@/components/conviction-meter";
 import { GapChaseBadge } from "@/components/gap-chase";
+import { SpreadBadge, SpreadSkips } from "@/components/spread-gate";
 import { HoldWindowCopy } from "@/components/hold-window-copy";
 import { PickWatchControls } from "@/components/pick-watch-controls";
 import { ScoreChips } from "@/components/score-chips";
@@ -112,6 +113,7 @@ export function PremovePanel({
                       {formatDte(pick.dte)}
                     </span>
                     <GapChaseBadge contract={pick.alert.option_chain} />
+                    <SpreadBadge spread={pick.spread} />
                   </div>
                   <div className="mt-1 font-mono text-xs text-violet-200">
                     {formatPremium(pick.alert.total_premium)} premium · premove {pick.score}
@@ -170,6 +172,7 @@ export function PremovePanel({
       <p className="mt-3 text-[11px] text-muted-foreground">
         Not financial advice. FlowGuard does not route orders or place trades.
       </p>
+      <SpreadSkips skips={premove?.spreadSkips} />
     </section>
   );
 }

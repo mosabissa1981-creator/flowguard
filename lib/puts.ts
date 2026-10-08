@@ -15,6 +15,8 @@ import {
   type StockState,
 } from "@/lib/uw";
 import { isUwBlocked } from "@/lib/uw-quota";
+import { spreadFor } from "@/lib/spread-gate";
+import type { SpreadInfo } from "@/lib/spread-core";
 import type { FlowFilters, RankedFlow, RegimeSnapshot, TideBias } from "@/lib/types";
 
 /**
@@ -68,6 +70,9 @@ export type PutsConfirmation = "market-tide-bearish" | "ticker-tide-bearish" | "
 
 export type PutsCandidate = {
   contract: string;
+  /** Flow alert NBBO at the print (spread record fallback). */
+  alertBid?: number | null;
+  alertAsk?: number | null;
   ticker: string;
   issuer: string;
   sector: string;
@@ -113,6 +118,8 @@ export type PutsTracking = {
 };
 
 export type PutsEntry = PutsCandidate & {
+  /** TEST MODE ONLY: spread at logging time is recorded (flag), never used to filter this lane. */
+  spread?: SpreadInfo;
   day: string;
   loggedAt: string;
   entry: number;
@@ -344,6 +351,8 @@ async function compute(): Promise<PutsResponse> {
       const price = toNumber(a.price);
       return {
         contract: contractKey(row),
+        alertBid: a.bid ? toNumber(a.bid) : null,
+        alertAsk: a.ask ? toNumber(a.ask) : null,
         ticker: a.ticker,
         issuer: issuerKey(a.ticker),
         sector: sectorOf(a.ticker),
@@ -401,6 +410,8 @@ async function compute(): Promise<PutsResponse> {
         regimeLabel: regime?.label ?? null,
         yieldsRising: regime?.yields.rising ?? null,
         us30yChangeBp: regime?.yields.us30y.changeBp ?? null,
+        // TEST MODE: record the spread flag only (never filters the puts lane).
+        spread: await spreadFor(c.ticker, c.contract, { bid: c.alertBid, ask: c.alertAsk }).catch(() => undefined),
       };
       todays.push(entry);
       book.entries.push(entry);

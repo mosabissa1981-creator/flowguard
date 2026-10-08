@@ -6,6 +6,7 @@ import { Bot, RefreshCw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { GapChaseBadge } from "@/components/gap-chase";
+import { SpreadBadge, SpreadSkips } from "@/components/spread-gate";
 import { cn } from "@/lib/utils";
 import type { AiPicksResponse } from "@/lib/types";
 import { formatDte, formatExpiry, formatStrike } from "@/lib/format";
@@ -126,6 +127,7 @@ export function AiPicksPanel({
                   <span className="ml-2 text-xs font-normal text-muted-foreground">{formatDte(pick.dte)}</span>
                   <span className="ml-2 inline-block align-middle">
                     <GapChaseBadge contract={pick.alert.option_chain} />
+                    <SpreadBadge spread={pick.spread} />
                   </span>
                 </div>
                 <Badge
@@ -186,6 +188,7 @@ export function AiPicksPanel({
             : ""}
         </p>
       ) : null}
+      <SpreadSkips skips={data?.spreadSkips} />
     </section>
   );
 }

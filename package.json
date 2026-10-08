@@ -9,7 +9,8 @@
     "lint": "eslint",
     "score-study": "npx tsx scripts/score-study.ts",
     "rescore-book": "npx tsx scripts/rescore-book.ts",
-    "paper-check": "npx tsx scripts/paper-check.ts"
+    "paper-check": "npx tsx scripts/paper-check.ts",
+    "spread-gate-check": "npx tsx scripts/spread-gate-check.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

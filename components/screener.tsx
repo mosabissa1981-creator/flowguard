@@ -708,6 +708,7 @@ export function Screener({
 
       <PicksPanel
         picks={shownPicks}
+        spreadSkips={picksData?.spreadSkips}
         loading={picksLoading}
         notes={notes}
         watchlist={watchlist}

@@ -9,6 +9,8 @@ import { isLateSessionPrint, tradingDateET } from "@/lib/session";
 import { loadDoc, persistenceMode, saveDoc } from "@/lib/shadow/store";
 import { fetchContractHistoric, fetchTickerInfo, hasUnusualWhalesKey } from "@/lib/uw";
 import { isUwBlocked } from "@/lib/uw-quota";
+import { freshSpreadQuotes } from "@/lib/spread-gate";
+import { resolveSpread, spreadSkipReason, type SpreadInfo, type SpreadSkip } from "@/lib/spread-core";
 import type { FlowFilters, RankedFlow, TideBias } from "@/lib/types";
 
 /**
@@ -144,6 +146,11 @@ export type LaneCandidate = {
   reasons: string[];
   earningsDate?: string | null;
   exitPlan: { entry: number; target: number; targetPct: number; stop: number; stopPct: number; timeStopSessions: number };
+  /** Flow alert NBBO at the print (spread-gate fallback). */
+  alertBid?: number | null;
+  alertAsk?: number | null;
+  /** LIVE spread gate result at evaluation / logging time. */
+  spread?: SpreadInfo;
 };
 
 export type LaneTracking = {
@@ -176,6 +183,8 @@ export type LaneResult = {
   candidatesConsidered: number;
   warning?: string;
   sectorCounts?: Record<string, number>;
+  /** LIVE spread gate: candidates not logged because spread > SPREAD_MAX_PCT of mid. */
+  spreadSkips?: SpreadSkip[];
 };
 
 export type LanesResponse = {
@@ -369,6 +378,8 @@ function toCandidate(lane: LaneDef, row: RankedFlow, s: number, reasons: string[
     marketTide: row.marketTideBias,
     reasons,
     ...(earningsDate !== undefined ? { earningsDate } : {}),
+    alertBid: a.bid ? toNumber(a.bid) : null,
+    alertAsk: a.ask ? toNumber(a.ask) : null,
     exitPlan: {
       entry: price,
       target: round2(price * (1 + targetPct / 100)),
@@ -579,6 +590,22 @@ async function compute(): Promise<LanesResponse> {
 
   // ---- Daily logging per lane (frozen once logged) ----
   const locked = lockoutWarning(regime);
+  // LIVE spread gate for the setup / earnings run-up lanes: fresh UW NBBO in session (one batched call per
+  // ticker, memoized), else the alert's bid/ask; wide → not logged and shown as "Skipped: wide spread X%".
+  const allCands = results.flatMap((r) => r.candidates);
+  const fresh = live
+    ? await freshSpreadQuotes(allCands.map((c) => ({ ticker: c.ticker, contract: c.contract }))).catch(() => new Map())
+    : new Map();
+  const gateAt = new Date().toISOString();
+  for (const res of results) {
+    res.candidates = res.candidates.map((c) => ({
+      ...c,
+      spread: resolveSpread(fresh.get(c.contract), { bid: c.alertBid, ask: c.alertAsk }, gateAt),
+    }));
+    res.spreadSkips = res.candidates
+      .filter((c) => c.spread?.status === "wide")
+      .map((c) => ({ option_chain: c.contract, ticker: c.ticker, reason: spreadSkipReason(c.spread!), spread: c.spread!, list: res.lane.id }));
+  }
   for (const res of results) {
     const book = live ? await loadBook(res.lane.id) : { updatedAt: "", entries: [] };
     const todays = book.entries.filter((e) => e.day === day);
@@ -587,6 +614,7 @@ async function compute(): Promise<LanesResponse> {
       const pool = [...res.candidates];
       for (const c of pool) {
         if (todays.length >= res.lane.maxPerDay) break;
+        if (c.spread?.status === "wide") continue;
         if (todays.some((e) => e.contract === c.contract || e.issuer === c.issuer)) continue;
         const entry: LaneEntry = { ...c, day, loggedAt: new Date().toISOString(), entry: c.price, regimeLabel: regime?.label ?? null };
         todays.push(entry);

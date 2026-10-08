@@ -1,3 +1,5 @@
+import type { SpreadInfo, SpreadSkip } from "@/lib/spread-core";
+
 export type OptionType = "call" | "put";
 
 /** Raw Unusual Whales flow-alert row. Field names match the public API. */
@@ -144,6 +146,8 @@ export type DailyPick = RankedFlow & {
   thesis: string;
   fadeRisks: string[];
   exitPlan?: ExitPlan;
+  /** LIVE spread gate: bid/ask/spread% at evaluation (status "unknown" = kept but tagged). */
+  spread?: SpreadInfo;
 };
 
 export type RegimeBrief = {
@@ -166,6 +170,8 @@ export type PicksResponse = {
   regime?: RegimeBrief | null;
   /** Contracts removed by the issuer / sector concentration caps. */
   capDrops?: { option_chain: string; ticker: string; reason: string }[];
+  /** LIVE spread gate: names excluded because bid-ask spread > SPREAD_MAX_PCT of mid ("Skipped: wide spread X%"). */
+  spreadSkips?: SpreadSkip[];
 };
 
 export type MorningShortlistResponse = PicksResponse & {
@@ -410,4 +416,6 @@ export type AiPicksResponse = {
   warning?: string;
   quotaBlocked?: boolean;
   disclaimer: string;
+  /** LIVE spread gate: names kept out of the AI finalists (morning / picks / premove) for spread > SPREAD_MAX_PCT. */
+  spreadSkips?: SpreadSkip[];
 };

@@ -234,6 +234,24 @@ hard daily cap `SHADOW_LLM_DAILY_USD` (default $1, provider-reported cost). Env:
 `SHADOW_LOCAL_DIR=/tmp/shadow npx tsx --conditions=react-server scripts/shadow-local.ts <studyDir> 2026-09-30 09:52`.
 `scripts/build-study-summary.mjs` adds `shadowAccuracy` (per module: W/L/flat of boosted vs passed vs flagged).
 
+## Spread gate (LIVE, approved Oct 8 2026)
+
+One constant: `SPREAD_MAX_PCT = 0.10` in `lib/spread-core.ts`. Spread = (ask − bid) / mid.
+
+- **Filtered (live):** main Picks, Premove, the morning shortlist (and therefore the AI-picks finalists, which
+  are built from those three), and the setup / earnings run-up lanes (`lib/lanes.ts`). A candidate over 10%
+  is excluded and listed on the desk as "Skipped: wide spread X%" (`spreadSkips` on `/api/picks`,
+  `/api/premove`, `/api/morning`, `/api/ai-picks`, and per lane on `/api/lanes`).
+- **Quote:** fresh UW NBBO during the regular session (9:30–16:00 ET) for the top ~20 rows of each list
+  (one batched call per ticker, ≤ 12 tickers per list, 2 in flight, 4-min memo shared via KV, skipped near the
+  UW daily ceiling); otherwise the flow alert's bid/ask at the print.
+- **Unknown:** no usable bid/ask from either → kept, tagged "spread unknown".
+- **Stored:** `spread` {bid, ask, mid, pct, source, status, at} on every live pick, lane entry and AI pick;
+  `entrySpread` on paper positions. Paper applies the same rule to main + lanes entries (skip reason
+  "Skipped: wide spread X%").
+- **Test lanes** (lottery, puts, earnings calendar): spread is recorded only, never filtered.
+- Tests: `npm run spread-gate-check`.
+
 ## Notify auth
 
 `POST /api/notify` and `POST /api/notify/test` require `NOTIFY_SECRET` (header `x-flowguard-key` or `?key=`);

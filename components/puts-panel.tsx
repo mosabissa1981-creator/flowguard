@@ -4,11 +4,14 @@ import { useCallback, useEffect, useState } from "react";
 import { TrendingDown } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
+import { SpreadBadge } from "@/components/spread-gate";
+import type { SpreadInfo } from "@/lib/spread-core";
 import { formatExpiry, formatPremium, formatStrike } from "@/lib/format";
 
 const POLL_MS = 15 * 60_000;
 
 type PutRow = {
+  spread?: SpreadInfo;
   contract: string;
   ticker: string;
   strike: number;
@@ -117,6 +120,7 @@ export function PutsPanel() {
                   <span className="ml-2 text-xs font-normal text-muted-foreground">{p.dte}d</span>
                 </div>
                 <Badge className="shrink-0 rounded-md bg-rose-500/15 text-rose-200">score {p.putsScore}</Badge>
+                <SpreadBadge spread={p.spread} testOnly />
               </div>
               <div className="font-mono text-[11px] text-muted-foreground">
                 {p.moneynessPct}% OTM · {p.askSharePct}% ask · vol/OI {p.volOi}× · {formatPremium(p.premiumUsd)}

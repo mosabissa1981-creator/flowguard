@@ -37,6 +37,7 @@ import {
   type PaperMark,
   type PaperPosition,
 } from "@/lib/paper-core";
+import { SPREAD_MAX_PCT, resolveSpread, spreadSkipReason, type SpreadInfo } from "@/lib/spread-core";
 import type { AiPick, AiPicksResponse, WatchQuote } from "@/lib/types";
 
 /**
@@ -88,6 +89,9 @@ type MainPickLite = {
   alertPrice: number;
   confidence: number | null;
   plan: { entry: number; target: number; targetPct: number; stop: number; stopPct: number; timeStopDate: string } | null;
+  /** Flow alert NBBO at the print (spread-gate fallback when no live quote). */
+  alertBid?: number | null;
+  alertAsk?: number | null;
 };
 type MainPicksDoc = { day: string; at: string; engine: string; picks: MainPickLite[] };
 
@@ -164,6 +168,8 @@ function liteFromAi(p: AiPick, source: MainPickLite["source"]): MainPickLite {
     expiry: a.expiry.slice(0, 10),
     alertPrice: toNumber(a.price) || toNumber(a.ask),
     confidence: Number.isFinite(p.confidence) ? p.confidence : null,
+    alertBid: a.bid ? toNumber(a.bid) : null,
+    alertAsk: a.ask ? toNumber(a.ask) : null,
     plan: plan
       ? { entry: plan.entry, target: plan.target, targetPct: plan.targetPct, stop: plan.stop, stopPct: plan.stopPct, timeStopDate: plan.timeStop.date }
       : null,
@@ -212,6 +218,8 @@ type Candidate = {
   planLevels: PaperPosition["planLevels"];
   confidence?: number | null;
   loggedAt?: string;
+  alertBid?: number | null;
+  alertAsk?: number | null;
 };
 
 async function gatherCandidates(today: string, startedAt: string): Promise<Candidate[]> {
@@ -243,6 +251,8 @@ async function gatherCandidates(today: string, startedAt: string): Promise<Candi
       timeStopDate: p.plan?.timeStopDate ?? addSessions(today, 3),
       planLevels: p.plan ? { entry: p.plan.entry, target: p.plan.target, stop: p.plan.stop } : null,
       confidence: p.confidence,
+      alertBid: p.alertBid ?? null,
+      alertAsk: p.alertAsk ?? null,
     });
   }
 
@@ -259,6 +269,7 @@ async function gatherCandidates(today: string, startedAt: string): Promise<Candi
       book: "lottery", source: "lottery", day: e.day, contract: e.contract, ticker: e.ticker, side: e.side,
       strike: e.strike, expiry: e.expiry.slice(0, 10), alertPrice: e.entry || e.price,
       targetPct: 100, stopPct: null, timeStopDate: e.expiry.slice(0, 10), planLevels: null, loggedAt: e.loggedAt,
+      alertBid: e.alertBid ?? null, alertAsk: e.alertAsk ?? null,
     });
   }
   for (const e of puts?.entries ?? []) {
@@ -270,6 +281,7 @@ async function gatherCandidates(today: string, startedAt: string): Promise<Candi
       timeStopDate: addSessions(e.day, e.exitPlan?.timeStopSessions ?? 3),
       planLevels: e.exitPlan ? { entry: e.exitPlan.entry, target: e.exitPlan.target, stop: e.exitPlan.stop } : null,
       loggedAt: e.loggedAt,
+      alertBid: e.alertBid ?? null, alertAsk: e.alertAsk ?? null,
     });
   }
   lanes.forEach((book, i) => {
@@ -283,6 +295,7 @@ async function gatherCandidates(today: string, startedAt: string): Promise<Candi
         timeStopDate: addSessions(e.day, e.exitPlan?.timeStopSessions ?? lane.timeStopSessions),
         planLevels: e.exitPlan ? { entry: e.exitPlan.entry, target: e.exitPlan.target, stop: e.exitPlan.stop } : null,
         loggedAt: e.loggedAt,
+        alertBid: e.alertBid ?? null, alertAsk: e.alertAsk ?? null,
       });
     }
   });
@@ -392,6 +405,18 @@ async function runTick(opts: { force?: boolean; ai?: AiPicksResponse | null; now
         skip("Contract already expired.");
         continue;
       }
+      // Spread at entry: live UW NBBO, else the alert's bid/ask. LIVE rule for main + lanes (> SPREAD_MAX_PCT
+      // of mid → skipped); lottery / puts only record it (test mode).
+      const lq = quotes[c.contract];
+      const entrySpread: SpreadInfo = resolveSpread(
+        lq && lq.quality !== "flow_print" ? { bid: lq.bid, ask: lq.ask } : null,
+        { bid: c.alertBid, ask: c.alertAsk },
+        now.toISOString(),
+      );
+      if ((c.book === "main" || c.book === "lanes") && entrySpread.status === "wide") {
+        skip(`${spreadSkipReason(entrySpread)} (live rule: over ${Math.round(SPREAD_MAX_PCT * 100)}% of mid)`);
+        continue;
+      }
       const fill = entryFill(toFill(quotes[c.contract]), c.alertPrice);
       if (!fill) {
         skip("No live ask and no alert price.");
@@ -430,6 +455,7 @@ async function runTick(opts: { force?: boolean; ai?: AiPicksResponse | null; now
             timeStopDate: c.expiry && c.expiry < c.timeStopDate ? c.expiry : c.timeStopDate,
             planLevels: c.planLevels,
             confidence: c.confidence ?? null,
+            entrySpread,
             note: "TRACKING ONLY — skipped by the 5% one-contract rule; would-be P&L at 1 contract.",
             lastMark: null,
           });
@@ -461,6 +487,7 @@ async function runTick(opts: { force?: boolean; ai?: AiPicksResponse | null; now
         timeStopDate,
         planLevels: c.planLevels,
         confidence: c.confidence ?? null,
+        entrySpread,
         note: c.loggedAt ? `Logged ${c.loggedAt}` : undefined,
         lastMark: null,
       });
@@ -589,6 +616,13 @@ export async function logExternalPaperTrade(input: ExternalTradeInput, now = new
   const fq: Record<string, FillQuote | null> = {};
   for (const l of legs) fq[l.option_chain] = toFill(quotes[l.option_chain]);
   const net = spreadNet(legs, fq, "entry");
+  // TEST MODE record only: widest leg's bid-ask spread at entry (never filters this book).
+  const legSpreads = legs.map((l) => {
+    const q = quotes[l.option_chain];
+    return resolveSpread(q && q.quality !== "flow_print" ? { bid: q.bid, ask: q.ask } : null, null, now.toISOString());
+  });
+  const entrySpread: SpreadInfo | null =
+    legSpreads.filter((x) => x.pct != null).sort((a, b) => (b.pct ?? 0) - (a.pct ?? 0))[0] ?? legSpreads[0] ?? null;
   const alertDebit = toNumber(input.alertDebit);
   const price = net != null && net > 0 ? net : alertDebit > 0 ? round2(alertDebit * 1.05) : 0;
   const basis: PaperPosition["entryBasis"] = net != null && net > 0 ? "uw_net" : "alert_net+5%";
@@ -630,6 +664,7 @@ export async function logExternalPaperTrade(input: ExternalTradeInput, now = new
     timeStopDate: exitBy.slice(0, 10),
     timeStopAt: exitBy,
     planLevels: null,
+    entrySpread,
     lastMark: null,
   };
   state.positions.push(pos);

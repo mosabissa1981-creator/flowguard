@@ -6,6 +6,7 @@ import { compareActionable, withActionableAdjustments } from "@/lib/scoring";
 import { applyConcentrationCaps } from "@/lib/issuers";
 import { buildExitPlan } from "@/lib/exit-plan";
 import { lockoutWarning, loadRegimeSafe, regimeBrief, regimeCaps, regimeListCap, toActionableRegime } from "@/lib/regime";
+import { gateRankedRows } from "@/lib/spread-gate";
 import type { PicksResponse } from "@/lib/types";
 
 export { PICKS_FILTERS };
@@ -25,8 +26,11 @@ export async function loadDailyPicks(opts?: { forceFresh?: boolean }): Promise<P
   });
   adjusted.sort(compareActionable);
 
+  // LIVE spread gate (> SPREAD_MAX_PCT of mid → excluded, listed as "Skipped: wide spread X%").
+  const gate = await gateRankedRows(adjusted, "picks");
+
   const { kept, dropped } = applyConcentrationCaps(
-    adjusted,
+    gate.kept,
     regimeListCap(regime, MAX_PICKS),
     regimeCaps(regime),
   );
@@ -52,5 +56,6 @@ export async function loadDailyPicks(opts?: { forceFresh?: boolean }): Promise<P
     authFailed: ranked.authFailed,
     regime: regimeBrief(regime),
     capDrops: dropped,
+    spreadSkips: gate.skipped,
   };
 }

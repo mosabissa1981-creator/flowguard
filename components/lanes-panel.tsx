@@ -6,6 +6,8 @@ import { Layers } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { formatExpiry, formatPremium, formatStrike } from "@/lib/format";
+import { SpreadBadge, SpreadSkips } from "@/components/spread-gate";
+import type { SpreadInfo, SpreadSkip } from "@/lib/spread-core";
 
 const POLL_MS = 15 * 60_000;
 
@@ -25,12 +27,14 @@ type Row = {
   laneScore: number;
   reasons: string[];
   exitPlan?: { target: number; targetPct: number; stop: number; stopPct: number; timeStopSessions: number };
+  spread?: SpreadInfo;
 };
 type Lane = {
   lane: { id: string; title: string; side: "call" | "put"; maxPerDay: number; rules: string };
   picks: Row[];
   candidatesConsidered: number;
   warning?: string;
+  spreadSkips?: SpreadSkip[];
 };
 type View = {
   lanes: Lane[];
@@ -138,7 +142,10 @@ export function LanesPanel() {
                           {p.side === "call" ? "C" : "P"} {formatExpiry(p.expiry)}
                           <span className="ml-2 text-xs font-normal text-muted-foreground">{p.dte}d</span>
                         </div>
-                        <Badge className="shrink-0 rounded-md bg-sky-500/15 text-sky-200">score {p.laneScore}</Badge>
+                        <div className="flex shrink-0 flex-col items-end gap-1">
+                          <Badge className="rounded-md bg-sky-500/15 text-sky-200">score {p.laneScore}</Badge>
+                          <SpreadBadge spread={p.spread} />
+                        </div>
                       </div>
                       <div className="font-mono text-[11px] text-muted-foreground">
                         {p.otmPct}% OTM · {p.askSharePct}% ask · vol/OI {p.volOi}× · {formatPremium(p.premiumUsd)}
@@ -168,6 +175,7 @@ export function LanesPanel() {
                   ))}
                 </div>
               )}
+              <SpreadSkips skips={active.spreadSkips} />
             </div>
           ) : null}
         </>
