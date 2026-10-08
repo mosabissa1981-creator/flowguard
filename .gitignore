@@ -48,3 +48,7 @@ agent-tools/
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# python bytecode (study scripts)
+__pycache__/
+*.pyc
