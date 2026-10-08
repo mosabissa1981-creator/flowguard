@@ -38,6 +38,7 @@ import {
   type PaperPosition,
 } from "@/lib/paper-core";
 import { SPREAD_MAX_PCT, resolveSpread, spreadSkipReason, type SpreadInfo } from "@/lib/spread-core";
+import { SINGLE_STOCK_PUT_REASON, blockedByPutsRule } from "@/lib/puts-rule";
 import type { AiPick, AiPicksResponse, WatchQuote } from "@/lib/types";
 
 /**
@@ -92,6 +93,8 @@ type MainPickLite = {
   /** Flow alert NBBO at the print (spread-gate fallback when no live quote). */
   alertBid?: number | null;
   alertAsk?: number | null;
+  /** UW issue_type (LIVE puts rule: ETF/index puts only). */
+  issueType?: string | null;
 };
 type MainPicksDoc = { day: string; at: string; engine: string; picks: MainPickLite[] };
 
@@ -170,6 +173,7 @@ function liteFromAi(p: AiPick, source: MainPickLite["source"]): MainPickLite {
     confidence: Number.isFinite(p.confidence) ? p.confidence : null,
     alertBid: a.bid ? toNumber(a.bid) : null,
     alertAsk: a.ask ? toNumber(a.ask) : null,
+    issueType: a.issue_type || null,
     plan: plan
       ? { entry: plan.entry, target: plan.target, targetPct: plan.targetPct, stop: plan.stop, stopPct: plan.stopPct, timeStopDate: plan.timeStop.date }
       : null,
@@ -217,6 +221,8 @@ type Candidate = {
   timeStopDate: string;
   planLevels: PaperPosition["planLevels"];
   confidence?: number | null;
+  /** UW issue_type of the underlying (LIVE puts rule; missing on older rows → ETF/index ticker list). */
+  issueType?: string | null;
   loggedAt?: string;
   alertBid?: number | null;
   alertAsk?: number | null;
@@ -253,6 +259,7 @@ async function gatherCandidates(today: string, startedAt: string): Promise<Candi
       confidence: p.confidence,
       alertBid: p.alertBid ?? null,
       alertAsk: p.alertAsk ?? null,
+      issueType: p.issueType ?? null,
     });
   }
 
@@ -296,6 +303,7 @@ async function gatherCandidates(today: string, startedAt: string): Promise<Candi
         planLevels: e.exitPlan ? { entry: e.exitPlan.entry, target: e.exitPlan.target, stop: e.exitPlan.stop } : null,
         loggedAt: e.loggedAt,
         alertBid: e.alertBid ?? null, alertAsk: e.alertAsk ?? null,
+        issueType: e.issueType ?? null,
       });
     }
   });
@@ -403,6 +411,11 @@ async function runTick(opts: { force?: boolean; ai?: AiPicksResponse | null; now
       }
       if (c.expiry && c.expiry < today) {
         skip("Contract already expired.");
+        continue;
+      }
+      // LIVE puts rule for main + lanes: ETF/index puts only (lottery / puts test books unchanged).
+      if ((c.book === "main" || c.book === "lanes") && blockedByPutsRule(c.side, c.ticker, c.issueType)) {
+        skip(`${SINGLE_STOCK_PUT_REASON} (live rule)`);
         continue;
       }
       // Spread at entry: live UW NBBO, else the alert's bid/ask. LIVE rule for main + lanes (> SPREAD_MAX_PCT

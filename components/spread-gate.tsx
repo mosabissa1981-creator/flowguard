@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { SPREAD_MAX_PCT, type SpreadInfo, type SpreadSkip } from "@/lib/spread-core";
 import { cn } from "@/lib/utils";
 
-/** LIVE spread gate (client): per-pick spread tag + the "Skipped: wide spread X%" list. */
+/** LIVE spread gate (client): per-pick spread tag + the skipped list ("Skipped: wide spread X%" / single-stock put). */
 
 function pctText(pct: number | null | undefined): string {
   return pct == null ? "?" : `${Math.round(pct * 100)}%`;
@@ -43,7 +43,7 @@ export function SpreadSkips({ skips, className }: { skips?: SpreadSkip[] | null;
   const head = rows.slice(0, 6);
   const rest = rows.slice(6);
   const line = (s: SpreadSkip) => (
-    <li key={`${s.list ?? ""}:${s.option_chain}`} title={`Bid ${money(s.spread?.bid)} / ask ${money(s.spread?.ask)} (${s.spread?.source === "uw_nbbo" ? "live UW NBBO" : "flow alert NBBO"})`}>
+    <li key={`${s.list ?? ""}:${s.option_chain}`} title={s.rule === "puts" ? "Live rule: puts only on ETFs / indexes. Still logged in test mode." : `Bid ${money(s.spread?.bid)} / ask ${money(s.spread?.ask)} (${s.spread?.source === "uw_nbbo" ? "live UW NBBO" : "flow alert NBBO"})`}>
       <span className="font-mono text-foreground/80">{s.ticker}</span>{" "}
       <span className="font-mono">{s.option_chain}</span> — {s.reason}
     </li>
@@ -51,7 +51,9 @@ export function SpreadSkips({ skips, className }: { skips?: SpreadSkip[] | null;
   return (
     <div className={cn("mt-3 rounded-md border border-rose-400/20 bg-rose-500/5 px-2 py-1.5 text-xs text-muted-foreground", className)}>
       <div className="text-[10px] uppercase tracking-[0.16em] text-rose-300/80">
-        Skipped · wide spread (over {Math.round(SPREAD_MAX_PCT * 100)}% of mid)
+        {rows.some((s) => s.rule === "puts")
+          ? `Skipped · live rules (spread over ${Math.round(SPREAD_MAX_PCT * 100)}% of mid; ETF/index puts only)`
+          : `Skipped · wide spread (over ${Math.round(SPREAD_MAX_PCT * 100)}% of mid)`}
       </div>
       <ul className="mt-1 space-y-0.5">{head.map(line)}</ul>
       {rest.length > 0 ? (

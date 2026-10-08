@@ -1,3 +1,5 @@
+import { SINGLE_STOCK_PUT_REASON, blockedByPutsRule } from "@/lib/puts-rule";
+
 /**
  * LIVE spread gate (approved by Mosab 10/8/2026): live candidates whose option bid-ask spread is over
  * SPREAD_MAX_PCT of mid at evaluation time are excluded from live picks (shown as "Skipped: wide spread X%").
@@ -28,6 +30,8 @@ export type SpreadSkip = {
   option_chain: string;
   ticker: string;
   reason: string;
+  /** Which live rule skipped it (missing on older rows = spread). */
+  rule?: "spread" | "puts";
   spread: SpreadInfo;
   /** List the name was evaluated for (picks, premove, morning, lane id, paper book…). */
   list?: string;
@@ -105,6 +109,35 @@ export function splitBySpread<T>(
     const spread = spreadOf(row);
     if (spread.status === "wide") {
       skipped.push({ ...keyOf(row), reason: spreadSkipReason(spread), spread, ...(list ? { list } : {}) });
+      continue;
+    }
+    kept.push({ ...row, spread });
+  }
+  return { kept, skipped };
+}
+
+/**
+ * Both LIVE rules in one pass (order preserved): single-stock puts → skipped ("ETF/index puts only",
+ * see lib/puts-rule.ts), then wide spread → skipped; ok / unknown → kept (annotated with `spread`).
+ */
+export function splitByLiveRules<T>(
+  rows: T[],
+  spreadOf: (row: T) => SpreadInfo,
+  keyOf: (row: T) => { option_chain: string; ticker: string },
+  putOf: (row: T) => { side: string | null | undefined; ticker: string | null | undefined; issueType?: string | null },
+  list?: string,
+): { kept: Array<T & { spread: SpreadInfo }>; skipped: SpreadSkip[] } {
+  const kept: Array<T & { spread: SpreadInfo }> = [];
+  const skipped: SpreadSkip[] = [];
+  for (const row of rows) {
+    const p = putOf(row);
+    if (blockedByPutsRule(p.side, p.ticker, p.issueType)) {
+      skipped.push({ ...keyOf(row), reason: SINGLE_STOCK_PUT_REASON, rule: "puts", spread: spreadOf(row), ...(list ? { list } : {}) });
+      continue;
+    }
+    const spread = spreadOf(row);
+    if (spread.status === "wide") {
+      skipped.push({ ...keyOf(row), reason: spreadSkipReason(spread), rule: "spread", spread, ...(list ? { list } : {}) });
       continue;
     }
     kept.push({ ...row, spread });

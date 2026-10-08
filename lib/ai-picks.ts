@@ -15,6 +15,8 @@ import { loadAiPicksState, saveAiPicksState, type AiPicksState } from "@/lib/ai-
 import { clamp } from "@/lib/numbers";
 import { estimateCost } from "@/lib/shadow/llm";
 import type { AiPick, AiPicksResponse, AiPremoveReview, AiSkip, DailyPick, RegimeSnapshot } from "@/lib/types";
+import { resolveSpread } from "@/lib/spread-core";
+import { SINGLE_STOCK_PUT_REASON, blockedByPutsRule } from "@/lib/puts-rule";
 
 const MAX_CANDIDATES = 8;
 /** Premove ("Before the move") lane candidates sent to the same LLM call for a separate review. */
@@ -401,6 +403,45 @@ async function compute(opts: { force?: boolean }): Promise<AiPicksResponse> {
  * `force` bypasses the throttle (admin-only, see route). `persist: false` skips the shared state (tests).
  */
 export async function reviewCandidates(
+  gathered: Awaited<ReturnType<typeof gatherCandidates>>,
+  regime: RegimeSnapshot | null,
+  opts: { force?: boolean; persist?: boolean; brief?: string | null } = {},
+): Promise<AiPicksResponse> {
+  return applyLivePutsRule(await reviewCandidatesInner(gathered, regime, opts));
+}
+
+/**
+ * LIVE puts rule (ETF/index puts only) on the finished answer. Candidates already come from gated lists, but a
+ * stored/throttled LLM answer from earlier in the day can still hold a single-stock put: drop it here and list it
+ * as skipped. Calls untouched.
+ */
+export function applyLivePutsRule(value: AiPicksResponse): AiPicksResponse {
+  const blocked = (p: AiPick) => blockedByPutsRule(p.alert.type, p.alert.ticker, p.alert.issue_type);
+  const dropped = [...(value.picks ?? []), ...(value.premove?.picks ?? [])].filter(blocked);
+  if (dropped.length === 0) return value;
+  const skips = new Map((value.spreadSkips ?? []).map((sk) => [sk.option_chain, sk] as const));
+  for (const p of dropped) {
+    const k = contractKey(p);
+    if (!skips.has(k)) {
+      skips.set(k, {
+        option_chain: k,
+        ticker: p.alert.ticker,
+        reason: SINGLE_STOCK_PUT_REASON,
+        rule: "puts",
+        spread: p.spread ?? resolveSpread(null, { bid: p.alert.bid, ask: p.alert.ask }),
+        list: "ai-picks",
+      });
+    }
+  }
+  return {
+    ...value,
+    picks: (value.picks ?? []).filter((p) => !blocked(p)),
+    ...(value.premove ? { premove: { ...value.premove, picks: value.premove.picks.filter((p) => !blocked(p)) } } : {}),
+    spreadSkips: [...skips.values()],
+  };
+}
+
+async function reviewCandidatesInner(
   gathered: Awaited<ReturnType<typeof gatherCandidates>>,
   regime: RegimeSnapshot | null,
   opts: { force?: boolean; persist?: boolean; brief?: string | null } = {},
