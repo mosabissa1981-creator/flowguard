@@ -1,3 +1,4 @@
+import type { SpreadInfo } from "@/lib/spread-core";
 /**
  * PAPER / TEST MODE trading book — pure logic (no I/O). Fake money only; never touches live picks,
  * never places orders. Not financial advice.
@@ -92,6 +93,8 @@ export type PaperPosition = {
   /** Levels from the pick's own exit plan (vs the flow print), for reference. */
   planLevels?: { entry: number; target: number | null; stop: number | null } | null;
   confidence?: number | null;
+  /** Bid/ask/spread% at entry (LIVE spread gate for main + lanes; record-only for lottery/puts/earnings calendar). */
+  entrySpread?: SpreadInfo | null;
   note?: string;
   lastMark?: PaperMark | null;
 };

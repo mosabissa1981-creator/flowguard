@@ -4,12 +4,15 @@ import { useCallback, useEffect, useState } from "react";
 import { Ticket } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
+import { SpreadBadge } from "@/components/spread-gate";
+import type { SpreadInfo } from "@/lib/spread-core";
 import { formatExpiry, formatStrike } from "@/lib/format";
 
 const POLL_MS = 15 * 60_000;
 
 type Catalyst = { kind: "earnings" | "macro"; date: string; label: string } | null;
 type LotteryRow = {
+  spread?: SpreadInfo;
   contract: string;
   ticker: string;
   side: "call" | "put";
@@ -104,7 +107,7 @@ export function LotteryPanel() {
                 </Badge>
               </div>
               <div className="font-mono text-[11px] text-muted-foreground">
-                {p.otmPct}% OTM · {p.askSharePct}% ask · vol/OI {p.volOi}× · score {p.lotteryScore}
+                {p.otmPct}% OTM · {p.askSharePct}% ask · vol/OI {p.volOi}× · score {p.lotteryScore} <SpreadBadge spread={p.spread} testOnly />
               </div>
               {p.catalyst ? (
                 <div className="text-[11px] text-amber-200">

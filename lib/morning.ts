@@ -9,6 +9,7 @@ import { applyConcentrationCaps } from "@/lib/issuers";
 import { buildExitPlan } from "@/lib/exit-plan";
 import { loadRegimeSafe, regimeBrief, regimeCaps, regimeListCap, toActionableRegime } from "@/lib/regime";
 import { compareActionable, withActionableAdjustments } from "@/lib/scoring";
+import { gateRankedRows } from "@/lib/spread-gate";
 import type { MorningShortlistResponse } from "@/lib/types";
 import {
   isInMorningWindow,
@@ -58,8 +59,11 @@ export async function loadMorningShortlist(): Promise<MorningShortlistResponse> 
   );
   morningAlerts.sort(compareActionable);
 
+  // LIVE spread gate (> SPREAD_MAX_PCT of mid → excluded, listed as "Skipped: wide spread X%").
+  const gate = await gateRankedRows(morningAlerts, "morning");
+
   const { kept, dropped } = applyConcentrationCaps(
-    morningAlerts,
+    gate.kept,
     regimeListCap(regime, Math.min(MAX_PICKS, MAX_MORNING)),
     regimeCaps(regime),
   );
@@ -94,6 +98,7 @@ export async function loadMorningShortlist(): Promise<MorningShortlistResponse> 
     authFailed: ranked.authFailed,
     regime: regimeBrief(regime),
     capDrops: dropped,
+    spreadSkips: gate.skipped,
     warning:
       ranked.quotaBlocked
         ? ranked.warning

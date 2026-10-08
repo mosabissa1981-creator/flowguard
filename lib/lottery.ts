@@ -9,6 +9,8 @@ import { isLateSessionPrint, tradingDateET } from "@/lib/session";
 import { loadDoc, persistenceMode, saveDoc } from "@/lib/shadow/store";
 import { fetchContractHistoric, fetchTickerInfo, hasUnusualWhalesKey } from "@/lib/uw";
 import { isUwBlocked } from "@/lib/uw-quota";
+import { spreadFor } from "@/lib/spread-gate";
+import type { SpreadInfo } from "@/lib/spread-core";
 import type { FlowFilters, RankedFlow, RegimeSnapshot } from "@/lib/types";
 
 /**
@@ -56,6 +58,9 @@ export type LotteryCatalyst = { kind: "earnings" | "macro"; date: string; label:
 
 export type LotteryCandidate = {
   contract: string;
+  /** Flow alert NBBO at the print (spread record fallback). */
+  alertBid?: number | null;
+  alertAsk?: number | null;
   ticker: string;
   issuer: string;
   sector: string;
@@ -95,6 +100,8 @@ export type LotteryTracking = {
 };
 
 export type LotteryEntry = LotteryCandidate & {
+  /** TEST MODE ONLY: spread at logging time is recorded (flag), never used to filter this lane. */
+  spread?: SpreadInfo;
   day: string;
   loggedAt: string;
   /** Entry reference = the flow print price. */
@@ -205,6 +212,8 @@ function toCandidate(row: RankedFlow, score: number, reasons: string[], catalyst
   const a = row.alert;
   return {
     contract: contractKey(row),
+    alertBid: a.bid ? toNumber(a.bid) : null,
+    alertAsk: a.ask ? toNumber(a.ask) : null,
     ticker: a.ticker,
     issuer: issuerKey(a.ticker),
     sector: sectorOf(a.ticker),
@@ -287,7 +296,9 @@ async function compute(): Promise<LotteryResponse> {
     for (const c of candidates) {
       if (todays.length >= LOTTERY_RULES.maxPerDay) break;
       if (todays.some((e) => e.contract === c.contract || e.issuer === c.issuer)) continue;
-      const entry: LotteryEntry = { ...c, day, loggedAt: new Date().toISOString(), entry: c.price };
+      // TEST MODE: record the spread flag only (never filters the lottery lane).
+      const spread = await spreadFor(c.ticker, c.contract, { bid: c.alertBid, ask: c.alertAsk }).catch(() => undefined);
+      const entry: LotteryEntry = { ...c, day, loggedAt: new Date().toISOString(), entry: c.price, spread };
       todays.push(entry);
       book.entries.push(entry);
       added = true;
