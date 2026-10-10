@@ -11,7 +11,8 @@ export type ShadowModuleId =
   | "worth_the_price"
   | "x_sentiment_shift"
   | "regime_analogs"
-  | "adaptive_exits";
+  | "adaptive_exits"
+  | "lessons_review";
 
 export const SHADOW_MODULES: ShadowModuleId[] = [
   "news_x_check",
@@ -22,6 +23,7 @@ export const SHADOW_MODULES: ShadowModuleId[] = [
   "regime_analogs",
   "adaptive_exits",
   "debate",
+  "lessons_review",
 ];
 
 /** pass = no objection; flag = module objects; boost = module likes it; skip = module could not judge. */

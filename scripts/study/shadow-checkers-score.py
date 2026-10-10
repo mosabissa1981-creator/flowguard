@@ -11,7 +11,7 @@ Optional: joins the loss model's predictions (walk-forward) where the contract i
 import csv, glob, json, math, os, sys, collections
 S = "/workspace/flowguard/study"; H = "/workspace/flowguard/history"
 OUT = sys.argv[1] if len(sys.argv) > 1 else f"{S}/loss-model-work/shadow-checkers.json"
-MODS = ["news_x_check", "x_sentiment_shift", "earnings_check", "same_buyer_tracking", "worth_the_price", "regime_analogs", "adaptive_exits", "debate"]
+MODS = ["news_x_check", "x_sentiment_shift", "earnings_check", "same_buyer_tracking", "worth_the_price", "regime_analogs", "adaptive_exits", "debate", "lessons_review"]
 
 rep = {}
 for f in ("candidates.csv", "entries.csv"):

@@ -30,6 +30,7 @@ const SHORT: Record<ShadowModuleId, string> = {
   regime_analogs: "Analog",
   adaptive_exits: "Exits",
   debate: "Debate",
+  lessons_review: "Lessons",
 };
 
 const CELL: Record<ShadowVerdict["verdict"], string> = {
