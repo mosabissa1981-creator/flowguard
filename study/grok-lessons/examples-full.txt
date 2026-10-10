@@ -1,0 +1,25 @@
+## Real past examples (train window only; 12 winners, 12 losers, random picks, not cherry-picked). Use them as texture, not rules:
+[LOSER] 2024-10-23 SPY put K583 dte12 ask$5.87 spread0.5% ETF/index prem$117k vol/OI0.5 sweep score100 t=09:09CT -> hit -25% stop, result -25%
+[WINNER] 2024-10-30 KRE put K59.5 dte16 ask$1.91 spread1.1% ETF/index prem$29k vol/OI1.3 sweep score100 t=10:44CT -> hit +30% target in session 1-2, result +19%
+[LOSER] 2024-11-14 SOXL call K32 dte22 ask$1.90 spread3.8% ETF/index prem$32k vol/OI2.5 sweep score100 t=10:49CT -> opened below the stop (gap down), result -49%
+[WINNER] 2024-12-24 HOOD call K40 dte24 ask$1.71 spread3.6% stock prem$149k vol/OI0.1 sweep score100 t=09:03CT -> hit +30% target in session 1-2, result +28%
+[LOSER] 2025-02-10 GM call K49 dte11 ask$0.38 spread8.2% stock prem$100k vol/OI2.5 sweep score100 t=09:51CT -> opened below the stop (gap down), result -47%
+[WINNER] 2025-03-11 SPY call K560 dte10 ask$8.25 spread0.2% ETF/index prem$113k vol/OI0.7 sweep score100 t=12:47CT -> opened above +30% (gap up), result +30%
+[WINNER] 2025-05-20 TLT put K85 dte17 ask$1.06 spread0.9% ETF/index prem$95k vol/OI0.4 sweep score100 t=09:34CT -> opened above +30% (gap up), result +37%
+[WINNER] 2025-06-03 UPST call K55 dte17 ask$1.20 spread7.8% stock prem$172k vol/OI0.6 sweep score100 t=11:45CT -> opened above +30% (gap up), result +26%
+[LOSER] 2025-06-03 TSLA call K365 dte17 ask$14.20 spread0.7% stock prem$129k vol/OI0.3 sweep score100 t=12:20CT -> opened below the stop (gap down), result -29%
+[LOSER] 2025-06-30 SPY put K600 dte18 ask$2.61 spread0.8% ETF/index prem$392k vol/OI0.1 sweep score100 t=09:03CT -> hit -25% stop, result -25%
+[WINNER] 2025-07-16 KRE call K65 dte30 ask$0.68 spread3.0% ETF/index prem$29k vol/OI0.1 sweep score100 t=12:45CT -> opened above +30% (gap up), result -23%
+[LOSER] 2025-08-12 CRWD call K470 dte17 ask$9.20 spread2.8% stock prem$86k vol/OI0.3 sweep score100 t=09:46CT -> hit -25% stop, result -26%
+[WINNER] 2025-11-18 GOOG call K290 dte17 ask$7.05 spread2.1% stock prem$141k vol/OI1.7 no-sweep score100 t=11:36CT -> hit +30% target in session 1-2, result +28%
+[WINNER] 2025-12-02 GLD call K385 dte10 ask$5.90 spread1.7% ETF/index prem$541k vol/OI4.6 sweep score100 t=12:48CT -> hit +30% target in session 1-2, result +26%
+[LOSER] 2025-12-23 SPY put K625 dte24 ask$0.65 spread1.6% ETF/index prem$145k vol/OI0.1 sweep score99 t=08:42CT -> hit -25% stop, result -26%
+[LOSER] 2026-01-22 IBIT call K53 dte15 ask$0.65 spread3.1% ETF/index prem$65k vol/OI1.1 sweep score100 t=11:45CT -> hit -25% stop, result -27%
+[LOSER] 2026-03-16 TSLA call K400 dte17 ask$14.25 spread0.7% stock prem$104k vol/OI0.5 no-sweep score100 t=11:21CT -> hit -25% stop, result -25%
+[WINNER] 2026-03-18 SPY put K645 dte30 ask$8.87 spread0.9% ETF/index prem$4123k vol/OI0.2 sweep score100 t=09:35CT -> opened above +30% (gap up), result +45%
+[LOSER] 2026-05-07 SLV put K72 dte22 ask$2.87 spread1.4% ETF/index prem$243k vol/OI5.3 sweep score100 t=09:12CT -> opened below the stop (gap down), result -38%
+[LOSER] 2026-05-08 COST call K1070 dte21 ask$8.20 spread6.9% stock prem$196k vol/OI1.6 sweep score100 t=12:05CT -> opened below the stop (gap down), result -48%
+[WINNER] 2026-05-11 COHR call K412.5 dte11 ask$13.00 spread8.0% stock prem$102k vol/OI83.0 sweep score100 t=09:54CT -> opened above +30% (gap up), result +45%
+[WINNER] 2026-06-11 SPY call K717 dte21 ask$21.00 spread1.2% ETF/index prem$304k vol/OI14.5 no-sweep score100 t=11:06CT -> hit +30% target in session 1-2, result +24%
+[WINNER] 2026-09-08 SPY put K769 dte22 ask$9.87 spread0.4% ETF/index prem$113k vol/OI0.4 sweep score100 t=11:56CT -> hit +30% target in session 1-2, result +28%
+[LOSER] 2026-09-11 SMH call K555 dte42 ask$34.85 spread6.7% ETF/index prem$128k vol/OI12.3 sweep score100 t=09:15CT -> opened below the stop (gap down), result -46%

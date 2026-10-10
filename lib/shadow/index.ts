@@ -4,6 +4,7 @@ import { buildExitPlan } from "@/lib/exit-plan";
 import { issuerKey } from "@/lib/issuers";
 import { askShare, toNumber } from "@/lib/numbers";
 import { contractKey } from "@/lib/scoring";
+import { resolveSpread } from "@/lib/spread-core";
 import { tradingDateET } from "@/lib/session";
 import { fetchContractHistoric, fetchEarningsHistory, fetchTickerInfo, fetchVolStats } from "@/lib/uw";
 import { budgetLeft, etClock } from "@/lib/shadow/budget";
@@ -14,11 +15,13 @@ import {
   calendarTypeOf,
   earningsCheck,
   priorAppearances,
+  qualityFilter,
   regimeAnalogs,
   regimeAnalogVerdict,
   sameBuyerTracking,
   worthThePrice,
 } from "@/lib/shadow/modules";
+import { lessonsTestEnabled, lessonsVerdict, runLessonsReview, type LessonsJudgement } from "@/lib/shadow/lessons-review";
 import { loadDoc, persistenceMode, saveDoc } from "@/lib/shadow/store";
 import type { ContractBar, ShadowCandidate, ShadowDay, ShadowModuleId, ShadowRegimeFeatures, ShadowVerdict } from "@/lib/shadow/types";
 import type { DailyPick, RegimeSnapshot } from "@/lib/types";
@@ -87,6 +90,7 @@ export function toShadowCandidate(c: Candidate, regime: RegimeSnapshot | null, n
     underlying: toNumber(a.underlying_price),
     premiumUsd: Math.round(toNumber(a.total_premium)),
     askSharePct: Math.round(askShare(a) * 100),
+    spreadPct: (c.spread ?? resolveSpread(null, { bid: a.bid, ask: a.ask })).pct,
     chips: c.chips.map((ch) => `${ch.id}(${ch.delta >= 0 ? "+" : ""}${ch.delta})`),
     firstSeenAt: now.toISOString(),
     exitPlan: {
@@ -208,6 +212,7 @@ export async function runShadow(input: RunShadowInput): Promise<ShadowDay> {
     setVerdict(doc, c.contract, worthThePrice(c, doc.cache.vol[c.ticker]?.data ?? null, risky));
     setVerdict(doc, c.contract, adaptiveExits(c, doc.cache.vol[c.ticker]?.data ?? null, risky));
     setVerdict(doc, c.contract, regimeAnalogVerdict(c, analog));
+    setVerdict(doc, c.contract, qualityFilter(c)); // study only: log, never gates live picks
   }
 
   // 3) LLM modules (throttled, incremental, budgeted)
@@ -266,6 +271,21 @@ export async function runShadow(input: RunShadowInput): Promise<ShadowDay> {
         doc.llm.lastError = `${doc.llm.lastError ? doc.llm.lastError + " | " : ""}debate: ${(e instanceof Error ? e.message : String(e)).slice(0, 180)}`;
       }
     }
+    // TEST MODE (FLOWGUARD_LESSONS_TEST=1, default off): Grok + lessons sheet second opinion, shadow-scored only.
+    if (lessonsTestEnabled()) {
+      const seen = ((doc.dayNotes.lessons_review as Record<string, LessonsJudgement> | undefined) ??= {});
+      const todo = frozen.filter((c) => !(c.contract in seen));
+      if (todo.length) {
+        try {
+          const { results, usage } = await runLessonsReview(todo, now);
+          doc.llm.usage.push(usage);
+          doc.llm.spendUsd += usage.costUsd;
+          Object.assign(seen, results);
+        } catch (e) {
+          doc.llm.lastError = `${doc.llm.lastError ? doc.llm.lastError + " | " : ""}lessons_review: ${(e instanceof Error ? e.message : String(e)).slice(0, 180)}`;
+        }
+      }
+    }
     doc.llm.spendUsd = Math.round(doc.llm.spendUsd * 10000) / 10000;
   }
   for (const c of frozen) {
@@ -273,6 +293,9 @@ export async function runShadow(input: RunShadowInput): Promise<ShadowDay> {
     setVerdict(doc, c.contract, newsVerdict(c, n));
     setVerdict(doc, c.contract, xSentimentVerdict(c, n));
     setVerdict(doc, c.contract, debateVerdict(doc.cache.debate[c.contract]?.data));
+    if (lessonsTestEnabled()) {
+      setVerdict(doc, c.contract, lessonsVerdict((doc.dayNotes.lessons_review as Record<string, LessonsJudgement> | undefined)?.[c.contract]));
+    }
   }
   doc.updatedAt = new Date().toISOString();
   await saveDoc("day", day, doc);
@@ -282,7 +305,7 @@ export async function runShadow(input: RunShadowInput): Promise<ShadowDay> {
 /** Public view: drop raw caches unless asked. */
 export function publicView(doc: ShadowDay, full = false) {
   const { cache, ...rest } = doc;
-  const order: ShadowModuleId[] = ["news_x_check", "x_sentiment_shift", "earnings_check", "same_buyer_tracking", "worth_the_price", "regime_analogs", "adaptive_exits", "debate"];
+  const order: ShadowModuleId[] = ["news_x_check", "x_sentiment_shift", "earnings_check", "same_buyer_tracking", "worth_the_price", "regime_analogs", "adaptive_exits", "debate", "quality_filter", ...(lessonsTestEnabled() ? (["lessons_review"] as ShadowModuleId[]) : [])];
   const tally: Record<string, { pass: number; flag: number; boost: number; skip: number }> = {};
   for (const list of Object.values(doc.verdicts)) {
     for (const v of list) {
