@@ -12,7 +12,8 @@ export type ShadowModuleId =
   | "x_sentiment_shift"
   | "regime_analogs"
   | "adaptive_exits"
-  | "lessons_review";
+  | "lessons_review"
+  | "quality_filter";
 
 export const SHADOW_MODULES: ShadowModuleId[] = [
   "news_x_check",
@@ -24,6 +25,7 @@ export const SHADOW_MODULES: ShadowModuleId[] = [
   "adaptive_exits",
   "debate",
   "lessons_review",
+  "quality_filter",
 ];
 
 /** pass = no objection; flag = module objects; boost = module likes it; skip = module could not judge. */
@@ -58,6 +60,8 @@ export type ShadowCandidate = {
   underlying: number;
   premiumUsd: number;
   askSharePct: number;
+  /** Bid-ask spread as a fraction of mid at first sight (0.04 = 4%); null when unknown. */
+  spreadPct?: number | null;
   chips: string[];
   firstSeenAt: string;
   /** Current fixed exit plan (for adaptive_exits comparison). */

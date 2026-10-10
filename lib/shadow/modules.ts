@@ -271,3 +271,23 @@ export function regimeAnalogVerdict(c: ShadowCandidate, summary: AnalogSummary):
   if (t.w === 0 || lossRate >= 0.4 || t.l >= t.w + 2) return verdict("regime_analogs", "flag", -lossRate, 55, `${rec} — this type failed in similar regimes.`, { key, ...t });
   return verdict("regime_analogs", "pass", winRate - lossRate, 40, `${rec}.`, { key, ...t });
 }
+
+// ---------------------------------------------------------------- quality_filter (study only; log + score, never gates live picks). boost = meets all four thresholds, flag = misses one (so the study book compares meets vs misses)
+export const QUALITY_FILTER = { maxSpreadPct: 0.04, minOptionPrice: 2, minPremiumUsd: 100_000, minScore: 90 } as const;
+
+export function qualityFilter(c: ShadowCandidate): ShadowVerdict {
+  const q = QUALITY_FILTER;
+  const sp = c.spreadPct ?? null;
+  const score = c.rawScore;
+  const checks = {
+    spread: sp != null && sp <= q.maxSpreadPct,
+    price: c.optionPrint >= q.minOptionPrice,
+    premium: c.premiumUsd >= q.minPremiumUsd,
+    score: score >= q.minScore,
+  };
+  const data = { spreadPct: sp, optionPrice: c.optionPrint, premiumUsd: c.premiumUsd, poolScore: score, ...checks };
+  const line = `spread ${sp == null ? "n/a" : (sp * 100).toFixed(1) + "%"} (<=4%), price $${c.optionPrint} (>=$2), premium $${Math.round(c.premiumUsd / 1000)}k (>=$100k), score ${Math.round(score)} (>=90)`;
+  if (sp == null) return verdict("quality_filter", "skip", null, 30, `Spread unknown, cannot judge — ${line}.`, data);
+  const all = Object.values(checks).every(Boolean);
+  return verdict("quality_filter", all ? "boost" : "flag", all ? 1 : 0, 90, `${all ? "Meets all quality thresholds" : "Misses a threshold"} — ${line}. Study only.`, data);
+}
