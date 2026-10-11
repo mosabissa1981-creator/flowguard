@@ -365,6 +365,14 @@
     {
       "path": "/api/shadow/tick?c=2055",
       "schedule": "55 20 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/pullback-reclaim",
+      "schedule": "15 21 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/pullback-reclaim",
+      "schedule": "30 23 * * 1-5"
     }
   ]
 }
