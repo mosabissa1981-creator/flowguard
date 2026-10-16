@@ -4,7 +4,7 @@
  * Each candidate gets a max price = print +5% and +10%; a variant "fills" only if the contract trades at/below its max in the
  * first 60 min (9:30–10:30 ET). Exits are the live rules: +30% / −25% / 2-session hold.
  */
-import { MIN_ASK_SHARE, SPREAD_MAX, spreadPct } from "@/lib/shadow/risk-off-continuation-core";
+import { MIN_ASK_SHARE, SPREAD_MAX, spreadPct } from "@/lib/shadow/option-score-core";
 
 export const PING_ET_MIN = 9 * 60 + 35;
 export const EARLY_UNTIL_ET_MIN = 9 * 60 + 45;

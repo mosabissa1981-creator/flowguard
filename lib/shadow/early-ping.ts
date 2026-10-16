@@ -7,7 +7,7 @@ import { tradingDateET } from "@/lib/session";
 import { getSessionTape } from "@/lib/session-tape";
 import { etClock } from "@/lib/shadow/budget";
 import { CAPS, type CapId, EARLY_UNTIL_ET_MIN, type EpPrint, FILL_UNTIL_ET_MIN, PING_ET_MIN, PRIOR_AFTER_ET_MIN, maxPrice, rankCandidates } from "@/lib/shadow/early-ping-core";
-import { type OptBar, type PutResult, scorePut } from "@/lib/shadow/risk-off-continuation-core";
+import { type OptBar, type PutResult, scorePut } from "@/lib/shadow/option-score-core";
 import { loadDoc, persistenceMode, saveDoc } from "@/lib/shadow/store";
 import { fetchContractHistoric, hasUnusualWhalesKey } from "@/lib/uw";
 import { isUwBlocked } from "@/lib/uw-quota";
