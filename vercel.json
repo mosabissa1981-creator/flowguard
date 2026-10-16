@@ -373,6 +373,46 @@
     {
       "path": "/api/shadow/pullback-reclaim",
       "schedule": "30 23 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/early-ping",
+      "schedule": "36 13 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/early-ping",
+      "schedule": "36 14 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/early-ping",
+      "schedule": "50 13 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/early-ping",
+      "schedule": "50 14 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/early-ping",
+      "schedule": "32 14 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/early-ping",
+      "schedule": "32 15 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/early-ping",
+      "schedule": "56 19 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/early-ping",
+      "schedule": "56 20 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/early-ping",
+      "schedule": "25 21 * * 1-5"
+    },
+    {
+      "path": "/api/shadow/early-ping",
+      "schedule": "45 23 * * 1-5"
     }
   ]
 }

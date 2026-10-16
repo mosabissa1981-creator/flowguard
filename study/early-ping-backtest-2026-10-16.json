@@ -1,0 +1,46 @@
+{
+ "sessions": 528,
+ "first": "2024-10-07",
+ "last": "2026-10-14",
+ "results": {
+  "a": {
+   "candidates": 788,
+   "no_data": 2,
+   "skipped": 158,
+   "trades": 628,
+   "fill_rate": 79.9,
+   "win_pct": 36.3,
+   "mean": -5.0,
+   "median": -25.0,
+   "days_traded": 339,
+   "per_day_avg": -5.3,
+   "per_day_sum_avg": -9.3
+  },
+  "b5": {
+   "candidates": 1973,
+   "no_data": 70,
+   "skipped": 250,
+   "trades": 1653,
+   "fill_rate": 86.9,
+   "win_pct": 41.4,
+   "mean": -2.1,
+   "median": -22.6,
+   "days_traded": 478,
+   "per_day_avg": -2.4,
+   "per_day_sum_avg": -7.1
+  },
+  "b10": {
+   "candidates": 1973,
+   "no_data": 70,
+   "skipped": 207,
+   "trades": 1696,
+   "fill_rate": 89.1,
+   "win_pct": 39.0,
+   "mean": -3.5,
+   "median": -25.0,
+   "days_traded": 478,
+   "per_day_avg": -3.8,
+   "per_day_sum_avg": -12.4
+  }
+ }
+}
