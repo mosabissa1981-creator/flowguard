@@ -67,10 +67,6 @@
       "schedule": "5 14 * * 1-5"
     },
     {
-      "path": "/api/shadow/tick?c=1411",
-      "schedule": "11 14 * * 1-5"
-    },
-    {
       "path": "/api/shadow/tick?c=1416",
       "schedule": "16 14 * * 1-5"
     },
@@ -83,10 +79,6 @@
       "schedule": "27 14 * * 1-5"
     },
     {
-      "path": "/api/shadow/tick?c=1433",
-      "schedule": "33 14 * * 1-5"
-    },
-    {
       "path": "/api/shadow/tick?c=1438",
       "schedule": "38 14 * * 1-5"
     },
@@ -97,10 +89,6 @@
     {
       "path": "/api/shadow/tick?c=1449",
       "schedule": "49 14 * * 1-5"
-    },
-    {
-      "path": "/api/shadow/tick?c=1455",
-      "schedule": "55 14 * * 1-5"
     },
     {
       "path": "/api/shadow/tick?c=1500",
