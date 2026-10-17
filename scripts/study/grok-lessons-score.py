@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Step 3b: score the with/without-lessons Grok runs vs baselines on the same held-out days (live exit rules). Study only.
-Usage: grok-lessons-score.py [runs-prefix-dir] -> prints + writes grok-lessons-results.json"""
+Usage: grok-lessons-score.py [lessons-arm, default lessons] -> prints + writes grok-lessons-results.json
+(e.g. grok-lessons-score.py lessons_v2 -> grok-lessons-results-lessons_v2.json; base is always the comparison arm)"""
 import json, os, sys, numpy as np, pandas as pd
 W = "/workspace/flowguard/study/grok-lessons-work"
 d = pd.read_csv(f"{W}/dataset.csv"); d = d[d.ret.notna() & (d.ok_spread == 1) & (d.ok_put == 1)]
@@ -19,7 +20,8 @@ def load(arm):
                 seen.add(issuer(tick[(j["day"], c)])); keep.append(c)
         out[j["day"]] = (keep[:3], j["cands"], j["usd"])
     return out
-runs = {a: load(a) for a in ("base", "lessons")}
+LARM = sys.argv[1] if len(sys.argv) > 1 else "lessons"
+runs = {"base": load("base"), "lessons": load(LARM)}
 days = sorted(set(runs["base"]) & set(runs["lessons"]))
 rng = np.random.RandomState(1)
 def trades(sel):  # sel: day -> list of contracts
@@ -78,4 +80,4 @@ for h, dd in (("first_half_days", days[:len(days)//2]), ("second_half_days", day
     res[h] = {a: stats([t for t in trades(s) if t[0] in dd]) for a, s in sel.items() if a.startswith("grok")}
 res["cost_usd"] = {a: round(sum(runs[a][x][2] for x in runs[a]), 4) for a in runs}
 res["by_side"] = {a: {sd: stats([t for t in trades(sel[a]) if True and (t[0], ) and False] or [(0, 0, 0)]) for sd in []} for a in []}
-json.dump(res, open(f"{W}/grok-lessons-results.json", "w"), indent=1); print(json.dumps(res, indent=1))
+json.dump(res, open(f"{W}/grok-lessons-results.json" if LARM == "lessons" else f"{W}/grok-lessons-results-{LARM}.json", "w"), indent=1); print(json.dumps(res, indent=1))

@@ -4,10 +4,13 @@ TEST MODE study (Grok lessons, step 3): run Grok 4.7 with vs without the lessons
 Each day: candidates = top-12 Picks list + top-12 Premove list (by pool rank), deduped, live filters (spread<=10%, puts ETF/index only),
 facts known at the print only. Grok picks 0-3 contracts. Scored with the LIVE exit rules (+30% / -25% / 2 sessions, buy ask / sell bid)
 from dataset.csv. Resumable (jsonl per arm), hard dollar cap across all arms (ledger.json), nice-friendly low concurrency.
-Usage: grok-lessons-backtest.py <arm: base|lessons> <days.txt> [workers]
+Usage: grok-lessons-backtest.py <arm: base|lessons|lessons_v2> <days.txt> [workers]
+  lessons_v2 = lessons-train-v2.md (reworked ask/DTE bands, Oct 2026) from study/grok-lessons in this repo.
+  GROK_TEST_LEDGER=<path> keeps a separate dollar ledger (the cap applies per ledger).
 No Telegram, no live endpoints, no Unusual Whales calls (cached history only).
 """
 import json, os, re, sys, time, threading, urllib.request
+from pathlib import Path
 import pandas as pd
 from concurrent.futures import ThreadPoolExecutor
 W = "/workspace/flowguard/study/grok-lessons-work"
@@ -15,7 +18,7 @@ CAP = float(os.environ.get("GROK_TEST_CAP_USD", "4.5"))
 MODEL = "grok-4.7"
 arm, daysfile = sys.argv[1], sys.argv[2]; workers = int(sys.argv[3]) if len(sys.argv) > 3 else 3
 KEY = os.environ["LLM_API_KEY"].strip()
-LEDGER = f"{W}/ledger.json"; lock = threading.Lock()
+LEDGER = os.environ.get("GROK_TEST_LEDGER", f"{W}/ledger.json"); lock = threading.Lock()
 def spent():
     return json.load(open(LEDGER))["usd"] if os.path.exists(LEDGER) else 0.0
 def add(usd, arm):
@@ -43,8 +46,9 @@ SYSTEM_BASE = (
     'Respond with JSON only: {"picks":[{"contract":"...","confidence":0-100,"reason":"<=100 chars"}]}')
 def build(arm, day):
     sysm = SYSTEM_BASE
-    if arm == "lessons":
-        sysm += "\n\n" + open(f"{W}/lessons-train.md").read() + "\n\n" + open(f"{W}/examples-train.txt").read()
+    if arm in ("lessons", "lessons_v2"):
+        sheet = Path(__file__).resolve().parents[2] / "study/grok-lessons/lessons-train-v2.md" if arm == "lessons_v2" else Path(f"{W}/lessons-train.md")
+        sysm += "\n\n" + sheet.read_text() + "\n\n" + open(f"{W}/examples-train.txt").read()
     c = day_cands(day)
     user = f"Date {day}. Candidates (rank order, pool score shown):\n" + "\n".join(fact(r) for r in c.itertuples())
     return sysm, user, list(c.contract)

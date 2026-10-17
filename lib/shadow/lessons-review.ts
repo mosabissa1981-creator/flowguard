@@ -1,12 +1,14 @@
 import "server-only";
 
 import { GROK_LESSONS_EXAMPLES, GROK_LESSONS_SHEET } from "@/lib/shadow/grok-lessons";
+import { GROK_LESSONS_WEEKLY } from "@/lib/shadow/grok-lessons-weekly";
 import { callShadowLlm, parseJsonObject } from "@/lib/shadow/llm";
 import type { LlmUsageRecord, ShadowCandidate, ShadowVerdict } from "@/lib/shadow/types";
 
 /**
  * TEST MODE ONLY. "Grok + lessons" second opinion on the shadow finalists. Grok cannot be fine-tuned, so the 2-year lessons sheet
- * and a few real past winner/loser examples ride in the prompt. The result is logged as a shadow verdict (module lessons_review)
+ * and a few real past winner/loser examples ride in the prompt, plus a weekly study-book section regenerated every Friday by
+ * scripts/study/grok-lessons-weekly.py (lib/shadow/grok-lessons-weekly.ts; empty string = static sheet only). The result is logged as a shadow verdict (module lessons_review)
  * and scored in the study book next to the other modules. It NEVER changes morning / picks / premove / ai-picks, never sends
  * Telegram, and is OFF unless FLOWGUARD_LESSONS_TEST=1 (default off). Costs go through the shared shadow LLM ledger/budget.
  */
@@ -29,7 +31,8 @@ function factLine(c: ShadowCandidate): string {
 }
 
 export async function runLessonsReview(cands: ShadowCandidate[], now: Date): Promise<{ results: Record<string, LessonsJudgement>; usage: LlmUsageRecord }> {
-  const system = `${SYSTEM}\n\n${GROK_LESSONS_SHEET}\n\n${GROK_LESSONS_EXAMPLES}`;
+  const weekly = GROK_LESSONS_WEEKLY.trim();
+  const system = `${SYSTEM}\n\n${GROK_LESSONS_SHEET}${weekly ? `\n\n${weekly}` : ""}\n\n${GROK_LESSONS_EXAMPLES}`;
   const user = `As of ${now.toISOString()}. Candidates:\n${cands.map(factLine).join("\n")}`;
   const res = await callShadowLlm({ module: "lessons_review", system, user });
   const parsed = parseJsonObject<{ reviews?: Array<Record<string, unknown>> }>(res.text);
