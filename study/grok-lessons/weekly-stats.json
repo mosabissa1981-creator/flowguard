@@ -1,0 +1,623 @@
+{
+ "meta": {
+  "weekStart": "2026-10-12",
+  "weekEnd": "2026-10-16",
+  "since": "2026-10-12",
+  "days": [
+   "2026-10-12",
+   "2026-10-13",
+   "2026-10-14",
+   "2026-10-15",
+   "2026-10-16"
+  ],
+  "generatedAt": "2026-10-17T16:58:26+00:00"
+ },
+ "week": {
+  "all": {
+   "n": 170,
+   "W": 69,
+   "L": 19,
+   "F": 82,
+   "win": 40.6,
+   "avg": 18.2
+  },
+  "days": {
+   "2026-10-12": {
+    "dayType": "unknown",
+    "riskOff": "soft",
+    "puts": {
+     "n": 36,
+     "W": 4,
+     "L": 0,
+     "F": 32,
+     "win": 11.1,
+     "avg": 3.8
+    },
+    "calls": {
+     "n": 0,
+     "W": 0,
+     "L": 0,
+     "F": 0,
+     "win": null,
+     "avg": null
+    }
+   },
+   "2026-10-13": {
+    "dayType": "gap-down-bounce",
+    "riskOff": "soft",
+    "puts": {
+     "n": 26,
+     "W": 0,
+     "L": 6,
+     "F": 20,
+     "win": 0.0,
+     "avg": -6.1
+    },
+    "calls": {
+     "n": 21,
+     "W": 9,
+     "L": 3,
+     "F": 9,
+     "win": 42.9,
+     "avg": 23.0
+    }
+   },
+   "2026-10-14": {
+    "dayType": "sold-from-open",
+    "riskOff": "primary",
+    "puts": {
+     "n": 42,
+     "W": 26,
+     "L": 1,
+     "F": 15,
+     "win": 61.9,
+     "avg": 27.8
+    },
+    "calls": {
+     "n": 0,
+     "W": 0,
+     "L": 0,
+     "F": 0,
+     "win": null,
+     "avg": null
+    }
+   },
+   "2026-10-15": {
+    "dayType": "gap-down-bounce",
+    "riskOff": "soft",
+    "puts": {
+     "n": 13,
+     "W": 1,
+     "L": 9,
+     "F": 3,
+     "win": 7.7,
+     "avg": -30.7
+    },
+    "calls": {
+     "n": 8,
+     "W": 6,
+     "L": 0,
+     "F": 2,
+     "win": 75.0,
+     "avg": 38.0
+    }
+   },
+   "2026-10-16": {
+    "dayType": "sold-from-open",
+    "riskOff": "primary",
+    "puts": {
+     "n": 24,
+     "W": 23,
+     "L": 0,
+     "F": 1,
+     "win": 95.8,
+     "avg": 64.7
+    },
+    "calls": {
+     "n": 0,
+     "W": 0,
+     "L": 0,
+     "F": 0,
+     "win": null,
+     "avg": null
+    }
+   }
+  },
+  "etfPuts|sold-from-open": {
+   "n": 51,
+   "W": 39,
+   "L": 1,
+   "F": 11,
+   "win": 76.5,
+   "avg": 46.5
+  },
+  "allPuts|sold-from-open": {
+   "n": 66,
+   "W": 49,
+   "L": 1,
+   "F": 16,
+   "win": 74.2,
+   "avg": 41.2
+  },
+  "calls|sold-from-open": {
+   "n": 0,
+   "W": 0,
+   "L": 0,
+   "F": 0,
+   "win": null,
+   "avg": null
+  },
+  "etfPuts|gap-down-bounce": {
+   "n": 29,
+   "W": 0,
+   "L": 8,
+   "F": 21,
+   "win": 0.0,
+   "avg": -8.1
+  },
+  "allPuts|gap-down-bounce": {
+   "n": 39,
+   "W": 1,
+   "L": 15,
+   "F": 23,
+   "win": 2.6,
+   "avg": -14.3
+  },
+  "calls|gap-down-bounce": {
+   "n": 29,
+   "W": 15,
+   "L": 3,
+   "F": 11,
+   "win": 51.7,
+   "avg": 27.1
+  },
+  "etfPuts|up-from-open": {
+   "n": 0,
+   "W": 0,
+   "L": 0,
+   "F": 0,
+   "win": null,
+   "avg": null
+  },
+  "allPuts|up-from-open": {
+   "n": 0,
+   "W": 0,
+   "L": 0,
+   "F": 0,
+   "win": null,
+   "avg": null
+  },
+  "calls|up-from-open": {
+   "n": 0,
+   "W": 0,
+   "L": 0,
+   "F": 0,
+   "win": null,
+   "avg": null
+  },
+  "etfPuts|chop": {
+   "n": 0,
+   "W": 0,
+   "L": 0,
+   "F": 0,
+   "win": null,
+   "avg": null
+  },
+  "allPuts|chop": {
+   "n": 0,
+   "W": 0,
+   "L": 0,
+   "F": 0,
+   "win": null,
+   "avg": null
+  },
+  "calls|chop": {
+   "n": 0,
+   "W": 0,
+   "L": 0,
+   "F": 0,
+   "win": null,
+   "avg": null
+  },
+  "etfPuts|unknown": {
+   "n": 36,
+   "W": 4,
+   "L": 0,
+   "F": 32,
+   "win": 11.1,
+   "avg": 3.8
+  },
+  "allPuts|unknown": {
+   "n": 36,
+   "W": 4,
+   "L": 0,
+   "F": 32,
+   "win": 11.1,
+   "avg": 3.8
+  },
+  "calls|unknown": {
+   "n": 0,
+   "W": 0,
+   "L": 0,
+   "F": 0,
+   "win": null,
+   "avg": null
+  },
+  "riskOffHeld|sold-from-open": {
+   "n": 51,
+   "W": 39,
+   "L": 1,
+   "F": 11,
+   "win": 76.5,
+   "avg": 46.5
+  },
+  "riskOffHeld|other": {
+   "n": 0,
+   "W": 0,
+   "L": 0,
+   "F": 0,
+   "win": null,
+   "avg": null
+  },
+  "early": {
+   "n": 59,
+   "W": 30,
+   "L": 6,
+   "F": 23,
+   "win": 50.8,
+   "avg": 21.4
+  },
+  "late": {
+   "n": 111,
+   "W": 39,
+   "L": 13,
+   "F": 59,
+   "win": 35.1,
+   "avg": 16.5
+  },
+  "early|down": {
+   "n": 48,
+   "W": 46,
+   "L": 0,
+   "F": 2,
+   "win": 95.8,
+   "avg": 54.3
+  },
+  "late|down": {
+   "n": 18,
+   "W": 3,
+   "L": 1,
+   "F": 14,
+   "win": 16.7,
+   "avg": 6.6
+  },
+  "spread<=2%": {
+   "n": 71,
+   "W": 35,
+   "L": 8,
+   "F": 28,
+   "win": 49.3,
+   "avg": 27.5
+  },
+  "spread>2%": {
+   "n": 97,
+   "W": 34,
+   "L": 11,
+   "F": 52,
+   "win": 35.1,
+   "avg": 11.7
+  },
+  "singlePuts": {
+   "n": 25,
+   "W": 11,
+   "L": 7,
+   "F": 7,
+   "win": 44.0,
+   "avg": 1.2
+  }
+ },
+ "since": {
+  "all": {
+   "n": 170,
+   "W": 69,
+   "L": 19,
+   "F": 82,
+   "win": 40.6,
+   "avg": 18.2
+  },
+  "days": {
+   "2026-10-12": {
+    "dayType": "unknown",
+    "riskOff": "soft",
+    "puts": {
+     "n": 36,
+     "W": 4,
+     "L": 0,
+     "F": 32,
+     "win": 11.1,
+     "avg": 3.8
+    },
+    "calls": {
+     "n": 0,
+     "W": 0,
+     "L": 0,
+     "F": 0,
+     "win": null,
+     "avg": null
+    }
+   },
+   "2026-10-13": {
+    "dayType": "gap-down-bounce",
+    "riskOff": "soft",
+    "puts": {
+     "n": 26,
+     "W": 0,
+     "L": 6,
+     "F": 20,
+     "win": 0.0,
+     "avg": -6.1
+    },
+    "calls": {
+     "n": 21,
+     "W": 9,
+     "L": 3,
+     "F": 9,
+     "win": 42.9,
+     "avg": 23.0
+    }
+   },
+   "2026-10-14": {
+    "dayType": "sold-from-open",
+    "riskOff": "primary",
+    "puts": {
+     "n": 42,
+     "W": 26,
+     "L": 1,
+     "F": 15,
+     "win": 61.9,
+     "avg": 27.8
+    },
+    "calls": {
+     "n": 0,
+     "W": 0,
+     "L": 0,
+     "F": 0,
+     "win": null,
+     "avg": null
+    }
+   },
+   "2026-10-15": {
+    "dayType": "gap-down-bounce",
+    "riskOff": "soft",
+    "puts": {
+     "n": 13,
+     "W": 1,
+     "L": 9,
+     "F": 3,
+     "win": 7.7,
+     "avg": -30.7
+    },
+    "calls": {
+     "n": 8,
+     "W": 6,
+     "L": 0,
+     "F": 2,
+     "win": 75.0,
+     "avg": 38.0
+    }
+   },
+   "2026-10-16": {
+    "dayType": "sold-from-open",
+    "riskOff": "primary",
+    "puts": {
+     "n": 24,
+     "W": 23,
+     "L": 0,
+     "F": 1,
+     "win": 95.8,
+     "avg": 64.7
+    },
+    "calls": {
+     "n": 0,
+     "W": 0,
+     "L": 0,
+     "F": 0,
+     "win": null,
+     "avg": null
+    }
+   }
+  },
+  "etfPuts|sold-from-open": {
+   "n": 51,
+   "W": 39,
+   "L": 1,
+   "F": 11,
+   "win": 76.5,
+   "avg": 46.5
+  },
+  "allPuts|sold-from-open": {
+   "n": 66,
+   "W": 49,
+   "L": 1,
+   "F": 16,
+   "win": 74.2,
+   "avg": 41.2
+  },
+  "calls|sold-from-open": {
+   "n": 0,
+   "W": 0,
+   "L": 0,
+   "F": 0,
+   "win": null,
+   "avg": null
+  },
+  "etfPuts|gap-down-bounce": {
+   "n": 29,
+   "W": 0,
+   "L": 8,
+   "F": 21,
+   "win": 0.0,
+   "avg": -8.1
+  },
+  "allPuts|gap-down-bounce": {
+   "n": 39,
+   "W": 1,
+   "L": 15,
+   "F": 23,
+   "win": 2.6,
+   "avg": -14.3
+  },
+  "calls|gap-down-bounce": {
+   "n": 29,
+   "W": 15,
+   "L": 3,
+   "F": 11,
+   "win": 51.7,
+   "avg": 27.1
+  },
+  "etfPuts|up-from-open": {
+   "n": 0,
+   "W": 0,
+   "L": 0,
+   "F": 0,
+   "win": null,
+   "avg": null
+  },
+  "allPuts|up-from-open": {
+   "n": 0,
+   "W": 0,
+   "L": 0,
+   "F": 0,
+   "win": null,
+   "avg": null
+  },
+  "calls|up-from-open": {
+   "n": 0,
+   "W": 0,
+   "L": 0,
+   "F": 0,
+   "win": null,
+   "avg": null
+  },
+  "etfPuts|chop": {
+   "n": 0,
+   "W": 0,
+   "L": 0,
+   "F": 0,
+   "win": null,
+   "avg": null
+  },
+  "allPuts|chop": {
+   "n": 0,
+   "W": 0,
+   "L": 0,
+   "F": 0,
+   "win": null,
+   "avg": null
+  },
+  "calls|chop": {
+   "n": 0,
+   "W": 0,
+   "L": 0,
+   "F": 0,
+   "win": null,
+   "avg": null
+  },
+  "etfPuts|unknown": {
+   "n": 36,
+   "W": 4,
+   "L": 0,
+   "F": 32,
+   "win": 11.1,
+   "avg": 3.8
+  },
+  "allPuts|unknown": {
+   "n": 36,
+   "W": 4,
+   "L": 0,
+   "F": 32,
+   "win": 11.1,
+   "avg": 3.8
+  },
+  "calls|unknown": {
+   "n": 0,
+   "W": 0,
+   "L": 0,
+   "F": 0,
+   "win": null,
+   "avg": null
+  },
+  "riskOffHeld|sold-from-open": {
+   "n": 51,
+   "W": 39,
+   "L": 1,
+   "F": 11,
+   "win": 76.5,
+   "avg": 46.5
+  },
+  "riskOffHeld|other": {
+   "n": 0,
+   "W": 0,
+   "L": 0,
+   "F": 0,
+   "win": null,
+   "avg": null
+  },
+  "early": {
+   "n": 59,
+   "W": 30,
+   "L": 6,
+   "F": 23,
+   "win": 50.8,
+   "avg": 21.4
+  },
+  "late": {
+   "n": 111,
+   "W": 39,
+   "L": 13,
+   "F": 59,
+   "win": 35.1,
+   "avg": 16.5
+  },
+  "early|down": {
+   "n": 48,
+   "W": 46,
+   "L": 0,
+   "F": 2,
+   "win": 95.8,
+   "avg": 54.3
+  },
+  "late|down": {
+   "n": 18,
+   "W": 3,
+   "L": 1,
+   "F": 14,
+   "win": 16.7,
+   "avg": 6.6
+  },
+  "spread<=2%": {
+   "n": 71,
+   "W": 35,
+   "L": 8,
+   "F": 28,
+   "win": 49.3,
+   "avg": 27.5
+  },
+  "spread>2%": {
+   "n": 97,
+   "W": 34,
+   "L": 11,
+   "F": 52,
+   "win": 35.1,
+   "avg": 11.7
+  },
+  "singlePuts": {
+   "n": 25,
+   "W": 11,
+   "L": 7,
+   "F": 7,
+   "win": 44.0,
+   "avg": 1.2
+  }
+ }
+}
