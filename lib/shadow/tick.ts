@@ -6,6 +6,8 @@ import { tradingDateET } from "@/lib/session";
 import { loadChainScan } from "@/lib/shadow/chain-scan";
 import { loadFadeWatch } from "@/lib/shadow/fade-watch";
 import { loadFollowThrough } from "@/lib/shadow/follow-through";
+import { runTastyCompare } from "@/lib/shadow/tasty-compare";
+import { tastyTestEnabled } from "@/lib/tasty";
 import { etClock } from "@/lib/shadow/budget";
 import { flushUwUsage, runAsUwJob } from "@/lib/uw-usage";
 
@@ -40,6 +42,8 @@ export async function runShadowTick(now = new Date()) {
   await step("fadeWatch", () => loadFadeWatch({ now, refresh: true }));
   await step("followThrough", () => loadFollowThrough({ now }));
   await step("chainScan", () => loadChainScan({ now, refresh: true }));
+  // TEST MODE (FLOWGUARD_TASTY_TEST=1, default off): Tastytrade bid/ask vs UW comparison log only; 0 UW calls, own 10-min throttle.
+  if (tastyTestEnabled()) await step("tastyCompare", () => runTastyCompare({ now }));
   await flushUwUsage().catch(() => undefined);
   return { ran: true, at: now.toISOString(), jobs: out };
 }
