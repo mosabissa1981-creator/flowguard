@@ -3,6 +3,7 @@ import { NextRequest } from "next/server";
 import { tradingDateET } from "@/lib/session";
 import { adminOk } from "@/lib/shadow/admin";
 import { blankDay, loadShadowDay, publicView, refreshShadow } from "@/lib/shadow";
+import { grokWideLimits, loadWideDay } from "@/lib/shadow/wide-pool";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -13,6 +14,7 @@ export const maxDuration = 120;
  *  - GET /api/shadow?day=2026-10-01 → stored day (read-only) — the study routine saves this as study/shadow-<day>.json.
  *  - &full=1                        → include raw module caches (news, debate, UW vol/earnings/historic).
  *  - ?refresh=1&key=<AI_PICKS_ADMIN_SECRET> → bypass the throttle (budget still applies).
+ *  - ?wide=1[&day=YYYY-MM-DD]       → TEST-mode Grok wide-pool doc (storage read only; never runs Grok or UW).
  */
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
@@ -20,6 +22,12 @@ export async function GET(request: NextRequest) {
   const today = tradingDateET();
   const day = params.get("day");
   if (day && !/^\d{4}-\d{2}-\d{2}$/.test(day)) return Response.json({ error: "day must be YYYY-MM-DD" }, { status: 400 });
+  if (params.get("wide") === "1") {
+    const d = day ?? today;
+    const doc = await loadWideDay(d);
+    if (!doc) return Response.json({ error: `no wide-pool doc stored for ${d}` }, { status: 404 });
+    return Response.json({ ...doc, limits: grokWideLimits() }, { headers: { "Cache-Control": d === today ? "no-store" : "s-maxage=600" } });
+  }
   if (day && day !== today) {
     const doc = await loadShadowDay(day);
     if (!doc) return Response.json({ error: `no shadow output stored for ${day}` }, { status: 404 });

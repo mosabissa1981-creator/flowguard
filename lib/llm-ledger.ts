@@ -8,7 +8,8 @@ import { kvBackend, kvDurable, kvGetNumber, kvIncrFloat } from "@/lib/kv";
  * LLM_ALLOW_WITHOUT_STORE=1, which allows a conservative per-instance cap (LLM_INSTANCE_CAP_USD, default $0.25).
  */
 
-export type LedgerScope = "shadow" | "ai-picks";
+/** "grok-wide" = TEST-mode Grok wide pool (own $ cap, FLOWGUARD_GROK_WIDE_USD); never shares the shadow budget. */
+export type LedgerScope = "shadow" | "ai-picks" | "grok-wide";
 
 const instanceSpend = new Map<string, number>();
 
