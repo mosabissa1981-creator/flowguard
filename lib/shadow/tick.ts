@@ -7,6 +7,7 @@ import { loadChainScan } from "@/lib/shadow/chain-scan";
 import { loadFadeWatch } from "@/lib/shadow/fade-watch";
 import { loadFollowThrough } from "@/lib/shadow/follow-through";
 import { runTastyCompare } from "@/lib/shadow/tasty-compare";
+import { grokWideEnabled, runGrokWide } from "@/lib/shadow/wide-pool";
 import { tastyTestEnabled } from "@/lib/tasty";
 import { etClock } from "@/lib/shadow/budget";
 import { flushUwUsage, runAsUwJob } from "@/lib/uw-usage";
@@ -44,6 +45,9 @@ export async function runShadowTick(now = new Date()) {
   await step("chainScan", () => loadChainScan({ now, refresh: true }));
   // TEST MODE (FLOWGUARD_TASTY_TEST=1, default off): Tastytrade bid/ask vs UW comparison log only; 0 UW calls, own 10-min throttle.
   if (tastyTestEnabled()) await step("tastyCompare", () => runTastyCompare({ now }));
+  // TEST MODE (FLOWGUARD_GROK_WIDE=1 + FLOWGUARD_LESSONS_TEST=1, default off): Grok + lessons on the wide pool the live lists cut.
+  // 0 flow calls (tape read with allowUw:false); grading = 1 UW historic per candidate after its time stop; own $ ledger.
+  if (grokWideEnabled()) await step("grokWide", () => runGrokWide({ now }));
   await flushUwUsage().catch(() => undefined);
   return { ran: true, at: now.toISOString(), jobs: out };
 }

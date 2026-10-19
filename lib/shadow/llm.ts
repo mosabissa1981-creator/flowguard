@@ -1,6 +1,6 @@
 import "server-only";
 
-import { ledgerAdd, llmPersistenceGate } from "@/lib/llm-ledger";
+import { ledgerAdd, llmPersistenceGate, type LedgerScope } from "@/lib/llm-ledger";
 import { tradingDateET } from "@/lib/session";
 
 import type { LlmUsageRecord } from "@/lib/shadow/types";
@@ -96,14 +96,15 @@ type ResponsesBody = {
  */
 /**
  * Gated entry point for every shadow-module LLM call: refuses when persistence is down (global $ cap
- * cannot be enforced) and records the spend in the global ledger.
+ * cannot be enforced) and records the spend in the global ledger. `ledger` defaults to the shared "shadow" scope; the
+ * TEST-mode Grok wide pool passes "grok-wide" so it has its own $ cap and never eats the shadow modules' daily budget.
  */
-export async function callShadowLlm(opts: Parameters<typeof callShadowLlmRaw>[0]): Promise<LlmResult> {
+export async function callShadowLlm(opts: Parameters<typeof callShadowLlmRaw>[0], ledger: LedgerScope = "shadow"): Promise<LlmResult> {
   const day = tradingDateET();
-  const gate = llmPersistenceGate("shadow", day);
+  const gate = llmPersistenceGate(ledger, day);
   if (!gate.ok) throw new Error(gate.reason);
   const res = await callShadowLlmRaw(opts);
-  await ledgerAdd("shadow", day, res.usage.costUsd).catch(() => 0);
+  await ledgerAdd(ledger, day, res.usage.costUsd).catch(() => 0);
   return res;
 }
 

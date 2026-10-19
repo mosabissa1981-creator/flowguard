@@ -30,9 +30,14 @@ function factLine(c: ShadowCandidate): string {
   return `${c.contract} | ${c.ticker} ${c.side} K${c.strike} dte${c.dte} px${c.underlying} ask$${c.optionPrint} premium$${Math.round(c.premiumUsd / 1000)}k askShare${c.askSharePct}% score${Math.round(c.rawScore)} lanes=${c.lanes.join("+")} t=${ct}CT`;
 }
 
-export async function runLessonsReview(cands: ShadowCandidate[], now: Date): Promise<{ results: Record<string, LessonsJudgement>; usage: LlmUsageRecord }> {
+/** System prompt = reviewer rules + lessons sheet + weekly study-book section + real examples. `extra` is appended to the rules line (wide pool). */
+export function lessonsSystemPrompt(extra?: string): string {
   const weekly = GROK_LESSONS_WEEKLY.trim();
-  const system = `${SYSTEM}\n\n${GROK_LESSONS_SHEET}${weekly ? `\n\n${weekly}` : ""}\n\n${GROK_LESSONS_EXAMPLES}`;
+  return `${SYSTEM}${extra ? ` ${extra}` : ""}\n\n${GROK_LESSONS_SHEET}${weekly ? `\n\n${weekly}` : ""}\n\n${GROK_LESSONS_EXAMPLES}`;
+}
+
+export async function runLessonsReview(cands: ShadowCandidate[], now: Date): Promise<{ results: Record<string, LessonsJudgement>; usage: LlmUsageRecord }> {
+  const system = lessonsSystemPrompt();
   const user = `As of ${now.toISOString()}. Candidates:\n${cands.map(factLine).join("\n")}`;
   const res = await callShadowLlm({ module: "lessons_review", system, user });
   const parsed = parseJsonObject<{ reviews?: Array<Record<string, unknown>> }>(res.text);
