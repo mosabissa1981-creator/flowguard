@@ -59,7 +59,7 @@ export const WIDE_POOL_MIN_SCORE = 55;
 export const WIDE_NEAR_MISS_MIN_SCORE = 45;
 /** Near-miss rows are at most this share of a run (the history test only covers tier "pool"). */
 export const WIDE_NEAR_MISS_SHARE = 1 / 3;
-export const WIDE_MAX_PER_ISSUER = 2;
+export const WIDE_MAX_PER_ISSUER = 3;
 
 /** Same rule as lib/flow-service looksUnusual (copied: that module is server-only). */
 export function looksUnusualAlert(a: FlowAlert): boolean {
