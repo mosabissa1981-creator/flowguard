@@ -1,22 +1,18 @@
 import { after } from "next/server";
 
-import { loadPuts } from "@/lib/puts";
 import { refreshLaneDebate } from "@/lib/shadow/lane-debate";
 import { paperTickQuietly } from "@/lib/paper";
+import { retiredBody } from "@/lib/retired-lanes";
 
 export const dynamic = "force-dynamic";
 
-/** Puts lane (TEST mode). Cached 10 min in memory + 5 min at the edge; zero extra flow calls. */
+/**
+ * Puts lane (TEST mode) — RETIRED 10/18/2026 (lib/retired-lanes.ts). No compute, logging or UW calls; the stored
+ * book stays in Blob (flowguard/shadow/puts-book.json) and on /api/puts/track. The shared after-response hooks
+ * (other lanes' debate, paper tick) are unchanged.
+ */
 export async function GET() {
-  // Shadow debate on newly logged picks runs after the response (throttled, budgeted; never changes picks).
   after(() => refreshLaneDebate().catch(() => undefined));
   after(() => paperTickQuietly());
-  try {
-    return Response.json(await loadPuts(), { headers: { "Cache-Control": "s-maxage=300, stale-while-revalidate=60" } });
-  } catch (error) {
-    return Response.json(
-      { mode: "test", error: error instanceof Error ? error.message.slice(0, 200) : "failed", picks: [] },
-      { status: 500 },
-    );
-  }
+  return Response.json(retiredBody("puts", { picks: [] }), { headers: { "Cache-Control": "s-maxage=300, stale-while-revalidate=60" } });
 }

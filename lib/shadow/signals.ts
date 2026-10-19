@@ -1,6 +1,7 @@
 import "server-only";
 
 import { LANES, loadBook } from "@/lib/lanes";
+import { isRetiredLane } from "@/lib/retired-lanes";
 import { loadLotteryBook } from "@/lib/lottery";
 import { loadPutsBook } from "@/lib/puts";
 import { tradingDateET } from "@/lib/session";
@@ -114,12 +115,14 @@ export async function refreshSignals(opts: { force?: boolean } = {}) {
   const book = (await loadDoc<Book>(KIND, "book", { fresh: true })) ?? { updatedAt: "", rows: {} };
   const entries = await loggedEntries();
   const allowUw = (await hasUnusualWhalesKey()) && !(await isUwBlocked());
+  // Retired lanes (lib/retired-lanes.ts): rows kept and outcomes still refreshed, but no new UW signal calls.
+  const uwEntries = entries.filter((e) => !isRetiredLane(e.lane));
   let uwCalls = 0;
   let changed = false;
   if (allowUw) {
     // 1) Dark pool + GEX on entries not yet evaluated (print-day data; UW serves past dates too).
     const gexCache = new Map<string, ReturnType<typeof parseGexStrikes>>();
-    const fresh = entries.filter((e) => !book.rows[e.key]?.computedAt && e.printTimeUtc).slice(-MAX_NEW_PER_RUN);
+    const fresh = uwEntries.filter((e) => !book.rows[e.key]?.computedAt && e.printTimeUtc).slice(-MAX_NEW_PER_RUN);
     for (const e of fresh) {
       const printMs = Date.parse(e.printTimeUtc as string);
       let dp: DarkPoolSignal | null = null;
@@ -146,7 +149,7 @@ export async function refreshSignals(opts: { force?: boolean } = {}) {
     // 1b) v2 signals (insider trades, ticker net premium) for rows that do not have them yet.
     const insiderCache = new Map<string, Record<string, unknown>[]>();
     const npCache = new Map<string, Awaited<ReturnType<typeof fetchNetPremTicks>>>();
-    const needV2 = entries.filter((e) => book.rows[e.key] && (book.rows[e.key].v ?? 1) < 2 && e.printTimeUtc).slice(-MAX_NEW_PER_RUN);
+    const needV2 = uwEntries.filter((e) => book.rows[e.key] && (book.rows[e.key].v ?? 1) < 2 && e.printTimeUtc).slice(-MAX_NEW_PER_RUN);
     for (const e of needV2) {
       const row = book.rows[e.key];
       const printMs = Date.parse(e.printTimeUtc as string);
@@ -174,7 +177,7 @@ export async function refreshSignals(opts: { force?: boolean } = {}) {
       changed = true;
     }
     // 2) OI follow-through (v2 rule) + FLEX transfer once the next session's OI is published.
-    const pending = entries.filter((e) => e.day < today && book.rows[e.key] && (!book.rows[e.key].oi || book.rows[e.key].oi?.verdict === "pending")).slice(-MAX_OI_PER_RUN);
+    const pending = uwEntries.filter((e) => e.day < today && book.rows[e.key] && (!book.rows[e.key].oi || book.rows[e.key].oi?.verdict === "pending")).slice(-MAX_OI_PER_RUN);
     for (const e of pending) {
       uwCalls += 1;
       const bars = await fetchContractHistoric(e.contract, 12).catch(() => []);

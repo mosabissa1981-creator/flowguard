@@ -95,7 +95,7 @@ export function LanesPanel() {
         ) : null}
       </div>
       <p className="mb-2 rounded-md bg-sky-500/10 px-2 py-1 text-xs font-medium text-sky-100">
-        Study only, small size. Six rule lanes logged separately; never in picks or the AI review.
+        Study only, small size. Rule lanes logged separately; never in picks or the AI review. Breakdown and earnings run-down puts retired 10/18/2026.
       </p>
 
       {loading && !data ? <p className="text-sm text-muted-foreground">Scanning setup lanes…</p> : null}
