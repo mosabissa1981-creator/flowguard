@@ -27,8 +27,8 @@ import { gradeWide, selectWide, wideFactLine, type WideCandidate, type WideGrade
  *
  * Cost guards:
  *  - Grok: own ledger scope "grok-wide" with its own daily cap FLOWGUARD_GROK_WIDE_USD (default $1, hard max $3); never uses
- *    the shared shadow budget. ≤ FLOWGUARD_GROK_WIDE_MAX candidates/day (default 200, hard max 400) in batches of 20;
- *    runs 10:00–14:30 ET, ≥ 60 min apart, ≤ 40 candidates per run.
+ *    the shared shadow budget. ≤ FLOWGUARD_GROK_WIDE_MAX candidates/day (default 200, hard max 1000) in batches of 20;
+ *    runs 10:00–14:30 ET, ≥ 45 min apart, ≤ 100 candidates per run (≤ 7 runs → ≤ 700/day).
  *  - UW: the candidates come from the already-synced session tape with allowUw:false (0 flow calls). Grading costs one
  *    /option-contract/{id}/historic per candidate once its 2-session time stop has passed (≤ 60 per tick run, ≥ 20 min
  *    apart, ≤ 3 tries each), under the shared 35,000/day job stop (uwJobBudgetOk).
@@ -36,10 +36,10 @@ import { gradeWide, selectWide, wideFactLine, type WideCandidate, type WideGrade
 
 const KIND = "grok-wide";
 const BATCH = 20;
-const PER_RUN = 40;
+const PER_RUN = 100;
 const RUN_FROM_ET = 10 * 60;
 const RUN_TO_ET = 14 * 60 + 30;
-const RUN_MIN_INTERVAL_MS = 60 * 60_000;
+const RUN_MIN_INTERVAL_MS = 45 * 60_000;
 const GRADE_FROM_ET = 9 * 60 + 45;
 const GRADE_PER_RUN = 60;
 const GRADE_LOCK_SEC = 20 * 60;
@@ -68,7 +68,7 @@ function envNum(name: string, def: number, max: number): number {
 }
 
 export function grokWideLimits() {
-  return { usdCap: envNum("FLOWGUARD_GROK_WIDE_USD", 1, 3), dailyMax: Math.floor(envNum("FLOWGUARD_GROK_WIDE_MAX", 200, 400)) };
+  return { usdCap: envNum("FLOWGUARD_GROK_WIDE_USD", 1, 3), dailyMax: Math.floor(envNum("FLOWGUARD_GROK_WIDE_MAX", 200, 1000)) };
 }
 
 function blank(day: string): WideDoc {
@@ -128,7 +128,7 @@ async function reviewStep(now: Date): Promise<string> {
   const day = tradingDateET(now);
   const doc = (await loadWideDay(day)) ?? blank(day);
   const last = doc.llm.lastRunAt ? Date.parse(doc.llm.lastRunAt) : 0;
-  if (last && now.getTime() - last < RUN_MIN_INTERVAL_MS) return "throttled (≥ 60 min between wide runs)";
+  if (last && now.getTime() - last < RUN_MIN_INTERVAL_MS) return "throttled (≥ 45 min between wide runs)";
   const { usdCap, dailyMax } = grokWideLimits();
   const spent = Math.max(doc.llm.spendUsd, await ledgerSpend("grok-wide", day).catch(() => doc.llm.spendUsd));
   if (spent >= usdCap) return `Grok wide budget $${usdCap.toFixed(2)} reached`;
