@@ -14,6 +14,7 @@ import { resolveSpread, spreadSkipReason, type SpreadInfo, type SpreadSkip } fro
 import { SINGLE_STOCK_PUT_REASON, blockedByPutsRule } from "@/lib/puts-rule";
 import { RISK_OFF_PUT_REASON, blockedByRiskOffPuts, loadRiskOff, unknownRiskOff } from "@/lib/risk-off";
 import { HOLD_SESSIONS, LIVE_EXIT_RULE_TEXT, STOP_PCT_WHOLE, TARGET_PCT_WHOLE } from "@/lib/exit-plan";
+import { RETIRED_REASON, isRetiredLane } from "@/lib/retired-lanes";
 import type { FlowFilters, RankedFlow, RiskOffBrief, TideBias } from "@/lib/types";
 
 /**
@@ -24,6 +25,8 @@ import type { FlowFilters, RankedFlow, RiskOffBrief, TideBias } from "@/lib/type
  *  - UW /stock/{t}/info (next earnings date) for ≤ MAX_EARNINGS_LOOKUPS tickers, 12h cache.
  *  - Yahoo daily chart (3 months) for ≤ MAX_CHARTS tickers + SPY/QQQ, 10 min cache — free, not UW.
  * Tracking: one UW historic call per open entry across all lanes (≤ MAX_TRACK per call).
+ * Retired lanes (`retired: true`, list in lib/retired-lanes.ts) are skipped: no compute, logging, tracking or UW calls;
+ * their stored books stay readable.
  */
 
 export type LaneId =
@@ -41,9 +44,11 @@ export type LaneDef = {
   maxPerDay: number;
   timeStopSessions: number;
   rules: string;
+  /** Retired 10/18/2026 (lib/retired-lanes.ts): not computed, logged or tracked; book kept as history. */
+  retired?: boolean;
 };
 
-export const LANES: LaneDef[] = [
+export const LANES: LaneDef[] = ([
   {
     id: "calls-earnings-runup",
     title: "Calls · Earnings run-up",
@@ -96,7 +101,10 @@ export const LANES: LaneDef[] = [
     timeStopSessions: HOLD_SESSIONS,
     rules: "3+ distinct issuers in the same sector with qualifying ask-side put buying today; log the strongest 1–2.",
   },
-];
+] satisfies LaneDef[]).map((l): LaneDef => (isRetiredLane(l.id) ? { ...l, retired: true } : l));
+
+/** Lanes still running (not retired). */
+export const ACTIVE_LANES: LaneDef[] = LANES.filter((l) => !l.retired);
 
 export const LANE_COMMON_RULES = {
   minPremiumUsd: 25_000,
@@ -469,7 +477,9 @@ async function compute(): Promise<LanesResponse> {
 
   // ---- Lookups (capped, cached) ----
   const allowUw = live && (await hasUnusualWhalesKey()) && !(await isUwBlocked());
-  const ranked45 = [...elig45].filter((r) => !against(r)).sort((a, b) => baseScore(b, tideFor(b)).s - baseScore(a, tideFor(a)).s);
+  // Earnings lookups only for sides with an active earnings lane (retired puts run-down → call tickers only).
+  const earnSides = new Set(ACTIVE_LANES.filter((l) => l.id === "calls-earnings-runup" || l.id === "puts-earnings-rundown").map((l) => l.side));
+  const ranked45 = [...elig45].filter((r) => earnSides.has(r.alert.type) && !against(r)).sort((a, b) => baseScore(b, tideFor(b)).s - baseScore(a, tideFor(a)).s);
   const isEtf = (r: RankedFlow) => /etf|index/i.test(r.alert.issue_type || "");
   const earnTickers = [...new Set(ranked45.filter((r) => !isEtf(r)).map((r) => r.alert.ticker))].slice(0, MAX_EARNINGS_LOOKUPS);
   const earnings = new Map<string, string | null>();
@@ -499,6 +509,10 @@ async function compute(): Promise<LanesResponse> {
 
   const results: LaneResult[] = [];
   for (const lane of LANES) {
+    if (lane.retired) {
+      results.push({ lane, picks: [], candidates: [], candidatesConsidered: 0, warning: RETIRED_REASON });
+      continue;
+    }
     const out: LaneCandidate[] = [];
     let sectorCounts: Record<string, number> | undefined;
     if (lane.id === "calls-earnings-runup" || lane.id === "puts-earnings-rundown") {
@@ -624,6 +638,7 @@ async function compute(): Promise<LanesResponse> {
       );
   }
   for (const res of results) {
+    if (res.lane.retired) continue;
     const book = live ? await loadBook(res.lane.id) : { updatedAt: "", entries: [] };
     const todays = book.entries.filter((e) => e.day === day);
     let added = false;
@@ -775,6 +790,7 @@ export async function trackLanes(only?: LaneId) {
   if (allowUw) {
     // Oldest-checked first so a cap rotates fairly across lanes.
     const open = books
+      .filter(({ id }) => !isRetiredLane(id))
       .flatMap(({ id, book }) => book.entries.filter((e) => !e.tracking?.final && e.day < today).map((e) => ({ id, e })))
       .sort((a, b) => String(a.e.tracking?.asOf ?? "").localeCompare(String(b.e.tracking?.asOf ?? "")))
       .slice(0, MAX_TRACK);
@@ -803,6 +819,7 @@ export async function trackLanes(only?: LaneId) {
     lanes: books.map(({ id, book }) => ({
       lane: id,
       title: LANES.find((l) => l.id === id)?.title ?? id,
+      ...(isRetiredLane(id) ? { retired: true, warning: RETIRED_REASON } : {}),
       summary: summarizeLane(book.entries),
       entries: book.entries,
     })),

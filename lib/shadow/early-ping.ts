@@ -164,3 +164,8 @@ export async function loadEarlyPing(opts: { force?: boolean; now?: Date } = {}) 
   }
   return earlyPingView(stored ?? emptyBook());
 }
+
+/** Read-only view of the stored book (no run, no UW calls) — used while the lane is retired (lib/retired-lanes.ts). */
+export async function storedEarlyPingView() {
+  return earlyPingView((await loadDoc<EpBook>(KIND, DAY)) ?? emptyBook());
+}

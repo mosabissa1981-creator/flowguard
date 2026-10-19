@@ -161,6 +161,15 @@ Next.js App Router, TypeScript, Tailwind CSS, shadcn/ui.
 - Yields: official Treasury daily par-curve CSV first (prior close + 5-session trend, bear-steepening flag);
   Yahoo only supplies the intraday last before Treasury posts the day's close.
 
+## Retired TEST lanes (10/18/2026)
+
+Retired after the 2-year lane scorecard (`study/lane-history-scorecard-2026-10-18.md`): breakdown puts,
+earnings run-down puts, the Puts test lane, and the early-ping shadow lane. List: `lib/retired-lanes.ts`.
+They no longer compute, log, track, or make Unusual Whales calls (shadow-signal lookups skip their rows too).
+`/api/puts`, `/api/puts/track`, `/api/shadow/early-ping`, and the two lanes on `/api/lanes` / `/api/lanes/track`
+answer `retired: true` (track endpoints still return the stored book, read-only). The 10 early-ping crons were
+removed from `vercel.json`. Stored books and study files are kept.
+
 ## Gap-up chase checker (TEST / shadow)
 
 `GET /api/shadow/gap-chase` · card "Gap-up chase check" under Shadow signals, plus an orange dashed
