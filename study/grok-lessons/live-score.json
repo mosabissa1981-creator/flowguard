@@ -1,29 +1,29 @@
 {
  "mode": "TEST MODE study only: lessons_review shadow verdicts graded on the study book. Never affects live picks.",
- "generated_at": "2026-10-17T16:58:26+00:00",
+ "generated_at": "2026-10-23T21:31:19+00:00",
  "window": {
   "since": "2026-10-12",
-  "until": "2026-10-16"
+  "until": "2026-10-23"
  },
  "label_rule": "study book: EOD mark vs flow print (or skip-time mid), +/-15% = winner/loser, else flat",
- "verdicts": 29,
- "graded": 23,
- "not_in_book": 6,
+ "verdicts": 70,
+ "graded": 52,
+ "not_in_book": 18,
  "take": {
-  "n": 3,
-  "W": 0,
-  "L": 1,
-  "F": 2,
-  "win_pct": 0.0,
-  "avg_outcome_pct": -5.0
+  "n": 6,
+  "W": 1,
+  "L": 2,
+  "F": 3,
+  "win_pct": 16.7,
+  "avg_outcome_pct": -7.2
  },
  "pass": {
-  "n": 20,
-  "W": 8,
-  "L": 3,
-  "F": 9,
-  "win_pct": 40.0,
-  "avg_outcome_pct": 20.6
+  "n": 46,
+  "W": 15,
+  "L": 9,
+  "F": 22,
+  "win_pct": 32.6,
+  "avg_outcome_pct": 10.9
  },
  "passed_winners": [
   "2026-10-13 NVDA261030C00240000 +62%",
@@ -33,12 +33,22 @@
   "2026-10-13 AMD261016C00585000 +203%",
   "2026-10-15 MU261030C00900000 +21%",
   "2026-10-15 SMH261113C00565000 +44%",
-  "2026-10-15 CRWV261113C00065000 +23%"
+  "2026-10-15 CRWV261113C00065000 +23%",
+  "2026-10-19 TSLA261120C00360000 +59%",
+  "2026-10-19 NVDA261120C00215000 +32%",
+  "2026-10-19 TSLA261030C00370000 +104%",
+  "2026-10-20 QQQ261120P00665000 +27%",
+  "2026-10-20 QQQ261106P00700000 +41%",
+  "2026-10-20 SMH261120P00510000 +55%",
+  "2026-10-21 NOW261106C00180000 +41%"
  ],
  "take_rows": [
   "2026-10-12 SPY261023P00769000 F -1%",
   "2026-10-13 AMZN261120C00270000 L -16%",
-  "2026-10-15 CRWD261106C00250000 F +2%"
+  "2026-10-15 CRWD261106C00250000 F +2%",
+  "2026-10-19 META261030C00700000 F -2%",
+  "2026-10-19 NVDA261120C00220000 W +35%",
+  "2026-10-21 NVDA261106C00220000 L -62%"
  ],
  "days": {
   "2026-10-12": {
@@ -60,6 +70,26 @@
   "2026-10-16": {
    "shadow_doc": false,
    "verdicts": 0
+  },
+  "2026-10-19": {
+   "shadow_doc": true,
+   "verdicts": 8
+  },
+  "2026-10-20": {
+   "shadow_doc": true,
+   "verdicts": 12
+  },
+  "2026-10-21": {
+   "shadow_doc": true,
+   "verdicts": 12
+  },
+  "2026-10-22": {
+   "shadow_doc": false,
+   "verdicts": 0
+  },
+  "2026-10-23": {
+   "shadow_doc": true,
+   "verdicts": 9
   }
  },
  "rows": [
@@ -410,6 +440,498 @@
    "grade": "F",
    "outcome_pct": 2.13,
    "study_only": false
+  },
+  {
+   "day": "2026-10-19",
+   "contract": "TSLA261120C00360000",
+   "ticker": "TSLA",
+   "side": "call",
+   "judge": "pass",
+   "confidence": 40,
+   "why": "Same issuer as the cheaper TSLA call; $22 ask is outside the best $2-$10 band and spread is unknown.",
+   "grade": "W",
+   "outcome_pct": 58.59,
+   "study_only": false
+  },
+  {
+   "day": "2026-10-19",
+   "contract": "NVDA261120C00215000",
+   "ticker": "NVDA",
+   "side": "call",
+   "judge": "pass",
+   "confidence": 42,
+   "why": "Pass the twin NVDA; $10.82 ask is just outside the best band vs the $8.40 repeat.",
+   "grade": "W",
+   "outcome_pct": 31.7,
+   "study_only": false
+  },
+  {
+   "day": "2026-10-19",
+   "contract": "META261030C00700000",
+   "ticker": "META",
+   "side": "call",
+   "judge": "take",
+   "confidence": 48,
+   "why": "Early, prem $2.0M in band, DTE 11, ask $10-$30, score ok. Wrong if spread >4% or gap down.",
+   "grade": "F",
+   "outcome_pct": -1.93,
+   "study_only": false
+  },
+  {
+   "day": "2026-10-19",
+   "contract": "META261030C00695000",
+   "ticker": "META",
+   "side": "call",
+   "judge": "pass",
+   "confidence": 44,
+   "why": "Same issuer as the $28.55 META; $31 ask is the weaker $30+ band. One META only.",
+   "grade": "F",
+   "outcome_pct": 2.47,
+   "study_only": false
+  },
+  {
+   "day": "2026-10-19",
+   "contract": "SQQQ261030C00038000",
+   "ticker": "SQQQ",
+   "side": "call",
+   "judge": "pass",
+   "confidence": 55,
+   "why": "Ask $1.63 under $2; cheap prints lose to spread and gap stops. Hard skip.",
+   "grade": "L",
+   "outcome_pct": -35.58,
+   "study_only": false
+  },
+  {
+   "day": "2026-10-19",
+   "contract": "TSLA261030C00370000",
+   "ticker": "TSLA",
+   "side": "call",
+   "judge": "pass",
+   "confidence": 38,
+   "why": "Early and in-band, but a third mega-cap tech call is the same bet; spread unknown.",
+   "grade": "W",
+   "outcome_pct": 103.79,
+   "study_only": false
+  },
+  {
+   "day": "2026-10-19",
+   "contract": "NVDA261120C00220000",
+   "ticker": "NVDA",
+   "side": "call",
+   "judge": "take",
+   "confidence": 50,
+   "why": "Best ask band $8.40, early, prem/score/DTE ok, repeat NVDA. Wrong if spread >4% or gap.",
+   "grade": "W",
+   "outcome_pct": 35.12,
+   "study_only": false
+  },
+  {
+   "day": "2026-10-19",
+   "contract": "SMH261106C00560000",
+   "ticker": "SMH",
+   "side": "call",
+   "judge": "pass",
+   "confidence": 46,
+   "why": "Same semi bet as NVDA; askShare 66% is soft vs usual 95%+. One semi only.",
+   "grade": "F",
+   "outcome_pct": 4.51,
+   "study_only": false
+  },
+  {
+   "day": "2026-10-20",
+   "contract": "QQQ261120P00665000",
+   "ticker": "QQQ",
+   "side": "put",
+   "judge": "pass",
+   "confidence": 58,
+   "why": "Prem $81k under $100k noise; index put needs selloff holding below open, unconfirmed. Same bet as SPY puts.",
+   "grade": "W",
+   "outcome_pct": 27.11,
+   "study_only": false
+  },
+  {
+   "day": "2026-10-20",
+   "contract": "SPY261120P00745000",
+   "ticker": "SPY",
+   "side": "put",
+   "judge": "pass",
+   "confidence": 60,
+   "why": "Prem $65k fails quality bucket. Correlated with QQQ/SPY puts; one index-put bet only, tide not confirmed.",
+   "grade": "F",
+   "outcome_pct": 0.61,
+   "study_only": false
+  },
+  {
+   "day": "2026-10-20",
+   "contract": "SPY261218P00740000",
+   "ticker": "SPY",
+   "side": "put",
+   "judge": "pass",
+   "confidence": 60,
+   "why": "DTE 59 is 46+ avoid band despite prem $271k and score 90. Same SPY/QQQ put cluster.",
+   "grade": "F",
+   "outcome_pct": 0.72,
+   "study_only": false
+  },
+  {
+   "day": "2026-10-20",
+   "contract": "QQQ261106P00700000",
+   "ticker": "QQQ",
+   "side": "put",
+   "judge": "pass",
+   "confidence": 42,
+   "why": "Prem $97k under $100k; index put with no held-selloff confirmation. Early print cannot offset noise premium.",
+   "grade": "W",
+   "outcome_pct": 40.69,
+   "study_only": false
+  },
+  {
+   "day": "2026-10-20",
+   "contract": "IWM261120P00259000",
+   "ticker": "IWM",
+   "side": "put",
+   "judge": "pass",
+   "confidence": 48,
+   "why": "Quality print but ETF put and no evidence selloff is holding below the open. Index puts cluster; skip.",
+   "grade": "L",
+   "outcome_pct": -29.31,
+   "study_only": false
+  },
+  {
+   "day": "2026-10-20",
+   "contract": "SMH261120P00510000",
+   "ticker": "SMH",
+   "side": "put",
+   "judge": "pass",
+   "confidence": 55,
+   "why": "Score 85 under 90. Under-90 prints lost on both windows; ask/prem cannot rescue it.",
+   "grade": "W",
+   "outcome_pct": 55.08,
+   "study_only": false
+  },
+  {
+   "day": "2026-10-20",
+   "contract": "XLE261120P00066000",
+   "ticker": "XLE",
+   "side": "put",
+   "judge": "pass",
+   "confidence": 58,
+   "why": "Ask $1.29, prem $39k, score 76. Cheap, small, low-score lottery-like put.",
+   "grade": "F",
+   "outcome_pct": 4.65,
+   "study_only": false
+  },
+  {
+   "day": "2026-10-20",
+   "contract": "NFLX261120C00069000",
+   "ticker": null,
+   "side": null,
+   "judge": "take",
+   "confidence": 52,
+   "why": "Call in bucket: ask $4.60, prem $111k, score 136, DTE 31. Not pre-9CT; wrong if spread>4% or gap down.",
+   "grade": null,
+   "outcome_pct": null,
+   "study_only": null
+  },
+  {
+   "day": "2026-10-20",
+   "contract": "NFLX261106C00073000",
+   "ticker": null,
+   "side": null,
+   "judge": "pass",
+   "confidence": 50,
+   "why": "Same issuer as the NFLX take; prem $79k under $100k and later print.",
+   "grade": null,
+   "outcome_pct": null,
+   "study_only": null
+  },
+  {
+   "day": "2026-10-20",
+   "contract": "PLTR261113C00210000",
+   "ticker": null,
+   "side": null,
+   "judge": "pass",
+   "confidence": 46,
+   "why": "Early call but prem $95k under $100k. Small prints were noise and lost on retest.",
+   "grade": null,
+   "outcome_pct": null,
+   "study_only": null
+  },
+  {
+   "day": "2026-10-20",
+   "contract": "NVDA261106C00215000",
+   "ticker": null,
+   "side": null,
+   "judge": "pass",
+   "confidence": 48,
+   "why": "Noon print (12:40 CT) is the weak time band; premium only $103k; spread unshown so not a confirmed quality-bucket take.",
+   "grade": null,
+   "outcome_pct": null,
+   "study_only": null
+  },
+  {
+   "day": "2026-10-20",
+   "contract": "NVDA261106C00217500",
+   "ticker": null,
+   "side": null,
+   "judge": "pass",
+   "confidence": 55,
+   "why": "Premium $85k is under $100k noise, 12:00 CT print, and same issuer as the other NVDA call.",
+   "grade": null,
+   "outcome_pct": null,
+   "study_only": null
+  },
+  {
+   "day": "2026-10-21",
+   "contract": "SPY261120C00805000",
+   "ticker": "SPY",
+   "side": "call",
+   "judge": "pass",
+   "confidence": 55,
+   "why": "Ask $1.35 and $81k prem miss quality floors; far OTM lotto. Same issuer as the better SPY call.",
+   "grade": "L",
+   "outcome_pct": -58.52,
+   "study_only": true
+  },
+  {
+   "day": "2026-10-21",
+   "contract": "SPY261106C00755000",
+   "ticker": null,
+   "side": null,
+   "judge": "take",
+   "confidence": 55,
+   "why": "Early, score 126, $690k, DTE 16, ask $21 ok. Repeat SPY print. Wrong if spread>4% or gap down.",
+   "grade": null,
+   "outcome_pct": null,
+   "study_only": null
+  },
+  {
+   "day": "2026-10-21",
+   "contract": "NVDA261106C00220000",
+   "ticker": "NVDA",
+   "side": "call",
+   "judge": "take",
+   "confidence": 52,
+   "why": "Early ATM-ish, ask $6.90, $303k, score 126, DTE 16. Lone-print risk. Wrong on a gap down.",
+   "grade": "L",
+   "outcome_pct": -61.59,
+   "study_only": false
+  },
+  {
+   "day": "2026-10-21",
+   "contract": "NOW261106C00180000",
+   "ticker": "NOW",
+   "side": "call",
+   "judge": "pass",
+   "confidence": 58,
+   "why": "Ask $1.98 and $99k prem both miss skip lines despite early print and score 118.",
+   "grade": "W",
+   "outcome_pct": 41.41,
+   "study_only": false
+  },
+  {
+   "day": "2026-10-21",
+   "contract": "GOOGL261120C00330000",
+   "ticker": null,
+   "side": null,
+   "judge": "take",
+   "confidence": 50,
+   "why": "Early, $1.27M, ask $16.60, DTE 30, score 116. Lone print. Wrong if spread wide or gap down.",
+   "grade": null,
+   "outcome_pct": null,
+   "study_only": null
+  },
+  {
+   "day": "2026-10-21",
+   "contract": "SKHY261106C00148000",
+   "ticker": null,
+   "side": null,
+   "judge": "pass",
+   "confidence": 58,
+   "why": "Premium $56k is noise under the $100k line even with early print and score 105.",
+   "grade": null,
+   "outcome_pct": null,
+   "study_only": null
+  },
+  {
+   "day": "2026-10-21",
+   "contract": "BROS261120C00040000",
+   "ticker": "BROS",
+   "side": "call",
+   "judge": "pass",
+   "confidence": 48,
+   "why": "Barely $102k and score 98; weaker than the three quality takes already filled. Lone print.",
+   "grade": "F",
+   "outcome_pct": -14.58,
+   "study_only": false
+  },
+  {
+   "day": "2026-10-21",
+   "contract": "TSLA261120C00430000",
+   "ticker": "TSLA",
+   "side": "call",
+   "judge": "pass",
+   "confidence": 50,
+   "why": "Score sits on the 90 floor and strike is far OTM vs $383. Lone print; slate already full.",
+   "grade": "L",
+   "outcome_pct": -64.89,
+   "study_only": true
+  },
+  {
+   "day": "2026-10-21",
+   "contract": "AMD261113C00590000",
+   "ticker": null,
+   "side": null,
+   "judge": "take",
+   "confidence": 52,
+   "why": "Early repeat AMD call, DTE 23, prem $222k, score 120, ask $20.58 in $10-$30. Spread unknown; gap stop can still kill it.",
+   "grade": null,
+   "outcome_pct": null,
+   "study_only": null
+  },
+  {
+   "day": "2026-10-21",
+   "contract": "IBIT261120C00048000",
+   "ticker": "IBIT",
+   "side": "call",
+   "judge": "pass",
+   "confidence": 58,
+   "why": "Ask $1.75 and prem $88k fail the skip rules. Cheap sub-$100k prints lose to spread and gaps.",
+   "grade": "L",
+   "outcome_pct": -36.0,
+   "study_only": false
+  },
+  {
+   "day": "2026-10-21",
+   "contract": "AMD261106C00547500",
+   "ticker": null,
+   "side": null,
+   "judge": "pass",
+   "confidence": 55,
+   "why": "Same issuer as the K590 take. Ask $33.90 is the weaker $30+ band; only one AMD allowed.",
+   "grade": null,
+   "outcome_pct": null,
+   "study_only": null
+  },
+  {
+   "day": "2026-10-21",
+   "contract": "NBIS261120C00185000",
+   "ticker": null,
+   "side": null,
+   "judge": "pass",
+   "confidence": 48,
+   "why": "Early, prem and score ok, but lone print and spread not shown. Thin edge; skip the unconfirmed one.",
+   "grade": null,
+   "outcome_pct": null,
+   "study_only": null
+  },
+  {
+   "day": "2026-10-23",
+   "contract": "SPY261120P00750000",
+   "ticker": "SPY",
+   "side": "put",
+   "judge": "pass",
+   "confidence": 55,
+   "why": "Early quality-ish SPY put, but index puts are one bet and tide/below-open not confirmed; spread unknown.",
+   "grade": "F",
+   "outcome_pct": -2.43,
+   "study_only": false
+  },
+  {
+   "day": "2026-10-23",
+   "contract": "SPY261105P00760000",
+   "ticker": "SPY",
+   "side": "put",
+   "judge": "pass",
+   "confidence": 56,
+   "why": "Same issuer as the other SPY put; no held-selloff confirm, so skip the clustered index bet.",
+   "grade": "F",
+   "outcome_pct": -4.29,
+   "study_only": false
+  },
+  {
+   "day": "2026-10-23",
+   "contract": "SOXL261120P00095000",
+   "ticker": "SOXL",
+   "side": "put",
+   "judge": "pass",
+   "confidence": 52,
+   "why": "Same risk-off direction as index puts; leveraged ETF gap-stop risk and spread not shown.",
+   "grade": "F",
+   "outcome_pct": 1.32,
+   "study_only": false
+  },
+  {
+   "day": "2026-10-23",
+   "contract": "IWM261120P00262000",
+   "ticker": "IWM",
+   "side": "put",
+   "judge": "pass",
+   "confidence": 55,
+   "why": "SPY/IWM puts are one bet; morning index put needs a selloff still holding, not shown.",
+   "grade": "L",
+   "outcome_pct": -15.97,
+   "study_only": false
+  },
+  {
+   "day": "2026-10-23",
+   "contract": "EWY261120P00150000",
+   "ticker": "EWY",
+   "side": "put",
+   "judge": "pass",
+   "confidence": 48,
+   "why": "Score 100 is not an edge, premium only $120k, spread unknown.",
+   "grade": "F",
+   "outcome_pct": -4.76,
+   "study_only": false
+  },
+  {
+   "day": "2026-10-23",
+   "contract": "SLV261120P00047000",
+   "ticker": "SLV",
+   "side": "put",
+   "judge": "pass",
+   "confidence": 58,
+   "why": "Ask $1.35 is under $2; cheap options lose to spread and gap stops.",
+   "grade": "F",
+   "outcome_pct": -2.96,
+   "study_only": false
+  },
+  {
+   "day": "2026-10-23",
+   "contract": "ARKK261120P00080000",
+   "ticker": "ARKK",
+   "side": "put",
+   "judge": "pass",
+   "confidence": 58,
+   "why": "Premium $30k and score 84 both fail the skip cuts.",
+   "grade": "F",
+   "outcome_pct": -3.67,
+   "study_only": false
+  },
+  {
+   "day": "2026-10-23",
+   "contract": "EWZ261030P00042000",
+   "ticker": "EWZ",
+   "side": "put",
+   "judge": "pass",
+   "confidence": 57,
+   "why": "Premium $59k, score 73, and 7 DTE is flippy; not quality bucket.",
+   "grade": "F",
+   "outcome_pct": -12.16,
+   "study_only": true
+  },
+  {
+   "day": "2026-10-23",
+   "contract": "XLI261120P00160000",
+   "ticker": "XLI",
+   "side": "put",
+   "judge": "pass",
+   "confidence": 58,
+   "why": "ETF put allowed, ask/DTE/score ok, but prem $44k is noise and 12:14 CT is a noon print. Spread unknown; not quality bucket.",
+   "grade": null,
+   "outcome_pct": null,
+   "study_only": true
   }
  ]
 }

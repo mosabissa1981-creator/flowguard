@@ -1,8 +1,9 @@
-## Weekly study-book refresh (auto, week of 2026-10-12 to 2026-10-16; generated 2026-10-17 11:58 CT)
+## Weekly study-book refresh (auto, week of 2026-10-19 to 2026-10-23; generated 2026-10-23 16:31 CT)
 Study book labels (EOD mark vs print, +/-15%), small samples; tilts only, the 2-year sections above win any conflict.
-- Days: 10-12 unknown / risk-off soft, 10-13 gap-down-bounce / risk-off soft, 10-14 sold-from-open / risk-off primary, 10-15 gap-down-bounce / risk-off soft, 10-16 sold-from-open / risk-off primary. Week rows 69W/19L/82F (41% win, avg +18.2%).
-- Week: Index/ETF puts on days QQQ/SPY kept selling from the open: 39W/1L/11F (76% win, avg +46.5%); on gap-downs that bounced: 0W/8L/21F (0% win, avg -8.1%). Risk-off held-back index puts on sold-from-open days: 39W/1L/11F (76% win, avg +46.5%). Lean: a morning index put needs the selloff to be holding (tide still bearish, SPY/QQQ below the open); same-day index puts are ONE bet, take at most one.
-- Week: Gap-down that bounced: calls 15W/3L/11F (52% win, avg +27.1%) vs puts 1W/15L/23F (3% win, avg -14.3%). Lean: on a gap-down that is bouncing, favor calls and pass on puts.
-- Week: Prints before 9:00 CT: 30W/6L/23F (51% win, avg +21.4%); 9:00 CT or later: 39W/13L/59F (35% win, avg +16.5%). Puts on sold-from-open days, printed before 10:00 CT 46W/0L/2F (96% win, avg +54.3%) vs 10:00 CT or later 3W/1L/14F (17% win, avg +6.6%). Lean: early ask-side prints over late ones. Lean: on a down day, puts printed after 10:00 CT are chases.
-- Week: Spread <= 2%: 35W/8L/28F (49% win, avg +27.5%); spread > 2%: 34W/11L/52F (35% win, avg +11.7%).
-- This review's own record so far (2026-10-12 to 2026-10-16): takes 0W/1L/2F, passes 8W/3L/9F. Passed winners: 8 (e.g. NVDA261030C00240000, NVDA261030C00245000, META261106C00780000, META261120C00800000).
+- Days: 10-19 unknown / risk-off soft, 10-20 unknown / risk-off soft, 10-21 unknown, 10-22 unknown / risk-off primary, 10-23 unknown / risk-off soft. Week rows 20W/18L/27F (31% win, avg -0.3%).
+- Week: Spread <= 2%: 10W/9L/8F (37% win, avg -0.7%); spread > 2%: 8W/8L/16F (25% win, avg -0.8%).
+- Since 2026-10-12: Index/ETF puts on days QQQ/SPY kept selling from the open: 39W/1L/11F (76% win, avg +46.5%); on gap-downs that bounced: 0W/8L/21F (0% win, avg -8.1%). Risk-off held-back index puts on sold-from-open days: 39W/1L/11F (76% win, avg +46.5%). Lean: a morning index put needs the selloff to be holding (tide still bearish, SPY/QQQ below the open); same-day index puts are ONE bet, take at most one.
+- Since 2026-10-12: Gap-down that bounced: calls 15W/3L/11F (52% win, avg +27.1%) vs puts 1W/15L/23F (3% win, avg -14.3%). Lean: on a gap-down that is bouncing, favor calls and pass on puts.
+- Since 2026-10-12: Prints before 9:00 CT: 48W/23L/47F (41% win, avg +10.3%); 9:00 CT or later: 39W/13L/59F (35% win, avg +16.5%). Puts on sold-from-open days, printed before 10:00 CT 46W/0L/2F (96% win, avg +54.3%) vs 10:00 CT or later 3W/1L/14F (17% win, avg +6.6%). Lean: on a down day, puts printed after 10:00 CT are chases.
+- Since 2026-10-12: Spread <= 2%: 45W/17L/36F (46% win, avg +19.8%); spread > 2%: 42W/19L/68F (33% win, avg +8.6%).
+- This review's own record so far (2026-10-12 to 2026-10-23): takes 1W/2L/3F, passes 15W/9L/22F. Passed winners: 15 (e.g. NVDA261030C00240000, NVDA261030C00245000, META261106C00780000, META261120C00800000).
