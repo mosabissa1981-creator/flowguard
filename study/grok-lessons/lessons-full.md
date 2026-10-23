@@ -42,6 +42,14 @@ Quality bucket (spread <= 4% AND ask >= $2, no upper price cap, AND premium >= $
 4. Edge is thin (about +1 to +4% per trade at best). Do not report confidence above ~60.
 5. State what would make it wrong; this is a paper-trading study.
 
+## Backtest lessons (strategy research, 2026-10-23 rounds 1-2; WEAK/MARGINAL evidence)
+Two rounds, ~250 filter/exit combos on 2 years of picks (build before Feb 7 2026, unseen after). Nothing passed multiple-comparison correction, so treat these as gentle tilts, not rules.
+- Repeat flow (same ticker AND direction flagged in the prior 3 days) was the only idea positive in both the build and unseen periods (unseen +1.5%/trade vs -1.1% current; calls-only with a wide trailing exit about +7%). Prefer clean ask-side repeat flow on calls.
+- Puts lost under every exit tested (-4 to -13%/trade unseen). Be extra strict with puts.
+- Monday entries did worst (-7 to -12%/trade unseen).
+- Did not help: flow >= 3x the ticker's normal size, sector relative strength vs its ETF, 21-45 DTE, waiting for next-day open-interest confirmation, debit spreads instead of single options.
+- Most trades lose (median about -16 to -30%); gains come from rare +30% hits. Fewer, cleaner picks beat more picks.
+
 ## Live-week lessons (study book, week of Mon Oct 12 - Fri Oct 16, 2026; small sample, one market week)
 Scored on the study book (EOD mark vs flow print or skip-time mid, +/-15% = win/loss), not the +30/-25 plan. Use as tilts, not rules.
 1. Risk-off morning index puts when the selloff HOLDS: on the two PRIMARY risk-off days that kept selling from the open (Oct 14 CPI, Oct 16 oil), the ETF/index puts the risk-off rule held back went 39W/1L/11F (avg +46.5%); the ones printed in the morning went 20W/0L/1F on Oct 14 and 18W/0L/0F on Oct 16. All of them were ONE correlated bet (index selloff), not 39 edges: take at most one index put and only when tide is still bearish and SPY/QQQ are below the open.
