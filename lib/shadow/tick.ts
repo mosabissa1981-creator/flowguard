@@ -7,6 +7,7 @@ import { loadChainScan } from "@/lib/shadow/chain-scan";
 import { loadFadeWatch } from "@/lib/shadow/fade-watch";
 import { loadFollowThrough } from "@/lib/shadow/follow-through";
 import { runTastyCompare } from "@/lib/shadow/tasty-compare";
+import { grokGexDexEnabled, runGrokGexDex } from "@/lib/shadow/grok-gex-dex";
 import { grokWideEnabled, runGrokWide } from "@/lib/shadow/wide-pool";
 import { tastyTestEnabled } from "@/lib/tasty";
 import { etClock } from "@/lib/shadow/budget";
@@ -48,6 +49,9 @@ export async function runShadowTick(now = new Date()) {
   // TEST MODE (FLOWGUARD_GROK_WIDE=1 + FLOWGUARD_LESSONS_TEST=1, default off): Grok + lessons on the wide pool the live lists cut.
   // 0 flow calls (tape read with allowUw:false); grading = 1 UW historic per candidate after its time stop; own $ ledger.
   if (grokWideEnabled()) await step("grokWide", () => runGrokWide({ now }));
+  // TEST MODE (on unless FLOWGUARD_GROK_GEX_DEX=0, and only when the wide lane is on): GEX/DEX Grok lane on rows the wide reviewer judged; own $ ledger,
+  // ≤ 3 cached UW greek-exposure calls per new ticker-day; skips any tick where the wide step just billed. Never changes live picks.
+  if (grokGexDexEnabled()) await step("grokGexDex", () => runGrokGexDex({ now }));
   await flushUwUsage().catch(() => undefined);
   return { ran: true, at: now.toISOString(), jobs: out };
 }

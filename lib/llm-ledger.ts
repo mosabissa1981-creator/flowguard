@@ -9,7 +9,17 @@ import { kvBackend, kvDurable, kvGetNumber, kvIncrFloat } from "@/lib/kv";
  */
 
 /** "grok-wide" = TEST-mode Grok wide pool (own $ cap, FLOWGUARD_GROK_WIDE_USD); never shares the shadow budget. */
-export type LedgerScope = "shadow" | "ai-picks" | "grok-wide";
+/** "grok-gex-dex" = TEST-mode GEX/DEX Grok shadow lane (own $ cap, FLOWGUARD_GROK_GEX_DEX_USD, hard max $1). */
+export type LedgerScope = "shadow" | "ai-picks" | "grok-wide" | "grok-gex-dex";
+
+/**
+ * Quiet test-mode Grok ledgers that share the owner's $3/day total.
+ * Live "ai-picks" is not included. "grok-wide" is the wide-pool lane.
+ */
+export const TEST_MODE_GROK_SCOPES = ["shadow", "grok-wide", "grok-gex-dex"] as const satisfies readonly LedgerScope[];
+
+/** Owner cap on today's quiet test-mode Grok spend (shadow + wide-pool + gex-dex). */
+export const TEST_MODE_GROK_DAY_CAP_USD = 3;
 
 const instanceSpend = new Map<string, number>();
 
@@ -42,4 +52,29 @@ export async function ledgerAdd(scope: LedgerScope, day: string, usd: number): P
   const k = `${scope}|${day}`;
   instanceSpend.set(k, (instanceSpend.get(k) ?? 0) + usd);
   return kvIncrFloat(key(scope, day), usd, 4 * 86400);
+}
+
+/**
+ * Sum of today's spend across the quiet test-mode Grok scopes.
+ * `gexDexFloor` is the gex-dex lane's own counter, used when it is ahead of the ledger.
+ */
+export async function testModeGrokSpend(day: string, gexDexFloor = 0): Promise<number> {
+  const parts = await Promise.all(
+    TEST_MODE_GROK_SCOPES.map(async (scope) => {
+      const n = await ledgerSpend(scope, day);
+      return scope === "grok-gex-dex" ? Math.max(n, gexDexFloor) : n;
+    }),
+  );
+  return Math.round(parts.reduce((sum, n) => sum + n, 0) * 10000) / 10000;
+}
+
+/**
+ * False when `spentUsd` is already at or above the $3 quiet-test total, or when adding `batchUsd` would go over it.
+ * A non-positive batch estimate does not fit — the caller passes a pre-call ceiling, since provider cost lands after the call.
+ */
+export function testModeGrokBatchFits(spentUsd: number, batchUsd: number): boolean {
+  if (!Number.isFinite(spentUsd) || !Number.isFinite(batchUsd) || !(batchUsd > 0)) return false;
+  const spent = Math.round(spentUsd * 10000) / 10000;
+  if (spent >= TEST_MODE_GROK_DAY_CAP_USD) return false;
+  return Math.round((spent + batchUsd) * 10000) / 10000 <= TEST_MODE_GROK_DAY_CAP_USD;
 }

@@ -1034,6 +1034,17 @@ export async function fetchGexByStrike(ticker: string, day: string): Promise<Rec
   return payload.data ?? [];
 }
 
+/** TEST (GEX Grok lane): dealer gamma by strike for ONE expiry (e.g. the nearest weekly). GET /greek-exposure/strike-expiry. Cached 12h. */
+export async function fetchGexByStrikeExpiry(ticker: string, day: string, expiry: string): Promise<Record<string, unknown>[]> {
+  if (await isUwBlocked()) return [];
+  const payload = await uwGet<{ data?: Record<string, unknown>[] }>(
+    `/api/stock/${encodeURIComponent(ticker.toUpperCase())}/greek-exposure/strike-expiry`,
+    { date: day, expiry },
+    DAY_TTL_MS,
+  );
+  return payload.data ?? [];
+}
+
 /** Shadow signals: insider (Form 4) transactions for one ticker, newest first. GET /api/insider/transactions. Cached 12h. */
 export async function fetchInsiderTransactions(ticker: string): Promise<Record<string, unknown>[]> {
   if (await isUwBlocked()) return [];
