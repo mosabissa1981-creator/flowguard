@@ -89,11 +89,11 @@ export async function loadWideDay(day: string): Promise<WideDoc | null> {
   return loadDoc<WideDoc>(KIND, day, { fresh: true });
 }
 
-const WIDE_RULE =
+export const WIDE_RULE =
   "These candidates are a WIDE study pool: setups the live lists ranked below their cut (lanes=wide-pool+pool) or just under the score floor (wide-pool+near-miss), judged only so the desk learns.";
 
 /** Parse one batch reply; enforce the module contract (≤ 3 takes, one per issuer, by confidence). Unreturned rows stay unjudged. */
-function parseBatch(text: string, batch: WideCandidate[], at: string): Record<string, WideJudgement> {
+export function parseBatch(text: string, batch: WideCandidate[], at: string): Record<string, WideJudgement> {
   const parsed = parseJsonObject<{ reviews?: Array<Record<string, unknown>> }>(text);
   const byKey = new Map(batch.map((c) => [c.contract, c]));
   const out: Record<string, WideJudgement> = {};

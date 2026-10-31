@@ -3,6 +3,7 @@ import { NextRequest } from "next/server";
 import { tradingDateET } from "@/lib/session";
 import { adminOk } from "@/lib/shadow/admin";
 import { blankDay, loadShadowDay, publicView, refreshShadow } from "@/lib/shadow";
+import { gexDexStudyView } from "@/lib/shadow/grok-gex-dex";
 import { grokWideLimits, loadWideDay } from "@/lib/shadow/wide-pool";
 
 export const dynamic = "force-dynamic";
@@ -15,6 +16,8 @@ export const maxDuration = 120;
  *  - &full=1                        → include raw module caches (news, debate, UW vol/earnings/historic).
  *  - ?refresh=1&key=<AI_PICKS_ADMIN_SECRET> → bypass the throttle (budget still applies).
  *  - ?wide=1[&day=YYYY-MM-DD]       → TEST-mode Grok wide-pool doc (storage read only; never runs Grok or UW).
+ *  - ?gexdex=1[&day=YYYY-MM-DD]     → TEST-mode GEX/DEX Grok lane vs current Grok vs rules (storage read only) — the study
+ *                                     routine saves this as study/grok-gex-dex-<day>.json.
  */
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
@@ -27,6 +30,12 @@ export async function GET(request: NextRequest) {
     const doc = await loadWideDay(d);
     if (!doc) return Response.json({ error: `no wide-pool doc stored for ${d}` }, { status: 404 });
     return Response.json({ ...doc, limits: grokWideLimits() }, { headers: { "Cache-Control": d === today ? "no-store" : "s-maxage=600" } });
+  }
+  if (params.get("gexdex") === "1") {
+    const d = day ?? today;
+    const view = await gexDexStudyView(d);
+    if (!view) return Response.json({ error: `no GEX/DEX Grok doc stored for ${d}` }, { status: 404 });
+    return Response.json(view, { headers: { "Cache-Control": d === today ? "no-store" : "s-maxage=600" } });
   }
   if (day && day !== today) {
     const doc = await loadShadowDay(day);
