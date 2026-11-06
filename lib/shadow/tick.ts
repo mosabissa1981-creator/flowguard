@@ -8,6 +8,7 @@ import { loadFadeWatch } from "@/lib/shadow/fade-watch";
 import { loadFollowThrough } from "@/lib/shadow/follow-through";
 import { runTastyCompare } from "@/lib/shadow/tasty-compare";
 import { claudeSecondEnabled, runClaudeSecond } from "@/lib/shadow/claude-second";
+import { gptThirdEnabled, runGptThird } from "@/lib/shadow/gpt-third";
 import { grokGexDexEnabled, runGrokGexDex } from "@/lib/shadow/grok-gex-dex";
 import { grokWideEnabled, runGrokWide } from "@/lib/shadow/wide-pool";
 import { tastyTestEnabled } from "@/lib/tasty";
@@ -56,6 +57,9 @@ export async function runShadowTick(now = new Date()) {
   // TEST MODE (on unless FLOWGUARD_CLAUDE_SECOND=0; needs wide lane + ANTHROPIC_API_KEY): Claude second-opinion on the same wide rows Grok judged;
   // own $ ledger under the shared $3 quiet-test total; 0 UW calls; never changes live picks.
   if (claudeSecondEnabled()) await step("claudeSecond", () => runClaudeSecond({ now }));
+  // TEST MODE (on unless FLOWGUARD_GPT_THIRD=0; needs wide lane + OPENAI_API_KEY): GPT third-opinion on the same wide rows Grok judged;
+  // own $ ledger under the shared $3 quiet-test total; 0 UW calls; never changes live picks. No-ops when OPENAI_API_KEY is missing.
+  if (gptThirdEnabled()) await step("gptThird", () => runGptThird({ now }));
   await flushUwUsage().catch(() => undefined);
   return { ran: true, at: now.toISOString(), jobs: out };
 }

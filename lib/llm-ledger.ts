@@ -11,15 +11,16 @@ import { kvBackend, kvDurable, kvGetNumber, kvIncrFloat } from "@/lib/kv";
 /** "grok-wide" = TEST-mode Grok wide pool (own $ cap, FLOWGUARD_GROK_WIDE_USD); never shares the shadow budget. */
 /** "grok-gex-dex" = TEST-mode GEX/DEX Grok shadow lane (own $ cap, FLOWGUARD_GROK_GEX_DEX_USD, hard max $1). */
 /** "claude-second" = TEST-mode Claude second-opinion lane (own $ cap, FLOWGUARD_CLAUDE_SECOND_USD, hard max $1); uses ANTHROPIC_API_KEY. */
-export type LedgerScope = "shadow" | "ai-picks" | "grok-wide" | "grok-gex-dex" | "claude-second";
+/** "gpt-third" = TEST-mode GPT third-opinion lane (own $ cap, FLOWGUARD_GPT_THIRD_USD, hard max $0.75); uses OPENAI_API_KEY. */
+export type LedgerScope = "shadow" | "ai-picks" | "grok-wide" | "grok-gex-dex" | "claude-second" | "gpt-third";
 
 /**
- * Quiet test-mode AI ledgers that share the owner's $3/day total (Grok shadow/wide/gex-dex + Claude second).
+ * Quiet test-mode AI ledgers that share the owner's $3/day total (Grok shadow/wide/gex-dex + Claude + GPT).
  * Live "ai-picks" is not included. "grok-wide" is the wide-pool lane.
  */
-export const TEST_MODE_GROK_SCOPES = ["shadow", "grok-wide", "grok-gex-dex", "claude-second"] as const satisfies readonly LedgerScope[];
+export const TEST_MODE_GROK_SCOPES = ["shadow", "grok-wide", "grok-gex-dex", "claude-second", "gpt-third"] as const satisfies readonly LedgerScope[];
 
-/** Owner cap on today's quiet test-mode AI spend (shadow + wide-pool + gex-dex + claude-second). */
+/** Owner cap on today's quiet test-mode AI spend (shadow + wide-pool + gex-dex + claude-second + gpt-third). */
 export const TEST_MODE_GROK_DAY_CAP_USD = 3;
 
 const instanceSpend = new Map<string, number>();
