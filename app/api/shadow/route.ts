@@ -4,6 +4,7 @@ import { tradingDateET } from "@/lib/session";
 import { adminOk } from "@/lib/shadow/admin";
 import { blankDay, loadShadowDay, publicView, refreshShadow } from "@/lib/shadow";
 import { claudeSecondStudyView } from "@/lib/shadow/claude-second";
+import { gptThirdStudyView } from "@/lib/shadow/gpt-third";
 import { gexDexStudyView } from "@/lib/shadow/grok-gex-dex";
 import { grokWideLimits, loadWideDay } from "@/lib/shadow/wide-pool";
 
@@ -21,6 +22,8 @@ export const maxDuration = 120;
  *                                     routine saves this as study/grok-gex-dex-<day>.json.
  *  - ?claude=1[&day=YYYY-MM-DD]     → TEST-mode Claude second-opinion vs current Grok vs rules (storage read only) — the study
  *                                     routine saves this as study/claude-second-<day>.json.
+ *  - ?gpt=1[&day=YYYY-MM-DD]        → TEST-mode GPT third-opinion vs current Grok vs rules (storage read only) — the study
+ *                                     routine saves this as study/gpt-third-<day>.json.
  */
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
@@ -44,6 +47,12 @@ export async function GET(request: NextRequest) {
     const d = day ?? today;
     const view = await claudeSecondStudyView(d);
     if (!view) return Response.json({ error: `no Claude second-opinion doc stored for ${d}` }, { status: 404 });
+    return Response.json(view, { headers: { "Cache-Control": d === today ? "no-store" : "s-maxage=600" } });
+  }
+  if (params.get("gpt") === "1") {
+    const d = day ?? today;
+    const view = await gptThirdStudyView(d);
+    if (!view) return Response.json({ error: `no GPT third-opinion doc stored for ${d}` }, { status: 404 });
     return Response.json(view, { headers: { "Cache-Control": d === today ? "no-store" : "s-maxage=600" } });
   }
   if (day && day !== today) {

@@ -9,7 +9,8 @@ import type { LlmUsageRecord } from "@/lib/shadow/types";
  * Shared LLM client for shadow modules. xAI keys (xai-…) use the Responses API, which also hosts the
  * server-side web_search / x_search tools. Other providers get plain JSON chat (no search modules).
  * Primary key: LLM_API_KEY (Grok/xAI — live + Grok shadow lanes). Optional second key: ANTHROPIC_API_KEY
- * for the Claude second-opinion test lane only (anthropicLlmConfig). Keys are never logged.
+ * for the Claude second-opinion test lane only (anthropicLlmConfig). OPENAI_API_KEY is for the GPT
+ * third-opinion lane only (openaiLlmConfig). Keys are never logged.
  */
 
 const DEFAULT_TIMEOUT_MS = 55_000;
@@ -28,6 +29,10 @@ const PRICES: Record<string, { input: number; cached: number; output: number }> 
   "claude-haiku-4-5": { input: 1, cached: 0.1, output: 5 },
   "claude-haiku-4-5-20251001": { input: 1, cached: 0.1, output: 5 },
   "claude-haiku-5-5": { input: 1, cached: 0.1, output: 5 },
+  // OpenAI list prices (USD / 1M tokens) — used when the provider omits cost.
+  "gpt-4.1-mini": { input: 0.4, cached: 0.1, output: 1.6 },
+  "gpt-4.1": { input: 2, cached: 0.5, output: 8 },
+  "gpt-4o-mini": { input: 0.15, cached: 0.075, output: 0.6 },
 };
 const WEB_SEARCH_USD = 0.005;
 const X_POST_USD = 0.005;
@@ -92,6 +97,29 @@ export function anthropicLlmConfig(): ShadowLlmConfig | null {
   return {
     key,
     provider: "anthropic",
+    baseUrl,
+    model,
+    searchModel: model,
+    searchEnabled: false,
+  };
+}
+
+/**
+ * OpenAI-only config for the TEST-mode GPT third-opinion lane. Reads OPENAI_API_KEY (never LLM_API_KEY),
+ * so Grok stays the primary reviewer when both keys are present. Returns null when the key is missing
+ * (lane no-ops).
+ */
+export function openaiLlmConfig(): ShadowLlmConfig | null {
+  const key = process.env.OPENAI_API_KEY?.trim() || "";
+  if (!key) return null;
+  const model =
+    process.env.FLOWGUARD_GPT_THIRD_MODEL?.trim() ||
+    process.env.OPENAI_MODEL?.trim() ||
+    "gpt-4.1-mini";
+  const baseUrl = (process.env.OPENAI_BASE_URL?.trim() || "https://api.openai.com/v1").replace(/\/$/, "");
+  return {
+    key,
+    provider: "openai",
     baseUrl,
     model,
     searchModel: model,
@@ -268,7 +296,7 @@ async function callShadowLlmRaw(opts: {
     return {
       text: json.choices?.[0]?.message?.content ?? "",
       sources: [],
-      usage: blankUsage(opts.module, model, inTok, outTok, (inTok * 0.4 + outTok * 1.6) / 1e6, Date.now() - started),
+      usage: blankUsage(opts.module, model, inTok, outTok, estimateCost(model, inTok, 0, outTok, 0, 0), Date.now() - started),
     };
   } finally {
     clearTimeout(timer);
