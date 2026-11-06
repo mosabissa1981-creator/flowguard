@@ -8,7 +8,8 @@ import type { LlmUsageRecord } from "@/lib/shadow/types";
 /**
  * Shared LLM client for shadow modules. xAI keys (xai-…) use the Responses API, which also hosts the
  * server-side web_search / x_search tools. Other providers get plain JSON chat (no search modules).
- * The key is read from LLM_API_KEY and never logged.
+ * Primary key: LLM_API_KEY (Grok/xAI — live + Grok shadow lanes). Optional second key: ANTHROPIC_API_KEY
+ * for the Claude second-opinion test lane only (anthropicLlmConfig). Keys are never logged.
  */
 
 const DEFAULT_TIMEOUT_MS = 55_000;
@@ -21,6 +22,12 @@ const PRICES: Record<string, { input: number; cached: number; output: number }> 
   "grok-4.3": { input: 1.25, cached: 0.2, output: 2.5 },
   "grok-4.20-0309-reasoning": { input: 1.25, cached: 0.2, output: 2.5 },
   "grok-4.20-0309-non-reasoning": { input: 1.25, cached: 0.2, output: 2.5 },
+  // Anthropic list prices (USD / 1M tokens) — used when the provider omits cost.
+  "claude-sonnet-4-6": { input: 3, cached: 0.3, output: 15 },
+  "claude-sonnet-5": { input: 3, cached: 0.3, output: 15 },
+  "claude-haiku-4-5": { input: 1, cached: 0.1, output: 5 },
+  "claude-haiku-4-5-20251001": { input: 1, cached: 0.1, output: 5 },
+  "claude-haiku-5-5": { input: 1, cached: 0.1, output: 5 },
 };
 const WEB_SEARCH_USD = 0.005;
 const X_POST_USD = 0.005;
@@ -54,7 +61,7 @@ export function shadowLlmConfig(): ShadowLlmConfig | null {
   const model =
     process.env.SHADOW_LLM_MODEL?.trim() ||
     process.env.LLM_MODEL?.trim() ||
-    (provider === "anthropic" ? "claude-sonnet-4-5" : provider === "xai" ? "grok-4.7" : "gpt-4.1-mini");
+    (provider === "anthropic" ? "claude-sonnet-4-6" : provider === "xai" ? "grok-4.7" : "gpt-4.1-mini");
   const searchModel = process.env.SHADOW_SEARCH_MODEL?.trim() || (provider === "xai" ? "grok-4.3" : model);
   const effortEnv = process.env.LLM_REASONING_EFFORT?.trim().toLowerCase();
   const reasoningEffort =
@@ -67,6 +74,28 @@ export function shadowLlmConfig(): ShadowLlmConfig | null {
     searchModel,
     reasoningEffort,
     searchEnabled: provider === "xai" && process.env.SHADOW_SEARCH !== "off",
+  };
+}
+
+/**
+ * Claude-only config for the TEST-mode second-opinion lane. Reads ANTHROPIC_API_KEY (never LLM_API_KEY),
+ * so Grok stays the primary reviewer when both keys are present.
+ */
+export function anthropicLlmConfig(): ShadowLlmConfig | null {
+  const key = process.env.ANTHROPIC_API_KEY?.trim() || "";
+  if (!key) return null;
+  const model =
+    process.env.FLOWGUARD_CLAUDE_SECOND_MODEL?.trim() ||
+    process.env.ANTHROPIC_MODEL?.trim() ||
+    "claude-sonnet-4-6";
+  const baseUrl = (process.env.ANTHROPIC_BASE_URL?.trim() || "https://api.anthropic.com/v1").replace(/\/$/, "");
+  return {
+    key,
+    provider: "anthropic",
+    baseUrl,
+    model,
+    searchModel: model,
+    searchEnabled: false,
   };
 }
 
@@ -99,7 +128,10 @@ type ResponsesBody = {
  * cannot be enforced) and records the spend in the global ledger. `ledger` defaults to the shared "shadow" scope; the
  * TEST-mode Grok wide pool passes "grok-wide" so it has its own $ cap and never eats the shadow modules' daily budget.
  */
-export async function callShadowLlm(opts: Parameters<typeof callShadowLlmRaw>[0], ledger: LedgerScope = "shadow"): Promise<LlmResult> {
+export async function callShadowLlm(
+  opts: Parameters<typeof callShadowLlmRaw>[0],
+  ledger: LedgerScope = "shadow",
+): Promise<LlmResult> {
   const day = tradingDateET();
   const gate = llmPersistenceGate(ledger, day);
   if (!gate.ok) throw new Error(gate.reason);
@@ -115,8 +147,10 @@ async function callShadowLlmRaw(opts: {
   search?: { web?: boolean; x?: boolean; fromDate?: string; maxTurns?: number };
   model?: string;
   timeoutMs?: number;
+  /** Override provider/key (Claude second-opinion lane). Defaults to shadowLlmConfig() / LLM_API_KEY. */
+  cfg?: ShadowLlmConfig | null;
 }): Promise<LlmResult> {
-  const cfg = shadowLlmConfig();
+  const cfg = opts.cfg ?? shadowLlmConfig();
   if (!cfg) throw new Error("no-key");
   if (opts.search && !cfg.searchEnabled) throw new Error("search-unavailable");
   const model = opts.model ?? (opts.search ? cfg.searchModel : cfg.model);
@@ -208,7 +242,7 @@ async function callShadowLlmRaw(opts: {
       return {
         text: (json.content ?? []).map((c) => c.text ?? "").join(""),
         sources: [],
-        usage: blankUsage(opts.module, model, inTok, outTok, (inTok * 3 + outTok * 15) / 1e6, Date.now() - started),
+        usage: blankUsage(opts.module, model, inTok, outTok, estimateCost(model, inTok, 0, outTok, 0, 0), Date.now() - started),
       };
     }
     const response = await fetch(`${cfg.baseUrl}/chat/completions`, {

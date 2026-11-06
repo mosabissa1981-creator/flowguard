@@ -10,15 +10,16 @@ import { kvBackend, kvDurable, kvGetNumber, kvIncrFloat } from "@/lib/kv";
 
 /** "grok-wide" = TEST-mode Grok wide pool (own $ cap, FLOWGUARD_GROK_WIDE_USD); never shares the shadow budget. */
 /** "grok-gex-dex" = TEST-mode GEX/DEX Grok shadow lane (own $ cap, FLOWGUARD_GROK_GEX_DEX_USD, hard max $1). */
-export type LedgerScope = "shadow" | "ai-picks" | "grok-wide" | "grok-gex-dex";
+/** "claude-second" = TEST-mode Claude second-opinion lane (own $ cap, FLOWGUARD_CLAUDE_SECOND_USD, hard max $1); uses ANTHROPIC_API_KEY. */
+export type LedgerScope = "shadow" | "ai-picks" | "grok-wide" | "grok-gex-dex" | "claude-second";
 
 /**
- * Quiet test-mode Grok ledgers that share the owner's $3/day total.
+ * Quiet test-mode AI ledgers that share the owner's $3/day total (Grok shadow/wide/gex-dex + Claude second).
  * Live "ai-picks" is not included. "grok-wide" is the wide-pool lane.
  */
-export const TEST_MODE_GROK_SCOPES = ["shadow", "grok-wide", "grok-gex-dex"] as const satisfies readonly LedgerScope[];
+export const TEST_MODE_GROK_SCOPES = ["shadow", "grok-wide", "grok-gex-dex", "claude-second"] as const satisfies readonly LedgerScope[];
 
-/** Owner cap on today's quiet test-mode Grok spend (shadow + wide-pool + gex-dex). */
+/** Owner cap on today's quiet test-mode AI spend (shadow + wide-pool + gex-dex + claude-second). */
 export const TEST_MODE_GROK_DAY_CAP_USD = 3;
 
 const instanceSpend = new Map<string, number>();
@@ -55,14 +56,21 @@ export async function ledgerAdd(scope: LedgerScope, day: string, usd: number): P
 }
 
 /**
- * Sum of today's spend across the quiet test-mode Grok scopes.
- * `gexDexFloor` is the gex-dex lane's own counter, used when it is ahead of the ledger.
+ * Sum of today's spend across the quiet test-mode AI scopes.
+ * `floors` lets a lane use its own in-doc counter when it is ahead of the Redis ledger
+ * (number = legacy gex-dex floor; object = per-scope floors).
  */
-export async function testModeGrokSpend(day: string, gexDexFloor = 0): Promise<number> {
+export async function testModeGrokSpend(
+  day: string,
+  floors: number | Partial<Record<LedgerScope, number>> = 0,
+): Promise<number> {
+  const floorMap: Partial<Record<LedgerScope, number>> =
+    typeof floors === "number" ? { "grok-gex-dex": floors } : floors;
   const parts = await Promise.all(
     TEST_MODE_GROK_SCOPES.map(async (scope) => {
       const n = await ledgerSpend(scope, day);
-      return scope === "grok-gex-dex" ? Math.max(n, gexDexFloor) : n;
+      const floor = floorMap[scope] ?? 0;
+      return Math.max(n, floor);
     }),
   );
   return Math.round(parts.reduce((sum, n) => sum + n, 0) * 10000) / 10000;

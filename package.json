@@ -12,7 +12,8 @@
     "paper-check": "npx tsx scripts/paper-check.ts",
     "spread-gate-check": "npx tsx scripts/spread-gate-check.ts",
     "exit-plan-check": "npx tsx --conditions=react-server scripts/exit-plan-check.ts",
-    "risk-off-check": "npx tsx --conditions=react-server scripts/risk-off-check.ts"
+    "risk-off-check": "npx tsx --conditions=react-server scripts/risk-off-check.ts",
+    "claude-second-check": "tsx --conditions=react-server scripts/claude-second-check.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
