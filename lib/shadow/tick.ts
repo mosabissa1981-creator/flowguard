@@ -7,6 +7,7 @@ import { loadChainScan } from "@/lib/shadow/chain-scan";
 import { loadFadeWatch } from "@/lib/shadow/fade-watch";
 import { loadFollowThrough } from "@/lib/shadow/follow-through";
 import { runTastyCompare } from "@/lib/shadow/tasty-compare";
+import { claudeSecondEnabled, runClaudeSecond } from "@/lib/shadow/claude-second";
 import { grokGexDexEnabled, runGrokGexDex } from "@/lib/shadow/grok-gex-dex";
 import { grokWideEnabled, runGrokWide } from "@/lib/shadow/wide-pool";
 import { tastyTestEnabled } from "@/lib/tasty";
@@ -52,6 +53,9 @@ export async function runShadowTick(now = new Date()) {
   // TEST MODE (on unless FLOWGUARD_GROK_GEX_DEX=0, and only when the wide lane is on): GEX/DEX Grok lane on rows the wide reviewer judged; own $ ledger,
   // ≤ 3 cached UW greek-exposure calls per new ticker-day; skips any tick where the wide step just billed. Never changes live picks.
   if (grokGexDexEnabled()) await step("grokGexDex", () => runGrokGexDex({ now }));
+  // TEST MODE (on unless FLOWGUARD_CLAUDE_SECOND=0; needs wide lane + ANTHROPIC_API_KEY): Claude second-opinion on the same wide rows Grok judged;
+  // own $ ledger under the shared $3 quiet-test total; 0 UW calls; never changes live picks.
+  if (claudeSecondEnabled()) await step("claudeSecond", () => runClaudeSecond({ now }));
   await flushUwUsage().catch(() => undefined);
   return { ran: true, at: now.toISOString(), jobs: out };
 }
