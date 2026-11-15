@@ -201,15 +201,24 @@ Never places orders and never changes live picks.
   paper-fill the shared wide-pool rows (no new LLM calls). Grok/Claude/GPT fill only the rows that model
   already marked TAKE. Rules fills every quality-floor row. Test lanes (`lottery`, `puts`, `lanes`,
   `earnings-calendar`) are unchanged.
-- **AI-trader floor, before any of those fills:** spread ≤ 4% of mid, ask ≥ $2, premium ≥ $100k, score ≥ 90.
-  Existing guards still apply: ETF/index puts only, risk-off ETF-put hold-back, issuer/sector caps, and the
-  report-day 3-pick cap (risky days use that same list cap of 3). Exits and size match main (+30% / −25% /
-  2-session hold / 2:30 PM CT, 2% per trade).
+- **AI-trader floor, before a quality fill:** spread ≤ 4% of mid, ask ≥ $2, premium ≥ $100k, score ≥ 90.
+  Existing guards still apply: ETF/index puts only, risk-off ETF-put hold-back, and issuer/sector caps.
+  With the study boost off, the report-day list cap stays 3 (risky days use that same cap; calm stays 10).
+  Exits match main (+30% / −25% / 2-session hold / 2:30 PM CT).
+- **Study boost** (`FLOWGUARD_AI_TRADER_STUDY_BOOST`, default on through 2026-12-11; set `0` to turn off, or a
+  `YYYY-MM-DD` to keep it on through that day). No new cron — the wide, Claude, and GPT reviewers already ride
+  `/api/shadow/tick`. While it is on they judge more rows (Grok default 600/day, every 20 min, 10:00–15:00 ET,
+  highest score then earliest print first) and stop when the existing $3 quiet-test ledger cannot fit the next
+  batch. Quality list cap is at least 8 (report-day rises from 3; calm stays 10). Each AI book may also
+  paper-fill up to 8 **study** takes that miss the quality floor and pass the live floor (spread ≤ 10%,
+  premium ≥ $10k, score ≥ 45), tagged `tier: "study"`. Those do not copy onto main. AI-book open cost may
+  reach 40% so the extra fills can land; main stays at 10%. Live picks, the morning board, premove, pings,
+  and the other study lanes are unchanged.
 - **Friday score** (after 16:15 ET, from the existing paper tick and `/api/shadow/signals` cron — no new cron):
-  trades, win rate, avg return, total P&L, take-avg vs pass-avg vs the rules book. Winner = highest avg take
-  return that also beats rules with at least 5 trades; otherwise no winner. Written to
-  `study/ai-trader-books/week-YYYY-MM-DD.json` + `.md` when the disk is writable, always stored for the paper
-  card, and shown on the paper account. `npm run ai-trader-books-check` covers the pure rules.
+  quality and study tiers are reported separately. Winner = highest quality-tier avg take return that also
+  beats the rules-only book with at least 5 quality trades; study fills are not in that average. Otherwise no
+  winner. Written to `study/ai-trader-books/week-YYYY-MM-DD.json` + `.md` when the disk is writable, always
+  stored for the paper card, and shown on the paper account. `npm run ai-trader-books-check` covers the pure rules.
 - **Size:** 2% of the book value per trade (min 1 contract); skip if 1 contract > 5%; total open cost ≤ 10%.
   Lottery 0.5% per trade, open ≤ 5%.
 - **Fill:** live UW ask when the pick is taken (batched `option-contracts?option_symbol[]=…`, one call per underlying);

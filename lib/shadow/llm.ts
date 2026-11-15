@@ -134,6 +134,22 @@ export function estimateCost(model: string, inTok: number, cached: number, outTo
   return ((inTok - cached) * p.input + cached * p.cached + outTok * p.output) / 1e6 + web * WEB_SEARCH_USD + posts * X_POST_USD;
 }
 
+/**
+ * Pre-call dollar ceiling for one review batch. The provider reports cost only after the call,
+ * so the $3 quiet-test ledger is checked against this upper bound.
+ * When `tighten` is set and a real batch has already landed today, reserve 25% over the worst
+ * batch seen and never above the token formula. That lets extra reviews continue until the
+ * ledger — not a fat first guess — says stop.
+ */
+export function reviewBatchCeiling(model: string, system: string, user: string, rows: number, observedMaxUsd: number, tighten: boolean): number {
+  const inTok = Math.ceil((system.length + user.length) / 3);
+  const outTok = 1500 + Math.max(rows, 1) * 250;
+  const formula = Math.round(estimateCost(model, inTok, 0, outTok, 0, 0) * 10000) / 10000;
+  if (!tighten || !(observedMaxUsd > 0)) return formula;
+  const tight = Math.round(Math.max(observedMaxUsd * 1.25, 0.01) * 10000) / 10000;
+  return Math.min(formula, tight);
+}
+
 type ResponsesBody = {
   output?: Array<{ type: string; content?: Array<{ type: string; text?: string; annotations?: Array<{ type: string; url?: string }> }> }>;
   usage?: {

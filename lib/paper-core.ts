@@ -136,6 +136,11 @@ export type PaperPosition = {
   drivenBy?: AiTraderSource | null;
   /** Why that source was selected at fill time. Kept on the fill so a later winner does not rewrite history. */
   drivenByWhy?: string | null;
+  /**
+   * AI-trader book tier. "quality" cleared the strict floor. "study" missed it and cleared the live floor.
+   * Absent on older rows and on non-AI books — treat those as quality when scoring the contest.
+   */
+  tier?: "quality" | "study" | null;
   note?: string;
   lastMark?: PaperMark | null;
 };

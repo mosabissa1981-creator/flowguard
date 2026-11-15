@@ -14,10 +14,12 @@ import {
   type AiTraderPanel,
   type AiTraderRow,
   type AiTraderSource,
+  type AiTraderTier,
   type HeldSlot,
   type PaperTradeInput,
   type WeekScore,
 } from "@/lib/ai-trader-books-core";
+import { studyBoostEnabled, studyBoostUntil, AI_TRADER_BOOST_FILL_CAP, AI_TRADER_BOOST_OPEN_RISK } from "@/lib/ai-trader-study-boost";
 import { kvGet, kvGetMany, kvSet, kvSetNx } from "@/lib/kv";
 import type { PaperClosed, PaperPosition } from "@/lib/paper-core";
 import { round2 } from "@/lib/paper-core";
@@ -32,8 +34,9 @@ import { loadRegimeSafe } from "@/lib/regime";
 import { loadRiskOff } from "@/lib/risk-off";
 
 /**
- * PAPER / TEST ONLY. Loads the wide / Claude / GPT decisions that already exist (no new LLM calls),
- * turns the quality-floor takes into paper fills, and writes the Friday score.
+ * PAPER / TEST ONLY. Loads the wide / Claude / GPT decisions that already exist (no new LLM calls here;
+ * the study boost widens those lanes' own review steps), turns quality-floor takes into paper fills,
+ * and, while the boost is on, also fills a study tier. Writes the Friday score with the tiers split.
  * The score is stored in Redis and, when the disk is writable, under study/ai-trader-books/.
  * Hooked from the paper tick and the existing after-close signals cron. No new Vercel cron.
  */
@@ -84,9 +87,20 @@ export async function loadLatestWeek(): Promise<WeekScore | null> {
   return doc;
 }
 
-export async function loadAiTraderPanel(): Promise<AiTraderPanel> {
+export function aiTraderStudyBoostOn(today: string): boolean {
+  return studyBoostEnabled(process.env.FLOWGUARD_AI_TRADER_STUDY_BOOST, today);
+}
+
+export async function loadAiTraderPanel(now = new Date()): Promise<AiTraderPanel> {
   const latest = await loadLatestWeek().catch(() => null);
-  return panelFrom(parseMainSourceSetting(process.env.FLOWGUARD_PAPER_MAIN_SOURCE), latest);
+  const today = tradingDateET(now);
+  const on = aiTraderStudyBoostOn(today);
+  return panelFrom(parseMainSourceSetting(process.env.FLOWGUARD_PAPER_MAIN_SOURCE), latest, {
+    on,
+    until: studyBoostUntil(process.env.FLOWGUARD_AI_TRADER_STUDY_BOOST),
+    fillCap: AI_TRADER_BOOST_FILL_CAP,
+    openRiskCapPct: AI_TRADER_BOOST_OPEN_RISK,
+  });
 }
 
 /** Today's competing-book fills, plus the main-book copy of the selected source. */
@@ -109,6 +123,7 @@ export async function gatherAiTraderFills(opts: {
     mainSource: resolved.source,
     mainSourceWhy: resolved.why,
     notBeforeMs: opts.startedAtMs,
+    studyBoost: aiTraderStudyBoostOn(opts.today),
   });
 }
 
@@ -143,26 +158,41 @@ async function decisionBuckets(days: string[], today: string) {
   return decisions;
 }
 
-function tradesFromLedger(open: PaperPosition[], closed: PaperClosed[], days: Set<string>): { trades: PaperTradeInput[]; pending: Record<AiTraderSource, number> } {
+function positionTier(tier: AiTraderTier | null | undefined): AiTraderTier {
+  return tier === "study" ? "study" : "quality";
+}
+
+function tradesFromLedger(open: PaperPosition[], closed: PaperClosed[], days: Set<string>): {
+  trades: PaperTradeInput[];
+  pending: Record<AiTraderSource, number>;
+  studyPending: Record<AiTraderSource, number>;
+} {
   const trades: PaperTradeInput[] = [];
   const pending: Record<AiTraderSource, number> = { grok: 0, claude: 0, gpt: 0, rules: 0 };
-  const push = (p: { book: string; day: string; contract: string; ticker: string; qty: number; costUsd: number }, closedTrade: { pnlUsd: number; pnlPct: number } | null, mark: number | null) => {
+  const studyPending: Record<AiTraderSource, number> = { grok: 0, claude: 0, gpt: 0, rules: 0 };
+  const push = (
+    p: { book: string; day: string; contract: string; ticker: string; qty: number; costUsd: number; tier?: AiTraderTier | null },
+    closedTrade: { pnlUsd: number; pnlPct: number } | null,
+    mark: number | null,
+  ) => {
     const source = BOOK_SOURCE[p.book];
     if (!source || !days.has(p.day)) return;
+    const tier = positionTier(p.tier);
+    const bucket = tier === "study" ? studyPending : pending;
     if (closedTrade) {
-      trades.push({ book: source, day: p.day, contract: p.contract, ticker: p.ticker, returnPct: closedTrade.pnlPct, pnlUsd: closedTrade.pnlUsd, closed: true });
+      trades.push({ book: source, day: p.day, contract: p.contract, ticker: p.ticker, returnPct: closedTrade.pnlPct, pnlUsd: closedTrade.pnlUsd, closed: true, tier });
       return;
     }
     if (mark != null && mark >= 0 && p.costUsd > 0) {
       const pnlUsd = round2(mark * 100 * p.qty - p.costUsd);
-      trades.push({ book: source, day: p.day, contract: p.contract, ticker: p.ticker, returnPct: round2((pnlUsd / p.costUsd) * 100), pnlUsd, closed: false });
+      trades.push({ book: source, day: p.day, contract: p.contract, ticker: p.ticker, returnPct: round2((pnlUsd / p.costUsd) * 100), pnlUsd, closed: false, tier });
       return;
     }
-    pending[source] += 1;
+    bucket[source] += 1;
   };
   for (const p of open) push(p, null, p.lastMark?.value ?? null);
   for (const c of closed) push(c, { pnlUsd: c.pnlUsd, pnlPct: c.pnlPct }, null);
-  return { trades, pending };
+  return { trades, pending, studyPending };
 }
 
 async function loadLedger(): Promise<{ positions: PaperPosition[]; closed: PaperClosed[] }> {
@@ -208,9 +238,9 @@ export async function maybeScoreAiTraderWeek(
   if (!(await kvSetNx(lockKey(week.weekEnd), now.toISOString(), 10 * 60))) return { ran: false, reason: "score already running" };
   try {
     const books = ledger ?? (await loadLedger());
-    const { trades, pending } = tradesFromLedger(books.positions, books.closed, new Set(week.days));
+    const { trades, pending, studyPending } = tradesFromLedger(books.positions, books.closed, new Set(week.days));
     const decisions = await decisionBuckets(week.days, day);
-    const score = buildWeekScore({ week, generatedAt: now.toISOString(), trades, pending, decisions });
+    const score = buildWeekScore({ week, generatedAt: now.toISOString(), trades, pending, studyPending, decisions });
     score.studyWritten = await writeStudyWeek(score);
     await kvSet(weekKey(week.weekEnd), score, { tier: "rare", ttlSec: 400 * 86400 });
     await kvSet(LATEST_KEY, score, { tier: "rare" });
