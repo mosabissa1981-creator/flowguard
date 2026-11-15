@@ -9,15 +9,23 @@ import { formatExpiry, formatStrike } from "@/lib/format";
 import type { BookStats, PaperClosed, PaperPosition } from "@/lib/paper-core";
 import type { PaperView } from "@/lib/paper";
 
+type AiPanel = NonNullable<PaperView["aiTrader"]>;
+
 const POLL_MS = 5 * 60_000;
 
 const money = (n: number) => `${n < 0 ? "−" : ""}$${Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const signed = (n: number) => `${n > 0 ? "+" : n < 0 ? "−" : ""}$${Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const tone = (n: number) => (n > 0 ? "text-emerald-300" : n < 0 ? "text-rose-300" : "text-muted-foreground");
 
+const AI_BOOKS = new Set(["ai-grok", "ai-claude", "ai-gpt", "ai-rules"]);
+
 const SOURCE: Record<string, string> = {
   "ai-pick": "Pick",
   premove: "Premove",
+  grok: "Grok",
+  claude: "Claude",
+  gpt: "GPT",
+  rules: "Rules",
   lottery: "Lottery",
   puts: "Puts",
   "earnings-calendar": "Earn cal",
@@ -58,6 +66,7 @@ function OpenRow({ p }: { p: PaperPosition }) {
       <div className="font-mono text-[11px] text-muted-foreground">
         target {p.target != null ? `$${p.target.toFixed(2)}` : "—"} · stop {p.stop != null ? `$${p.stop.toFixed(2)}` : "none"} · time stop {p.timeStopAt ? clockCT(p.timeStopAt) : `${p.timeStopDate} 2:30 PM CT`}
       </div>
+      {p.drivenBy ? <div className="font-mono text-[10px] text-sky-200/80">source {p.drivenBy}{p.drivenByWhy ? ` · ${p.drivenByWhy}` : ""}</div> : null}
     </li>
   );
 }
@@ -117,6 +126,78 @@ function BookTable({ books }: { books: BookStats[] }) {
   );
 }
 
+function AiTraderBlock({ panel, books, open, closed }: { panel: AiPanel | null; books: BookStats[]; open: PaperPosition[]; closed: PaperClosed[] }) {
+  const week = panel?.week ?? null;
+  const pct = (n: number | null) => (n == null ? "—" : `${n > 0 ? "+" : ""}${n.toFixed(1)}%`);
+  return (
+    <div className="mt-3 rounded-lg border border-sky-400/30 bg-sky-500/5 p-2.5">
+      <div className="mb-1 text-[11px] font-medium text-sky-100">AI trader books</div>
+      <p className="text-[11px] text-muted-foreground">
+        Main source: {panel?.mainSource ?? "rules"}
+        {panel?.mainSourceWhy ? ` · ${panel.mainSourceWhy}` : ""}. Each book paper-fills only its own takes from the shared wide pool, after the quality floor
+        (spread ≤ 4%, ask ≥ $2, premium ≥ $100k, score ≥ 90). Friday score picks the next week's main source.
+      </p>
+      {books.length > 0 ? <div className="mt-2"><BookTable books={books} /></div> : null}
+      {week ? (
+        <div className="mt-2">
+          <div className="text-[11px] text-sky-100">
+            Week ending {week.weekEnd}: {week.winner ? `${week.winner} wins` : "no winner"}. {week.winnerReason}
+          </div>
+          <div className="mt-1 overflow-x-auto">
+            <table className="w-full font-mono text-[11px]">
+              <thead className="text-muted-foreground">
+                <tr>
+                  <th className="py-1 text-left font-normal">Book</th>
+                  <th className="py-1 text-right font-normal">Trades</th>
+                  <th className="py-1 text-right font-normal">Win</th>
+                  <th className="py-1 text-right font-normal">Avg</th>
+                  <th className="py-1 text-right font-normal">P&L</th>
+                  <th className="py-1 text-right font-normal">Take</th>
+                  <th className="py-1 text-right font-normal">Pass</th>
+                </tr>
+              </thead>
+              <tbody>
+                {week.books.map((b) => (
+                  <tr key={b.book} className="border-t border-border/40">
+                    <td className="py-1 pr-2">{b.label}</td>
+                    <td className="py-1 text-right">{b.trades}</td>
+                    <td className="py-1 text-right">{b.winRatePct == null ? "—" : `${b.winRatePct}%`}</td>
+                    <td className={cn("py-1 text-right", tone(b.avgReturnPct ?? 0))}>{pct(b.avgReturnPct)}</td>
+                    <td className={cn("py-1 text-right", tone(b.totalPnlUsd))}>{signed(b.totalPnlUsd)}</td>
+                    <td className="py-1 text-right">{pct(b.takeAvgPct)}</td>
+                    <td className="py-1 text-right">{pct(b.passAvgPct)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="mt-1 text-[10px] text-muted-foreground">
+            {week.studyWritten ? `Written to ${week.studyMd}` : `Shown here. Writes ${week.studyJson} when the process can save files.`}
+          </p>
+        </div>
+      ) : (
+        <p className="mt-2 text-[11px] text-muted-foreground">
+          No Friday score yet. Week 1 starts {panel?.week1Monday ?? "2026-11-16"}. Until a score names a winner, main follows the rules-only book.
+        </p>
+      )}
+      {open.length > 0 ? (
+        <ul className="mt-2 grid gap-2 lg:grid-cols-2">
+          {open.map((p) => (
+            <OpenRow key={p.id} p={p} />
+          ))}
+        </ul>
+      ) : null}
+      {closed.length > 0 ? (
+        <ul className="mt-2">
+          {closed.map((c) => (
+            <ClosedRow key={`${c.id}:${c.exitedAt}`} c={c} />
+          ))}
+        </ul>
+      ) : null}
+    </div>
+  );
+}
+
 export function PaperPanel() {
   const [data, setData] = useState<PaperView | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -144,7 +225,10 @@ export function PaperPanel() {
 
   const h = data?.headline;
   const mainOpen = (data?.open ?? []).filter((p) => p.book === "main");
-  const testOpen = (data?.open ?? []).filter((p) => p.book !== "main");
+  const aiOpen = (data?.open ?? []).filter((p) => AI_BOOKS.has(p.book));
+  const testOpen = (data?.open ?? []).filter((p) => p.book !== "main" && !AI_BOOKS.has(p.book));
+  const aiStats = (data?.books ?? []).filter((b) => AI_BOOKS.has(b.book));
+  const testStats = (data?.books ?? []).filter((b) => b.book !== "main" && !AI_BOOKS.has(b.book));
 
   return (
     <section className="rounded-xl border border-dashed border-sky-400/40 bg-card/50 p-3 sm:p-4" aria-label="Paper account">
@@ -177,7 +261,10 @@ export function PaperPanel() {
           <div className="mt-3">
             <div className="mb-1 text-[11px] font-medium text-muted-foreground">Open positions ({mainOpen.length})</div>
             {mainOpen.length === 0 ? (
-              <p className="text-xs text-muted-foreground">None. New entries happen when the rules/AI take a pick (not watch-only or lockout).</p>
+              <p className="text-xs text-muted-foreground">
+                None. Main follows {data?.aiTrader?.mainSource ?? "the rules-only book"}
+                {data?.aiTrader?.mainSourceWhy ? ` (${data.aiTrader.mainSourceWhy})` : ""}. Premove still fills here. Grok AI-picks takes do not.
+              </p>
             ) : (
               <ul className="grid gap-2 lg:grid-cols-2">
                 {mainOpen.map((p) => (
@@ -202,11 +289,13 @@ export function PaperPanel() {
             )}
           </details>
 
+          <AiTraderBlock panel={data!.aiTrader} books={aiStats} open={aiOpen} closed={data!.closedAi ?? []} />
+
           <details className="mt-1">
             <summary className="cursor-pointer select-none py-1 text-[11px] font-medium text-muted-foreground">
               Test lanes, separate books ({testOpen.length} open)
             </summary>
-            <BookTable books={data!.books.filter((b) => b.book !== "main")} />
+            <BookTable books={testStats} />
             {testOpen.length > 0 ? (
               <ul className="mt-2 grid gap-2 lg:grid-cols-2">
                 {testOpen.map((p) => (
