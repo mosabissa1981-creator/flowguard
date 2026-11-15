@@ -9,6 +9,7 @@ import {
   buildWeekScore,
   capsForRegime,
   isFridayAfterClose,
+  liveFloorReason,
   parseMainSourceSetting,
   qualityFloorReason,
   renderWeekMd,
@@ -19,6 +20,12 @@ import {
   type AiTraderSource,
   type PaperTradeInput,
 } from "@/lib/ai-trader-books-core";
+import {
+  AI_TRADER_BOOST_FILL_CAP,
+  byScoreThenEarlier,
+  projectQuietSpend,
+  studyBoostEnabled,
+} from "@/lib/ai-trader-study-boost";
 
 function row(over: Partial<AiTraderRow> & Pick<AiTraderRow, "contract" | "ticker">): AiTraderRow {
   return {
@@ -196,5 +203,123 @@ assert.match(tied.winnerReason, /tie/);
 
 const noRules = scoreOf(trades("grok", 9, 6));
 assert.equal(noRules.winner, null);
+
+// Study boost off keeps the report-day list at 3 and does not fill live-floor misses.
+assert.equal(qualityFloorReason(row({ contract: "A", ticker: "AAPL", spreadPct: 0.06 })), qualityFloorReason(row({ contract: "A", ticker: "AAPL", spreadPct: 0.06 })));
+assert.equal(liveFloorReason(row({ contract: "A", ticker: "AAPL", spreadPct: 0.1, score: 45, premiumUsd: 10_000, ask: 0.4 })), null);
+assert.ok(liveFloorReason(row({ contract: "A", ticker: "AAPL", spreadPct: 0.11 }))?.includes("spread"));
+assert.ok(liveFloorReason(row({ contract: "A", ticker: "AAPL", score: 44 }))?.includes("score"));
+assert.equal(studyBoostEnabled(undefined, "2026-11-16"), true);
+assert.equal(studyBoostEnabled("", "2026-12-11"), true);
+assert.equal(studyBoostEnabled("", "2026-12-12"), false);
+assert.equal(studyBoostEnabled("0", "2026-11-16"), false);
+assert.equal(studyBoostEnabled("off", "2026-11-16"), false);
+assert.equal(studyBoostEnabled("2026-12-18", "2026-12-15"), true);
+assert.equal(studyBoostEnabled("2026-12-18", "2026-12-19"), false);
+assert.equal(studyBoostEnabled("sometimes", "2026-11-16"), false);
+
+const boostedReport = selectAiTraderFills(reportRows, { ...base, regimeLabel: "report-day", studyBoost: true });
+const boostedGrok = boostedReport.filter((f) => f.book === "ai-grok" && f.tier === "quality").map((f) => f.contract);
+assert.equal(boostedGrok.length, 4, "report-day quality list rises to the names that fit issuer caps, up to 8");
+assert.ok(boostedGrok.includes("B1"));
+assert.ok(boostedReport.filter((f) => f.book === "ai-grok" && f.tier === "quality").every((f) => f.openRiskCapPct === 0.4));
+assert.ok(boostedReport.filter((f) => f.book === "main").every((f) => f.openRiskCapPct == null && f.tier === "quality"));
+
+const many = Array.from({ length: 9 }, (_, i) =>
+  row({ contract: `Q${i}`, ticker: `ZZ${i}`, score: 99 - i, grok: "take", claude: "take", gpt: "pass" }),
+);
+const cappedBoost = selectAiTraderFills(many, { ...base, regimeLabel: "report-day", studyBoost: true });
+assert.equal(cappedBoost.filter((f) => f.book === "ai-grok" && f.tier === "quality").length, AI_TRADER_BOOST_FILL_CAP);
+assert.equal(cappedBoost.filter((f) => f.book === "ai-rules" && f.tier === "quality").length, AI_TRADER_BOOST_FILL_CAP);
+assert.ok(!cappedBoost.some((f) => f.contract === "Q8" && f.tier === "quality"));
+const calmMany = Array.from({ length: 11 }, (_, i) => row({ contract: `C${i}`, ticker: `QQ${i}`, score: 110 - i }));
+const calmBoost = selectAiTraderFills(calmMany, { ...base, studyBoost: true });
+assert.equal(calmBoost.filter((f) => f.book === "ai-grok" && f.tier === "quality").length, 10, "calm list cap stays 10");
+
+const studyNames = Array.from({ length: 9 }, (_, i) =>
+  row({
+    contract: `S${i}`,
+    ticker: `YY${i}`,
+    score: 80 - i,
+    spreadPct: 0.08,
+    premiumUsd: 40_000,
+    ask: 1.2,
+    grok: "take",
+    claude: i === 0 ? "pass" : "take",
+    gpt: "take",
+  }),
+);
+const studyFill = selectAiTraderFills(studyNames, { ...base, studyBoost: true });
+assert.equal(studyFill.filter((f) => f.tier === "quality").length, 0);
+assert.equal(studyFill.filter((f) => f.book === "ai-grok" && f.tier === "study").length, 8);
+assert.equal(studyFill.filter((f) => f.book === "ai-claude" && f.tier === "study").length, 8);
+assert.equal(studyFill.filter((f) => f.book === "ai-gpt" && f.tier === "study").length, 8);
+assert.ok(!studyFill.some((f) => f.book === "ai-rules" || f.book === "main"));
+assert.ok(studyFill.filter((f) => f.tier === "study").every((f) => f.spreadMaxPct === 0.1));
+const wideSpread = selectAiTraderFills(
+  [row({ contract: "WIDE", ticker: "YY9", spreadPct: 0.12, score: 80, premiumUsd: 40_000, grok: "take" })],
+  { ...base, studyBoost: true },
+);
+assert.equal(wideSpread.length, 0);
+const stockPut = selectAiTraderFills(
+  [row({ contract: "SPUT", ticker: "NVDA", side: "put", etf: false, spreadPct: 0.08, score: 70, premiumUsd: 40_000, grok: "take" })],
+  { ...base, studyBoost: true },
+);
+assert.equal(stockPut.length, 0);
+const etfPut = selectAiTraderFills(
+  [row({ contract: "SPY2", ticker: "SPY", side: "put", etf: true, spreadPct: 0.08, score: 70, premiumUsd: 40_000, grok: "take" })],
+  { ...base, studyBoost: true, blockEtfPuts: true },
+);
+assert.equal(etfPut.length, 0);
+const heldStudy = selectAiTraderFills(studyNames, {
+  ...base,
+  regimeLabel: "report-day",
+  studyBoost: true,
+  held: [{ book: "ai-grok", ticker: "YY0", contract: "HELD", tier: "study" }],
+});
+assert.ok(!heldStudy.some((f) => f.book === "ai-grok" && f.ticker === "YY0"));
+const qualityHeld = selectAiTraderFills(studyNames, {
+  ...base,
+  regimeLabel: "report-day",
+  studyBoost: true,
+  held: [{ book: "ai-grok", ticker: "YY1", contract: "QHELD", tier: "quality" }],
+});
+assert.ok(qualityHeld.some((f) => f.book === "ai-grok" && f.tier === "study" && f.ticker === "YY1"), "study issuer cap is separate from quality");
+
+const off = selectAiTraderFills(studyNames, base);
+assert.equal(off.length, 0);
+
+const order = [
+  { score: 70, at: "2026-11-16T14:00:00Z", contract: "late" },
+  { score: 90, at: "2026-11-16T16:00:00Z", contract: "late-high" },
+  { score: 90, at: "2026-11-16T14:00:00Z", contract: "early-high" },
+].sort(byScoreThenEarlier);
+assert.deepEqual(order.map((x) => x.contract), ["early-high", "late-high", "late"]);
+
+const withStudyTrades = scoreOf([
+  ...trades("grok", 10, 5),
+  ...trades("rules", 2, 6),
+  ...trades("grok", 40, 8).map((t) => ({ ...t, tier: "study" as const, contract: `study-${t.contract}` })),
+]);
+assert.equal(withStudyTrades.winner, "grok");
+assert.equal(withStudyTrades.books.find((b) => b.book === "grok")?.trades, 5);
+assert.equal(withStudyTrades.books.find((b) => b.book === "grok")?.avgReturnPct, 10);
+assert.equal(withStudyTrades.books.find((b) => b.book === "grok")?.study?.trades, 8);
+assert.equal(withStudyTrades.books.find((b) => b.book === "grok")?.study?.avgReturnPct, 40);
+assert.equal(withStudyTrades.books.find((b) => b.book === "rules")?.study, null);
+assert.equal(withStudyTrades.trades.length, 11);
+assert.equal(withStudyTrades.studyTrades.length, 8);
+assert.match(renderWeekMd(withStudyTrades), /Study tier/);
+assert.match(renderWeekMd(withStudyTrades), /do not pick the winner/);
+assert.doesNotMatch(renderWeekMd(winner), /Study tier/);
+
+const spend = projectQuietSpend(true);
+const baseline = projectQuietSpend(false);
+assert.ok(spend.totalUsd <= spend.hardCapUsd, `boost spend ${spend.totalUsd} over $3`);
+assert.ok(baseline.totalUsd <= 3);
+assert.ok(spend.extraRows.grok > 0 && spend.extraRows.claude > 0 && spend.extraRows.gpt > 0);
+assert.equal(spend.studyFillsPerAiBook, 8);
+assert.equal(spend.qualityListCapReportDay, 8);
+console.log("study-boost projection", JSON.stringify({ boost: spend, baseline }, null, 2));
 
 console.log("ai-trader-books-check: ok");

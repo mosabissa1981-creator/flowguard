@@ -56,6 +56,8 @@ function OpenRow({ p }: { p: PaperPosition }) {
         <div className="min-w-0 font-mono text-sm font-semibold">
           {contractLabel(p)}
           <span className="ml-2 text-[11px] font-normal text-muted-foreground">{SOURCE[p.source] ?? p.source}</span>
+          {p.tier === "study" ? <span className="ml-2 text-[10px] font-normal uppercase tracking-wider text-amber-200/90">study</span> : null}
+          {p.tier === "quality" && AI_BOOKS.has(p.book) ? <span className="ml-2 text-[10px] font-normal uppercase tracking-wider text-sky-200/70">quality</span> : null}
         </div>
         <span className={cn("shrink-0 font-mono text-sm", pnl == null ? "text-muted-foreground" : tone(pnl))}>{pnl == null ? "no mark yet" : signed(pnl)}</span>
       </div>
@@ -135,7 +137,10 @@ function AiTraderBlock({ panel, books, open, closed }: { panel: AiPanel | null; 
       <p className="text-[11px] text-muted-foreground">
         Main source: {panel?.mainSource ?? "rules"}
         {panel?.mainSourceWhy ? ` · ${panel.mainSourceWhy}` : ""}. Each book paper-fills only its own takes from the shared wide pool, after the quality floor
-        (spread ≤ 4%, ask ≥ $2, premium ≥ $100k, score ≥ 90). Friday score picks the next week's main source.
+        (spread ≤ 4%, ask ≥ $2, premium ≥ $100k, score ≥ 90). Friday score picks the next week's main source from the quality tier only.
+        {panel?.studyBoost.on
+          ? ` Study boost is on through ${panel.studyBoost.until}: report-day list cap is ${panel.studyBoost.fillCap}, and each AI book may also fill up to ${panel.studyBoost.fillCap} study-tier takes that miss that floor and pass the live 10% spread gate.`
+          : ""}
       </p>
       {books.length > 0 ? <div className="mt-2"><BookTable books={books} /></div> : null}
       {week ? (
@@ -171,6 +176,35 @@ function AiTraderBlock({ panel, books, open, closed }: { panel: AiPanel | null; 
               </tbody>
             </table>
           </div>
+          {week.books.some((b) => (b.study?.trades ?? 0) > 0 || (b.study?.pending ?? 0) > 0) ? (
+            <div className="mt-2">
+              <div className="text-[11px] text-amber-100">Study tier (not used for the winner)</div>
+              <div className="mt-1 overflow-x-auto">
+                <table className="w-full font-mono text-[11px]">
+                  <thead className="text-muted-foreground">
+                    <tr>
+                      <th className="py-1 text-left font-normal">Book</th>
+                      <th className="py-1 text-right font-normal">Trades</th>
+                      <th className="py-1 text-right font-normal">Win</th>
+                      <th className="py-1 text-right font-normal">Avg</th>
+                      <th className="py-1 text-right font-normal">P&L</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {week.books.filter((b) => b.study).map((b) => (
+                      <tr key={b.book} className="border-t border-border/40">
+                        <td className="py-1 pr-2">{b.label}</td>
+                        <td className="py-1 text-right">{b.study?.trades ?? 0}</td>
+                        <td className="py-1 text-right">{b.study?.winRatePct == null ? "—" : `${b.study.winRatePct}%`}</td>
+                        <td className={cn("py-1 text-right", tone(b.study?.avgReturnPct ?? 0))}>{pct(b.study?.avgReturnPct ?? null)}</td>
+                        <td className={cn("py-1 text-right", tone(b.study?.totalPnlUsd ?? 0))}>{signed(b.study?.totalPnlUsd ?? 0)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : null}
           <p className="mt-1 text-[10px] text-muted-foreground">
             {week.studyWritten ? `Written to ${week.studyMd}` : `Shown here. Writes ${week.studyJson} when the process can save files.`}
           </p>

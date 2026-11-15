@@ -7,7 +7,7 @@ import { loadLotteryBook } from "@/lib/lottery";
 import { loadPutsBook } from "@/lib/puts";
 import { addSessions, liveTimeStopDate, STOP_PCT_WHOLE, TARGET_PCT_WHOLE, HOLD_SESSIONS } from "@/lib/exit-plan";
 import { gatherAiTraderFills, loadAiTraderPanel, maybeScoreAiTraderWeek } from "@/lib/ai-trader-books";
-import { askClearsFloor, type AiTraderPanel } from "@/lib/ai-trader-books-core";
+import { askClearsFloor, type AiTraderPanel, type AiTraderTier } from "@/lib/ai-trader-books-core";
 import { blockedByRiskOffPuts, loadRiskOff, unknownRiskOff } from "@/lib/risk-off";
 import { toNumber } from "@/lib/numbers";
 import { tradingDateET } from "@/lib/session";
@@ -236,8 +236,12 @@ type Candidate = {
   /** Main-book copy of the selected AI-trader source. */
   drivenBy?: AiTraderSource | null;
   drivenByWhy?: string | null;
-  /** Re-check the $2 ask floor at the live quote. */
+  /** Re-check the $2 ask floor at the live quote. Quality tier only. */
   qualityFloor?: boolean;
+  /** AI-trader tier. Study uses the 10% live spread gate and does not require a $2 ask. */
+  tier?: AiTraderTier | null;
+  /** Overrides the book's open-risk cap for this fill (study boost on the AI books). */
+  openRiskCapPct?: number;
 };
 
 async function gatherCandidates(today: string, startedAt: string, open: PaperPosition[], closed: PaperClosed[]): Promise<Candidate[]> {
@@ -337,7 +341,7 @@ async function gatherCandidates(today: string, startedAt: string, open: PaperPos
   // Competing AI-trader books + the main-book copy of the selected source. Reuses stored take/pass rows.
   const held = [...open, ...closed]
     .filter((p) => p.day === today)
-    .map((p) => ({ book: p.book, ticker: p.ticker, contract: p.contract }));
+    .map((p) => ({ book: p.book, ticker: p.ticker, contract: p.contract, tier: p.tier ?? ("quality" as const) }));
   const aiFills = await gatherAiTraderFills({
     today,
     startedAtMs: startMs,
@@ -365,7 +369,9 @@ async function gatherCandidates(today: string, startedAt: string, open: PaperPos
       spreadMaxPct: f.spreadMaxPct,
       drivenBy: f.drivenBy,
       drivenByWhy: f.drivenByWhy,
-      qualityFloor: true,
+      qualityFloor: f.tier !== "study",
+      tier: f.tier,
+      openRiskCapPct: f.openRiskCapPct,
     });
   }
   return out;
@@ -474,19 +480,21 @@ async function runTick(opts: { force?: boolean; ai?: AiPicksResponse | null; now
         skip("Contract already expired.");
         continue;
       }
-      // LIVE puts rule for main + lanes + AI-trader books: ETF/index puts only (lottery / puts test books unchanged).
-      if ((c.book === "main" || c.book === "lanes" || c.qualityFloor) && blockedByPutsRule(c.side, c.ticker, c.issueType)) {
+      // LIVE puts rule for main + lanes + AI-trader books (quality and study): ETF/index puts only.
+      const spreadGated = c.book === "main" || c.book === "lanes" || c.qualityFloor || c.tier === "study";
+      if (spreadGated && blockedByPutsRule(c.side, c.ticker, c.issueType)) {
         skip(`${SINGLE_STOCK_PUT_REASON} (live rule)`);
         continue;
       }
-      // Spread at entry: live UW NBBO, else the alert's bid/ask. LIVE 10% rule for main + lanes.
-      // AI-trader fills (and the main copy of them) use the 4% quality floor instead.
+      // Spread at entry: live UW NBBO, else the alert's bid/ask. LIVE 10% rule for main, lanes, and study.
+      // Quality-tier AI fills (and the main copy of them) use the 4% quality floor instead.
       const lq = quotes[c.contract];
       const liveNbbo = lq && lq.quality !== "flow_print" ? { bid: lq.bid, ask: lq.ask } : null;
-      const gatePct = c.qualityFloor ? (c.spreadMaxPct ?? SPREAD_MAX_PCT) : SPREAD_MAX_PCT;
+      const gatePct = c.qualityFloor || c.tier === "study" ? (c.spreadMaxPct ?? SPREAD_MAX_PCT) : SPREAD_MAX_PCT;
       const entrySpread: SpreadInfo = resolveSpread(liveNbbo, { bid: c.alertBid, ask: c.alertAsk }, now.toISOString(), gatePct);
-      if ((c.book === "main" || c.book === "lanes" || c.qualityFloor) && entrySpread.status === "wide") {
-        skip(`${spreadSkipReason(entrySpread)} (${c.qualityFloor ? "quality floor" : "live rule"}: over ${Math.round(gatePct * 100)}% of mid)`);
+      if (spreadGated && entrySpread.status === "wide") {
+        const which = c.qualityFloor ? "quality floor" : "live rule";
+        skip(`${spreadSkipReason(entrySpread)} (${which}: over ${Math.round(gatePct * 100)}% of mid)`);
         continue;
       }
       if (c.qualityFloor && !askClearsFloor(liveNbbo?.ask, c.alertAsk)) {
@@ -501,7 +509,8 @@ async function runTick(opts: { force?: boolean; ai?: AiPicksResponse | null; now
       const book = bal.books[c.book];
       const openCost = state.positions.filter((p) => p.book === c.book).reduce((s, p) => s + p.costUsd, 0);
       // Size off book value at cost (cash + open cost), so open trades don't shrink the next size.
-      const size = sizeTrade(fill.price, book.balance + openCost, openCost, SIZING[c.book]);
+      const sizing = c.openRiskCapPct != null ? { ...SIZING[c.book], openRiskCapPct: c.openRiskCapPct } : SIZING[c.book];
+      const size = sizeTrade(fill.price, book.balance + openCost, openCost, sizing);
       if (!size.ok) {
         skip(size.reason);
         // TRACKING ONLY: the 1-contract > 5% rule hides expensive picks from the study, so follow them at
@@ -566,7 +575,14 @@ async function runTick(opts: { force?: boolean; ai?: AiPicksResponse | null; now
         entrySpread,
         drivenBy: c.drivenBy ?? null,
         drivenByWhy: c.drivenByWhy ?? null,
-        note: c.drivenByWhy ? `Main source: ${c.drivenByWhy}` : c.loggedAt ? `Logged ${c.loggedAt}` : undefined,
+        tier: c.tier ?? null,
+        note: [
+          c.tier === "study" ? "Study tier — live floor, outside the quality contest" : c.tier === "quality" ? "Quality tier" : null,
+          c.drivenByWhy ? `Main source: ${c.drivenByWhy}` : null,
+          !c.drivenByWhy && c.loggedAt ? `Logged ${c.loggedAt}` : null,
+        ]
+          .filter(Boolean)
+          .join(" · ") || undefined,
         lastMark: null,
       });
       book.balance = round2(book.balance - size.costUsd);
@@ -833,8 +849,10 @@ function buildView(s: PaperState, now: Date, aiTrader?: AiTraderPanel | null): P
     aiTrader: aiTrader ?? null,
     rules: [
       "Start $10,000 per book. Headline = main. Main fills the weekly AI-trader winner (rules-only quality book until a winner) plus Premove. It does not fill Grok AI-picks takes. Grok, Claude, GPT, and rules-only are separate books.",
-      "AI-trader quality floor, before any of those books fill: spread ≤ 4% of mid, ask ≥ $2, premium ≥ $100k, score ≥ 90. Puts stay ETF/index only, risk-off still holds ETF puts back, and the issuer/sector caps plus the report-day 3-pick cap still apply.",
-      "Size: 2% of the book balance per trade (min 1 contract); skip if 1 contract > 5% of balance; total open cost ≤ 10%. Lottery: 0.5% per trade, open ≤ 5%. The AI-trader books use the main size.",
+      aiTrader?.studyBoost.on
+        ? `Study boost is on through ${aiTrader.studyBoost.until}. Quality fills use a list cap of at least ${aiTrader.studyBoost.fillCap} (report-day rises from 3; calm stays 10). Each AI book also paper-fills up to ${aiTrader.studyBoost.fillCap} study-tier takes that miss the quality floor and pass the live floor (spread ≤ 10%). Issuer/sector caps, ETF/index puts, and the risk-off hold-back stay. The Friday winner and main still use the quality tier only. AI-book open cost may reach ${Math.round(aiTrader.studyBoost.openRiskCapPct * 100)}% so those fills can land. Set FLOWGUARD_AI_TRADER_STUDY_BOOST=0 to turn this off.`
+        : "AI-trader quality floor, before any of those books fill: spread ≤ 4% of mid, ask ≥ $2, premium ≥ $100k, score ≥ 90. Puts stay ETF/index only, risk-off still holds ETF puts back, and the issuer/sector caps plus the report-day 3-pick cap still apply.",
+      "Size: 2% of the book balance per trade (min 1 contract); skip if 1 contract > 5% of balance; total open cost ≤ 10% (AI books use a wider open cap only while the study boost is on). Lottery: 0.5% per trade, open ≤ 5%.",
       "Fill: buy at the live UW ask when the pick is taken; no ask → alert price +5%.",
       "Exit: sell at the live bid when it reaches the pick's target or stop (same % as its exit plan, applied to the fill), or at the time stop (15:30 ET on its date). No bid → last −5%.",
       "Lottery: +100% take-profit, no stop, out by 15:30 ET on expiry day. Earnings calendar: net debit, exits at the given time.",

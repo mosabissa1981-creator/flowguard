@@ -87,3 +87,30 @@ export function testModeGrokBatchFits(spentUsd: number, batchUsd: number): boole
   if (spent >= TEST_MODE_GROK_DAY_CAP_USD) return false;
   return Math.round((spent + batchUsd) * 10000) / 10000 <= TEST_MODE_GROK_DAY_CAP_USD;
 }
+
+/**
+ * True when this lane's next batch still fits under the $3 quiet-test total.
+ * `docSpend` is the lane's own counter, used when it is ahead of Redis.
+ * A failed read refuses the batch (the cap could not be checked).
+ */
+export async function quietTestBatchGate(
+  day: string,
+  scope: LedgerScope,
+  docSpend: number,
+  ceilingUsd: number,
+): Promise<{ ok: true; spent: number } | { ok: false; spent: number; reason: string }> {
+  let spent: number;
+  try {
+    spent = await testModeGrokSpend(day, { [scope]: docSpend });
+  } catch {
+    return { ok: false, spent: -1, reason: "test-mode AI total unreadable — batch skipped" };
+  }
+  if (!testModeGrokBatchFits(spent, ceilingUsd)) {
+    return {
+      ok: false,
+      spent,
+      reason: `test-mode AI total cap $${TEST_MODE_GROK_DAY_CAP_USD.toFixed(2)} (spent $${spent.toFixed(2)}, batch ~$${ceilingUsd.toFixed(4)})`,
+    };
+  }
+  return { ok: true, spent };
+}

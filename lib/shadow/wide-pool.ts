@@ -1,7 +1,8 @@
 import "server-only";
 
+import { grokWidePace, byScoreThenEarlier, studyBoostEnabled } from "@/lib/ai-trader-study-boost";
 import { kvSetNx } from "@/lib/kv";
-import { ledgerSpend } from "@/lib/llm-ledger";
+import { ledgerSpend, quietTestBatchGate } from "@/lib/llm-ledger";
 import { liveTimeStopDate } from "@/lib/exit-plan";
 import { issuerKey } from "@/lib/issuers";
 import { rankAlerts } from "@/lib/scoring";
@@ -9,7 +10,7 @@ import { tradingDateET } from "@/lib/session";
 import { getSessionTape } from "@/lib/session-tape";
 import { etClock } from "@/lib/shadow/budget";
 import { lessonsSystemPrompt, lessonsTestEnabled } from "@/lib/shadow/lessons-review";
-import { callShadowLlm, parseJsonObject, shadowLlmConfig } from "@/lib/shadow/llm";
+import { callShadowLlm, parseJsonObject, reviewBatchCeiling, shadowLlmConfig } from "@/lib/shadow/llm";
 import { loadDoc, saveDoc } from "@/lib/shadow/store";
 import type { LlmUsageRecord, ShadowDay } from "@/lib/shadow/types";
 import { fetchContractHistoric, hasUnusualWhalesKey } from "@/lib/uw";
@@ -22,13 +23,17 @@ import { gradeWide, selectWide, wideFactLine, type WideCandidate, type WideGrade
  * reviewer sees them (tiers in lib/shadow/wide-pool-core.ts), tagged "wide-pool" and stored in their OWN day doc
  * (kind "grok-wide"), so they are scored separately from the live finalists. Rides /api/shadow/tick (no new cron).
  *
- * OFF unless FLOWGUARD_GROK_WIDE=1 AND FLOWGUARD_LESSONS_TEST=1. Never touches morning / picks / premove / ai-picks / board /
- * paper / pings / Telegram, and never writes the shadow day doc (it only reads it to skip today's finalists).
+ * OFF unless FLOWGUARD_GROK_WIDE=1 AND FLOWGUARD_LESSONS_TEST=1. Never touches the morning board, picks, premove,
+ * ai-picks, pings, or Telegram, and never writes the shadow day doc (it only reads it to skip today's finalists).
+ * The study boost may paper-fill this lane's takes. It still does not change live picks.
  *
  * Cost guards:
  *  - Grok: own ledger scope "grok-wide" with its own daily cap FLOWGUARD_GROK_WIDE_USD (default $1, hard max $3); never uses
  *    the shared shadow budget. ≤ FLOWGUARD_GROK_WIDE_MAX candidates/day (default 200, hard max 1000) in batches of 20;
  *    runs 10:00–14:30 ET, ≥ 45 min apart, ≤ 100 candidates per run (≤ 7 runs → ≤ 700/day).
+ *  - Study boost (FLOWGUARD_AI_TRADER_STUDY_BOOST, default on through 2026-12-11): same window extended to 15:00 ET,
+ *    ≥ 20 min apart, ≤ 80/run, default 600/day. Each batch also stops at the $3 quiet-test total. Higher-score, earlier
+ *    rows go first. Set the flag to 0 to restore the pace above.
  *  - UW: the candidates come from the already-synced session tape with allowUw:false (0 flow calls). Grading costs one
  *    /option-contract/{id}/historic per candidate once its 2-session time stop has passed (≤ 60 per tick run, ≥ 20 min
  *    apart, ≤ 3 tries each), under the shared 35,000/day job stop (uwJobBudgetOk).
@@ -36,10 +41,6 @@ import { gradeWide, selectWide, wideFactLine, type WideCandidate, type WideGrade
 
 const KIND = "grok-wide";
 const BATCH = 20;
-const PER_RUN = 100;
-const RUN_FROM_ET = 10 * 60;
-const RUN_TO_ET = 14 * 60 + 30;
-const RUN_MIN_INTERVAL_MS = 45 * 60_000;
 const GRADE_FROM_ET = 9 * 60 + 45;
 const GRADE_PER_RUN = 60;
 const GRADE_LOCK_SEC = 20 * 60;
@@ -67,8 +68,18 @@ function envNum(name: string, def: number, max: number): number {
   return Number.isFinite(v) && v > 0 ? Math.min(v, max) : def;
 }
 
-export function grokWideLimits() {
-  return { usdCap: envNum("FLOWGUARD_GROK_WIDE_USD", 1, 3), dailyMax: Math.floor(envNum("FLOWGUARD_GROK_WIDE_MAX", 200, 1000)) };
+export function grokWideLimits(now = new Date()) {
+  const boost = studyBoostEnabled(process.env.FLOWGUARD_AI_TRADER_STUDY_BOOST, tradingDateET(now));
+  const pace = grokWidePace(boost);
+  return {
+    usdCap: envNum("FLOWGUARD_GROK_WIDE_USD", pace.usdDefault, pace.usdHard),
+    dailyMax: Math.floor(envNum("FLOWGUARD_GROK_WIDE_MAX", pace.dailyMaxDefault, pace.dailyMaxHard)),
+    boost,
+    perRun: pace.perRun,
+    intervalMs: pace.intervalMs,
+    fromEt: pace.fromEt,
+    toEt: pace.toEt,
+  };
 }
 
 function blank(day: string): WideDoc {
@@ -122,17 +133,26 @@ export function parseBatch(text: string, batch: WideCandidate[], at: string): Re
 }
 
 async function reviewStep(now: Date): Promise<string> {
+  const limits = grokWideLimits(now);
   const c = etClock(now);
-  if (!c.weekday || c.minutes < RUN_FROM_ET || c.minutes > RUN_TO_ET) return "review window 10:00–14:30 ET";
-  if (!shadowLlmConfig()) return "no LLM key";
+  if (!c.weekday || c.minutes < limits.fromEt || c.minutes > limits.toEt) {
+    return limits.boost ? "review window 10:00–15:00 ET" : "review window 10:00–14:30 ET";
+  }
+  const cfg = shadowLlmConfig();
+  if (!cfg) return "no LLM key";
   const day = tradingDateET(now);
   const doc = (await loadWideDay(day)) ?? blank(day);
   const last = doc.llm.lastRunAt ? Date.parse(doc.llm.lastRunAt) : 0;
-  if (last && now.getTime() - last < RUN_MIN_INTERVAL_MS) return "throttled (≥ 45 min between wide runs)";
-  const { usdCap, dailyMax } = grokWideLimits();
+  const gapMin = Math.round(limits.intervalMs / 60_000);
+  if (last && now.getTime() - last < limits.intervalMs) return `throttled (≥ ${gapMin} min between wide runs)`;
+  const { usdCap, dailyMax, boost, perRun } = limits;
   const spent = Math.max(doc.llm.spendUsd, await ledgerSpend("grok-wide", day).catch(() => doc.llm.spendUsd));
   if (spent >= usdCap) return `Grok wide budget $${usdCap.toFixed(2)} reached`;
-  const room = Math.min(PER_RUN, dailyMax - doc.candidates.length);
+  if (boost) {
+    const gate = await quietTestBatchGate(day, "grok-wide", doc.llm.spendUsd, 0.01);
+    if (!gate.ok) return gate.reason;
+  }
+  const room = Math.min(perRun, dailyMax - doc.candidates.length);
   if (room <= 0) return `daily cap ${dailyMax} candidates reached`;
 
   const tape = (await getSessionTape({ allowUw: false })).alerts;
@@ -143,6 +163,7 @@ async function reviewStep(now: Date): Promise<string> {
   for (const x of doc.candidates) issuerCounts[issuerKey(x.ticker)] = (issuerCounts[issuerKey(x.ticker)] ?? 0) + 1;
   const picked = selectWide(rankAlerts(tape, { now }), { now, exclude, limit: room, issuerCounts });
   if (!picked.length) return "no new wide-pool candidates";
+  if (boost) picked.sort((a, b) => byScoreThenEarlier({ score: a.score, at: a.printTimeUtc, contract: a.contract }, { score: b.score, at: b.printTimeUtc, contract: b.contract }));
 
   doc.candidates.push(...picked);
   doc.llm.lastRunAt = now.toISOString();
@@ -151,14 +172,25 @@ async function reviewStep(now: Date): Promise<string> {
   await saveDoc(KIND, day, doc); // claim the slot before billing
   const system = lessonsSystemPrompt(WIDE_RULE);
   let judged = 0;
+  let skippedForTotal = 0;
+  const attempted = new Set<string>();
   for (let i = 0; i < picked.length; i += BATCH) {
     if (doc.llm.spendUsd >= usdCap) break;
     const batch = picked.slice(i, i + BATCH);
+    const user = `As of ${now.toISOString()}. Candidates:\n${batch.map(wideFactLine).join("\n")}`;
+    if (boost) {
+      const observed = doc.llm.usage.reduce((max, u) => Math.max(max, u.costUsd), 0);
+      const ceiling = reviewBatchCeiling(cfg.model, system, user, batch.length, observed, true);
+      const gate = await quietTestBatchGate(day, "grok-wide", doc.llm.spendUsd, ceiling);
+      if (!gate.ok) {
+        doc.llm.lastError = gate.reason;
+        skippedForTotal += picked.length - i;
+        break;
+      }
+    }
+    for (const row of batch) attempted.add(row.contract);
     try {
-      const res = await callShadowLlm(
-        { module: "lessons_review_wide", system, user: `As of ${now.toISOString()}. Candidates:\n${batch.map(wideFactLine).join("\n")}` },
-        "grok-wide",
-      );
+      const res = await callShadowLlm({ module: "lessons_review_wide", system, user }, "grok-wide");
       doc.llm.usage.push(res.usage);
       doc.llm.spendUsd = Math.round((doc.llm.spendUsd + res.usage.costUsd) * 10000) / 10000;
       const got = parseBatch(res.text, batch, new Date().toISOString());
@@ -169,9 +201,14 @@ async function reviewStep(now: Date): Promise<string> {
       break;
     }
   }
+  if (boost) {
+    const drop = new Set(picked.map((c) => c.contract).filter((k) => !attempted.has(k)));
+    if (drop.size) doc.candidates = doc.candidates.filter((c) => !drop.has(c.contract));
+  }
   doc.updatedAt = new Date().toISOString();
   await saveDoc(KIND, day, doc);
-  return `reviewed ${judged}/${picked.length} new wide-pool candidates ($${doc.llm.spendUsd.toFixed(4)} today)`;
+  const capBit = skippedForTotal ? `; skipped ${skippedForTotal} under the $3 test-mode total` : "";
+  return `reviewed ${judged}/${picked.length} new wide-pool candidates ($${doc.llm.spendUsd.toFixed(4)} today)${capBit}`;
 }
 
 function priorDays(today: string, n: number): string[] {

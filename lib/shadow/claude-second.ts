@@ -1,10 +1,11 @@
 import "server-only";
 
-import { ledgerSpend, TEST_MODE_GROK_DAY_CAP_USD, testModeGrokBatchFits, testModeGrokSpend } from "@/lib/llm-ledger";
+import { byScoreThenEarlier, claudeSecondPace, studyBoostEnabled } from "@/lib/ai-trader-study-boost";
+import { ledgerSpend, TEST_MODE_GROK_DAY_CAP_USD, quietTestBatchGate } from "@/lib/llm-ledger";
 import { tradingDateET } from "@/lib/session";
 import { etClock } from "@/lib/shadow/budget";
 import { lessonsSystemPrompt } from "@/lib/shadow/lessons-review";
-import { anthropicLlmConfig, callShadowLlm, estimateCost } from "@/lib/shadow/llm";
+import { anthropicLlmConfig, callShadowLlm, reviewBatchCeiling } from "@/lib/shadow/llm";
 import { loadDoc, saveDoc } from "@/lib/shadow/store";
 import type { LlmUsageRecord } from "@/lib/shadow/types";
 import { grokWideEnabled, loadWideDay, parseBatch, WIDE_RULE, type WideDoc } from "@/lib/shadow/wide-pool";
@@ -24,17 +25,16 @@ import { wideFactLine, type WideGrade, type WideJudgement } from "@/lib/shadow/w
  *
  * Cost guards:
  *  - Claude: own ledger scope "claude-second", daily cap FLOWGUARD_CLAUDE_SECOND_USD (default $0.75, hard max $1);
- *    plus the owner's $3/day total across quiet test-mode ledgers (shadow + grok-wide + grok-gex-dex + claude-second).
+ *    plus the owner's $3/day total across quiet test-mode ledgers (shadow + grok-wide + grok-gex-dex + claude-second + gpt-third).
  *    ≤ FLOWGUARD_CLAUDE_SECOND_MAX candidates/day (default 300, hard max 500), ≤ 60 per run in batches of 20, ≥ 40 min apart.
+ *  - Study boost (FLOWGUARD_AI_TRADER_STUDY_BOOST, default on through 2026-12-11): ≥ 20 min apart, ≤ 80/run,
+ *    default 600/day, lane cap default $1.25 (hard max $1.50). Rows are judged highest-score then earliest first,
+ *    and a batch that would cross $3 is not claimed so a later run can retry it. Set the flag to 0 to restore the pace above.
  *  - UW: 0 calls (reuses the wide doc's candidates / grades).
  */
 
 const KIND = "claude-second";
 const BATCH = 20;
-const PER_RUN = 60;
-const RUN_FROM_ET = 10 * 60;
-const RUN_TO_ET = 15 * 60;
-const RUN_MIN_INTERVAL_MS = 40 * 60_000;
 /** Do not start in the same few minutes the wide step just billed (keeps one heavy LLM job per tick). */
 const WIDE_COOLDOWN_MS = 4 * 60_000;
 
@@ -60,10 +60,17 @@ function envNum(name: string, def: number, max: number): number {
   return Number.isFinite(v) && v > 0 ? Math.min(v, max) : def;
 }
 
-export function claudeSecondLimits() {
+export function claudeSecondLimits(now = new Date()) {
+  const boost = studyBoostEnabled(process.env.FLOWGUARD_AI_TRADER_STUDY_BOOST, tradingDateET(now));
+  const pace = claudeSecondPace(boost);
   return {
-    usdCap: envNum("FLOWGUARD_CLAUDE_SECOND_USD", 0.75, 1),
-    dailyMax: Math.floor(envNum("FLOWGUARD_CLAUDE_SECOND_MAX", 300, 500)),
+    usdCap: envNum("FLOWGUARD_CLAUDE_SECOND_USD", pace.usdDefault, pace.usdHard),
+    dailyMax: Math.floor(envNum("FLOWGUARD_CLAUDE_SECOND_MAX", pace.dailyMaxDefault, pace.dailyMaxHard)),
+    boost,
+    perRun: pace.perRun,
+    intervalMs: pace.intervalMs,
+    fromEt: pace.fromEt,
+    toEt: pace.toEt,
   };
 }
 
@@ -85,8 +92,9 @@ export async function loadClaudeSecondDay(day: string): Promise<ClaudeSecondDoc 
 }
 
 async function reviewStep(now: Date): Promise<{ note: string; uwCalls: number }> {
+  const limits = claudeSecondLimits(now);
   const c = etClock(now);
-  if (!c.weekday || c.minutes < RUN_FROM_ET || c.minutes > RUN_TO_ET) return { note: "review window 10:00–15:00 ET", uwCalls: 0 };
+  if (!c.weekday || c.minutes < limits.fromEt || c.minutes > limits.toEt) return { note: "review window 10:00–15:00 ET", uwCalls: 0 };
   const cfg = anthropicLlmConfig();
   if (!cfg) return { note: "no ANTHROPIC_API_KEY", uwCalls: 0 };
   const day = tradingDateET(now);
@@ -96,26 +104,24 @@ async function reviewStep(now: Date): Promise<{ note: string; uwCalls: number }>
   if (wideLast && now.getTime() - wideLast < WIDE_COOLDOWN_MS) return { note: "wide step just ran — next tick", uwCalls: 0 };
   const doc = (await loadClaudeSecondDay(day)) ?? blank(day);
   const last = doc.llm.lastRunAt ? Date.parse(doc.llm.lastRunAt) : 0;
-  if (last && now.getTime() - last < RUN_MIN_INTERVAL_MS) return { note: "throttled (≥ 40 min between Claude runs)", uwCalls: 0 };
-  const { usdCap, dailyMax } = claudeSecondLimits();
+  const gapMin = Math.round(limits.intervalMs / 60_000);
+  if (last && now.getTime() - last < limits.intervalMs) return { note: `throttled (≥ ${gapMin} min between Claude runs)`, uwCalls: 0 };
+  const { usdCap, dailyMax, boost, perRun } = limits;
   const spent = Math.max(doc.llm.spendUsd, await ledgerSpend("claude-second", day).catch(() => doc.llm.spendUsd));
   if (spent >= usdCap) return { note: `Claude second budget $${usdCap.toFixed(2)} reached`, uwCalls: 0 };
-  let quietNow: number;
-  try {
-    quietNow = await testModeGrokSpend(day, { "claude-second": doc.llm.spendUsd });
-  } catch {
-    return { note: "test-mode AI total unreadable — batch skipped", uwCalls: 0 };
-  }
-  if (quietNow >= TEST_MODE_GROK_DAY_CAP_USD) return { note: `test-mode AI total $${TEST_MODE_GROK_DAY_CAP_USD.toFixed(2)} reached`, uwCalls: 0 };
-  const room = Math.min(PER_RUN, dailyMax - doc.reviewed.length);
+  const opened = await quietTestBatchGate(day, "claude-second", doc.llm.spendUsd, 0.01);
+  if (!opened.ok) return { note: opened.reason, uwCalls: 0 };
+  const room = Math.min(perRun, dailyMax - doc.reviewed.length);
   if (room <= 0) return { note: `daily cap ${dailyMax} candidates reached`, uwCalls: 0 };
 
-  // Same rows the current Grok judged (so the comparison is like for like), oldest first.
+  // Same rows Grok already judged. Boost spends the budget on higher-score, earlier rows first.
   const done = new Set(doc.reviewed);
-  const todo = wide.candidates.filter((x) => wide.judgements[x.contract] && !done.has(x.contract)).slice(0, room);
+  const pending = wide.candidates.filter((x) => wide.judgements[x.contract] && !done.has(x.contract));
+  if (boost) pending.sort((a, b) => byScoreThenEarlier({ score: a.score, at: a.printTimeUtc, contract: a.contract }, { score: b.score, at: b.printTimeUtc, contract: b.contract }));
+  const todo = pending.slice(0, room);
   if (!todo.length) return { note: "no new judged wide rows", uwCalls: 0 };
 
-  doc.reviewed.push(...todo.map((x) => x.contract));
+  if (!boost) doc.reviewed.push(...todo.map((x) => x.contract));
   doc.llm.lastRunAt = now.toISOString();
   doc.llm.lastError = undefined;
   doc.updatedAt = now.toISOString();
@@ -127,22 +133,21 @@ async function reviewStep(now: Date): Promise<{ note: string; uwCalls: number }>
   for (let i = 0; i < todo.length; i += BATCH) {
     if (doc.llm.spendUsd >= usdCap) break;
     const batch = todo.slice(i, i + BATCH);
-    const lines = batch.map((x) => wideFactLine(x)).join("\n");
-    const user = `As of ${now.toISOString()}. Candidates:\n${lines}`;
+    const user = `As of ${now.toISOString()}. Candidates:\n${batch.map((x) => wideFactLine(x)).join("\n")}`;
     const observed = doc.llm.usage.reduce((max, u) => Math.max(max, u.costUsd), 0);
-    const ceiling = Math.max(claudeBatchUsdCeiling(system, user, batch.length, cfg.model), observed);
-    let quietSpend: number;
-    try {
-      quietSpend = await testModeGrokSpend(day, { "claude-second": doc.llm.spendUsd });
-    } catch {
-      doc.llm.lastError = "test-mode AI total unreadable — batch skipped";
-      skippedForTotal += todo.length - i;
-      break;
-    }
-    if (!testModeGrokBatchFits(quietSpend, ceiling)) {
-      doc.llm.lastError = `test-mode AI total cap $${TEST_MODE_GROK_DAY_CAP_USD.toFixed(2)} (spent $${quietSpend.toFixed(2)}, batch ~$${ceiling.toFixed(4)})`;
-      skippedForTotal += batch.length;
+    const formula = reviewBatchCeiling(cfg.model, system, user, batch.length, 0, false);
+    const ceiling = boost ? reviewBatchCeiling(cfg.model, system, user, batch.length, observed, true) : Math.max(formula, observed);
+    const gate = await quietTestBatchGate(day, "claude-second", doc.llm.spendUsd, ceiling);
+    if (!gate.ok) {
+      doc.llm.lastError = gate.reason;
+      skippedForTotal += boost ? todo.length - i : batch.length;
+      if (boost) break;
       continue;
+    }
+    if (boost) {
+      doc.reviewed.push(...batch.map((x) => x.contract));
+      doc.updatedAt = new Date().toISOString();
+      await saveDoc(KIND, day, doc);
     }
     try {
       const res = await callShadowLlm(
@@ -163,13 +168,6 @@ async function reviewStep(now: Date): Promise<{ note: string; uwCalls: number }>
   await saveDoc(KIND, day, doc);
   const capBit = skippedForTotal ? `; skipped ${skippedForTotal} under the $${TEST_MODE_GROK_DAY_CAP_USD.toFixed(2)} test-mode total` : "";
   return { note: `Claude-reviewed ${judged}/${todo.length} rows ($${doc.llm.spendUsd.toFixed(4)} today)${capBit}`, uwCalls: 0 };
-}
-
-/** Pre-call ceiling for one batch. Provider cost is known only after the call, so the $3 total is checked against this upper bound. */
-function claudeBatchUsdCeiling(system: string, user: string, rows: number, model: string): number {
-  const inTok = Math.ceil((system.length + user.length) / 3);
-  const outTok = 1500 + Math.max(rows, 1) * 250;
-  return Math.round(estimateCost(model, inTok, 0, outTok, 0, 0) * 10000) / 10000;
 }
 
 /** One Claude-lane pass for /api/shadow/tick. Never throws into the tick (the step wrapper catches). */

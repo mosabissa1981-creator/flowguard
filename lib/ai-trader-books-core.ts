@@ -1,3 +1,11 @@
+import {
+  AI_TRADER_BOOST_FILL_CAP,
+  AI_TRADER_BOOST_OPEN_RISK,
+  AI_TRADER_LIVE_MIN_PREMIUM,
+  AI_TRADER_LIVE_MIN_SCORE,
+  AI_TRADER_LIVE_SPREAD_MAX,
+  AI_TRADER_STUDY_BOOST_END,
+} from "@/lib/ai-trader-study-boost";
 import { issuerKey, sectorOf, type ConcentrationCaps } from "@/lib/issuers";
 import type { AiTraderSource, PaperBookId } from "@/lib/paper-core";
 
@@ -28,6 +36,15 @@ export const AI_TRADER_FLOOR = {
   minPremiumUsd: AI_TRADER_MIN_PREMIUM,
   minScore: AI_TRADER_MIN_SCORE,
 } as const;
+
+/** Live floor for the study tier: spread ≤ 10%, premium ≥ $10k, score ≥ 45. No $2 ask minimum. */
+export const AI_TRADER_LIVE_FLOOR = {
+  spreadMaxPct: AI_TRADER_LIVE_SPREAD_MAX,
+  minPremiumUsd: AI_TRADER_LIVE_MIN_PREMIUM,
+  minScore: AI_TRADER_LIVE_MIN_SCORE,
+} as const;
+
+export type AiTraderTier = "quality" | "study";
 
 export const AI_TRADER_BOOK_ID: Record<AiTraderSource, PaperBookId> = {
   grok: "ai-grok",
@@ -85,9 +102,13 @@ export type AiTraderFill = {
   alertAsk: number;
   issueType: "ETF" | "Common Stock";
   spreadMaxPct: number;
+  /** "quality" clears the 4% / $2 / $100k / 90 floor. "study" misses that and clears the live floor. */
+  tier: AiTraderTier;
+  /** Set on AI-book fills while the study boost is on, so 8 fills can sit open. Main stays at the book default. */
+  openRiskCapPct?: number;
 };
 
-export type HeldSlot = { book: string; ticker: string; contract: string };
+export type HeldSlot = { book: string; ticker: string; contract: string; tier?: AiTraderTier | null };
 
 export type AiTraderCaps = ConcentrationCaps & { listCap: number };
 
@@ -108,6 +129,17 @@ export function qualityFloorReason(row: Pick<AiTraderRow, "spreadPct" | "ask" | 
   if (!(row.ask >= AI_TRADER_MIN_ASK)) return `Quality floor: ask $${row.ask} is under $${AI_TRADER_MIN_ASK}.`;
   if (!(row.premiumUsd >= AI_TRADER_MIN_PREMIUM)) return `Quality floor: premium $${Math.round(row.premiumUsd)} is under $100k.`;
   if (!(row.score >= AI_TRADER_MIN_SCORE)) return `Quality floor: score ${row.score} is under 90.`;
+  return null;
+}
+
+/** Live floor (spread ≤ 10%, premium ≥ $10k, score ≥ 45). Null means the row may enter the study tier. */
+export function liveFloorReason(row: Pick<AiTraderRow, "spreadPct" | "premiumUsd" | "score">): string | null {
+  if (row.spreadPct == null || !(row.spreadPct <= AI_TRADER_LIVE_SPREAD_MAX + 1e-9)) {
+    const shown = row.spreadPct == null ? "unknown" : `${(row.spreadPct * 100).toFixed(1)}%`;
+    return `Live floor: spread ${shown} is over 10% of mid.`;
+  }
+  if (!(row.premiumUsd >= AI_TRADER_LIVE_MIN_PREMIUM)) return `Live floor: premium $${Math.round(row.premiumUsd)} is under $10k.`;
+  if (!(row.score >= AI_TRADER_LIVE_MIN_SCORE)) return `Live floor: score ${row.score} is under ${AI_TRADER_LIVE_MIN_SCORE}.`;
   return null;
 }
 
@@ -201,7 +233,15 @@ export function applyDayCaps(rows: AiTraderRow[], held: HeldSlot[], caps: AiTrad
   return out;
 }
 
-function toFill(row: AiTraderRow, book: PaperBookId, source: AiTraderSource, drivenBy: AiTraderSource | null, why: string | null): AiTraderFill {
+function toFill(
+  row: AiTraderRow,
+  book: PaperBookId,
+  source: AiTraderSource,
+  drivenBy: AiTraderSource | null,
+  why: string | null,
+  tier: AiTraderTier,
+  loosenOpenRisk: boolean,
+): AiTraderFill {
   return {
     book,
     source,
@@ -216,14 +256,24 @@ function toFill(row: AiTraderRow, book: PaperBookId, source: AiTraderSource, dri
     alertBid: row.spreadPct == null ? null : bidFromAskSpread(row.ask, row.spreadPct),
     alertAsk: row.ask,
     issueType: row.etf ? "ETF" : "Common Stock",
-    spreadMaxPct: AI_TRADER_SPREAD_MAX,
+    spreadMaxPct: tier === "study" ? AI_TRADER_LIVE_SPREAD_MAX : AI_TRADER_SPREAD_MAX,
+    tier,
+    openRiskCapPct: loosenOpenRisk && book !== "main" ? AI_TRADER_BOOST_OPEN_RISK : undefined,
   };
+}
+
+function heldFor(held: HeldSlot[], book: PaperBookId, tier: AiTraderTier): HeldSlot[] {
+  return held.filter((h) => h.book === book && (tier === "study" ? h.tier === "study" : h.tier !== "study"));
 }
 
 /**
  * One day's fills. Quality floor and the puts / risk-off guards run first.
  * Each book then keeps only its takes (rules keeps every surviving row) inside the issuer, sector, and list caps.
- * Main receives a second capped copy of the selected source, counting today's main holds (including Premove).
+ * Main receives a second capped copy of the selected source's quality rows, counting today's main holds (including Premove).
+ *
+ * Study boost (opts.studyBoost): the quality list cap is at least 8 (report-day 3 becomes 8; calm stays 10).
+ * Issuer and sector caps stay. Each AI book also paper-fills up to 8 takes that miss the quality floor and
+ * pass the live floor, tagged tier "study". Those do not copy onto main and do not enter the Friday winner.
  */
 export function selectAiTraderFills(
   rows: AiTraderRow[],
@@ -234,22 +284,38 @@ export function selectAiTraderFills(
     mainSource: AiTraderSource;
     mainSourceWhy: string;
     notBeforeMs?: number | null;
+    studyBoost?: boolean;
   },
 ): AiTraderFill[] {
-  const caps = capsForRegime(opts.regimeLabel);
+  const regimeCaps = capsForRegime(opts.regimeLabel);
+  const boost = Boolean(opts.studyBoost);
+  const caps = boost ? { ...regimeCaps, listCap: Math.max(regimeCaps.listCap, AI_TRADER_BOOST_FILL_CAP) } : regimeCaps;
   const eligible = eligibleRows(rows, opts.blockEtfPuts, opts.notBeforeMs ?? null);
   const out: AiTraderFill[] = [];
   const picked = new Map<AiTraderSource, AiTraderRow[]>();
   const sources: AiTraderSource[] = ["grok", "claude", "gpt", "rules"];
   for (const source of sources) {
-    const held = opts.held.filter((h) => h.book === AI_TRADER_BOOK_ID[source]);
-    const rowsForBook = applyDayCaps(judged(eligible, source), held, caps);
+    const book = AI_TRADER_BOOK_ID[source];
+    const rowsForBook = applyDayCaps(judged(eligible, source), heldFor(opts.held, book, "quality"), caps);
     picked.set(source, rowsForBook);
-    for (const row of rowsForBook) out.push(toFill(row, AI_TRADER_BOOK_ID[source], source, null, null));
+    for (const row of rowsForBook) out.push(toFill(row, book, source, null, null, "quality", boost));
   }
   const mainHeld = opts.held.filter((h) => h.book === "main");
   for (const row of applyDayCaps(picked.get(opts.mainSource) ?? [], mainHeld, caps)) {
-    out.push(toFill(row, "main", opts.mainSource, opts.mainSource, opts.mainSourceWhy));
+    out.push(toFill(row, "main", opts.mainSource, opts.mainSource, opts.mainSourceWhy, "quality", false));
+  }
+  if (!boost) return out;
+  const notBefore = opts.notBeforeMs ?? null;
+  const studyRows = rows.filter((row) => {
+    if (!qualityFloorReason(row) || liveFloorReason(row) || hardGuardReason(row, opts.blockEtfPuts)) return false;
+    if (notBefore != null && row.firstSeenAt && Date.parse(row.firstSeenAt) < notBefore) return false;
+    return true;
+  });
+  const studyCaps = { ...regimeCaps, listCap: AI_TRADER_BOOST_FILL_CAP };
+  for (const source of ["grok", "claude", "gpt"] as const) {
+    const book = AI_TRADER_BOOK_ID[source];
+    const rowsForBook = applyDayCaps(judged(studyRows, source), heldFor(opts.held, book, "study"), studyCaps);
+    for (const row of rowsForBook) out.push(toFill(row, book, source, null, null, "study", true));
   }
   return out;
 }
@@ -262,6 +328,8 @@ export type PaperTradeInput = {
   returnPct: number;
   pnlUsd: number;
   closed: boolean;
+  /** Missing means quality (fills opened before the study tier). */
+  tier?: AiTraderTier;
 };
 
 export type BookWeekStats = {
@@ -284,6 +352,18 @@ export type BookWeekStats = {
   takePending: number;
   passPending: number;
   vsRulesPct: number | null;
+  /** Study-tier paper fills. Null on the rules book (it has no study tier). Not used to pick the winner. */
+  study: TierWeekStats | null;
+};
+
+export type TierWeekStats = {
+  trades: number;
+  pending: number;
+  wins: number;
+  losses: number;
+  winRatePct: number | null;
+  avgReturnPct: number | null;
+  totalPnlUsd: number;
 };
 
 export type WeekScore = {
@@ -299,7 +379,10 @@ export type WeekScore = {
   winner: "grok" | "claude" | "gpt" | null;
   winnerReason: string;
   books: BookWeekStats[];
+  /** Quality-tier paper fills only. These, plus the rules book, pick the winner. */
   trades: PaperTradeInput[];
+  /** Study-tier paper fills. Reported separately. They do not pick the winner or move main. */
+  studyTrades: PaperTradeInput[];
   studyJson: string;
   studyMd: string;
   /** True when this run wrote the study files. False on a read-only host (the card still has the score). */
@@ -376,31 +459,51 @@ export function pickWinner(books: BookWeekStats[]): { winner: "grok" | "claude" 
   };
 }
 
+function tierStats(mine: PaperTradeInput[], pending: number): TierWeekStats {
+  const wins = mine.filter((t) => t.returnPct > 0).length;
+  return {
+    trades: mine.length,
+    pending,
+    wins,
+    losses: mine.length - wins,
+    winRatePct: mine.length ? Math.round((wins / mine.length) * 100) : null,
+    avgReturnPct: avg(mine.map((t) => t.returnPct)),
+    totalPnlUsd: round2(mine.reduce((s, t) => s + t.pnlUsd, 0)),
+  };
+}
+
+function tradeSort(a: PaperTradeInput, b: PaperTradeInput): number {
+  return a.day.localeCompare(b.day) || a.book.localeCompare(b.book) || a.contract.localeCompare(b.contract);
+}
+
 export function buildWeekScore(args: {
   week: { weekStart: string; weekEnd: string; days: string[] };
   generatedAt: string;
   trades: PaperTradeInput[];
   pending: Partial<Record<AiTraderSource, number>>;
+  studyPending?: Partial<Record<AiTraderSource, number>>;
   decisions: Record<AiTraderSource, { takes: Array<number | null>; passes: Array<number | null> }>;
 }): WeekScore {
-  const rulesAvg = avg(args.trades.filter((t) => t.book === "rules").map((t) => t.returnPct));
+  const quality = args.trades.filter((t) => t.tier !== "study");
+  const study = args.trades.filter((t) => t.tier === "study" && t.book !== "rules");
+  const rulesAvg = avg(quality.filter((t) => t.book === "rules").map((t) => t.returnPct));
   const books: BookWeekStats[] = SOURCES.map((book) => {
-    const mine = args.trades.filter((t) => t.book === book);
-    const wins = mine.filter((t) => t.returnPct > 0).length;
-    const losses = mine.length - wins;
-    const avgReturnPct = avg(mine.map((t) => t.returnPct));
+    const mine = quality.filter((t) => t.book === book);
+    const stats = tierStats(mine, args.pending[book] ?? 0);
+    const avgReturnPct = stats.avgReturnPct;
     const takes = sideOf(args.decisions[book]?.takes ?? []);
     const passes = sideOf(args.decisions[book]?.passes ?? []);
+    const studyMine = study.filter((t) => t.book === book);
     return {
       book,
       label: AI_TRADER_SOURCE_LABEL[book],
-      trades: mine.length,
-      pending: args.pending[book] ?? 0,
-      wins,
-      losses,
-      winRatePct: mine.length ? Math.round((wins / mine.length) * 100) : null,
+      trades: stats.trades,
+      pending: stats.pending,
+      wins: stats.wins,
+      losses: stats.losses,
+      winRatePct: stats.winRatePct,
       avgReturnPct,
-      totalPnlUsd: round2(mine.reduce((s, t) => s + t.pnlUsd, 0)),
+      totalPnlUsd: stats.totalPnlUsd,
       takeAvgPct: takes.avg,
       passAvgPct: book === "rules" ? null : passes.avg,
       takeGraded: takes.graded,
@@ -408,6 +511,7 @@ export function buildWeekScore(args: {
       takePending: takes.pending,
       passPending: book === "rules" ? 0 : passes.pending,
       vsRulesPct: book === "rules" || avgReturnPct == null || rulesAvg == null ? null : round1(avgReturnPct - rulesAvg),
+      study: book === "rules" ? null : tierStats(studyMine, args.studyPending?.[book] ?? 0),
     };
   });
   const picked = pickWinner(books);
@@ -424,7 +528,8 @@ export function buildWeekScore(args: {
     winner: picked.winner,
     winnerReason: picked.reason,
     books,
-    trades: [...args.trades].sort((a, b) => a.day.localeCompare(b.day) || a.book.localeCompare(b.book) || a.contract.localeCompare(b.contract)),
+    trades: [...quality].sort(tradeSort),
+    studyTrades: [...study].sort(tradeSort),
     studyJson: `study/ai-trader-books/week-${args.week.weekEnd}.json`,
     studyMd: `study/ai-trader-books/week-${args.week.weekEnd}.md`,
     studyWritten: false,
@@ -452,8 +557,11 @@ export function renderWeekMd(score: WeekScore): string {
     `Exits: ${score.exits}`,
     `Pool: ${score.pool}`,
     "Take avg / pass avg use the wide-pool daily-bar grade (+30/−25/2-session) on quality-floor rows that also clear the puts and risk-off guards, before the day's list caps. Pending grades are left out of the average.",
+    "The winner and the main-paper switch use this quality tier only, plus the rules-only book. Study-tier fills are listed separately and do not pick the winner.",
     "",
     `**Winner:** ${score.winner ? AI_TRADER_SOURCE_LABEL[score.winner] : "none"}. ${score.winnerReason}`,
+    "",
+    "## Quality tier",
     "",
     "| Book | Trades | Win rate | Avg return | Total P&L | Take avg | Pass avg | vs rules |",
     "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
@@ -462,15 +570,47 @@ export function renderWeekMd(score: WeekScore): string {
     const wr = b.winRatePct == null ? "—" : `${b.winRatePct}% (${b.wins}–${b.losses})`;
     lines.push(`| ${b.label} | ${b.trades} | ${wr} | ${pct(b.avgReturnPct)} | ${money(b.totalPnlUsd)} | ${pct(b.takeAvgPct)} | ${pct(b.passAvgPct)} | ${pct(b.vsRulesPct)} |`);
   }
+  const studyTrades = score.studyTrades ?? [];
+  const studyBooks = score.books.filter((b) => b.study && (b.study.trades > 0 || b.study.pending > 0));
+  if (studyBooks.length || studyTrades.length) {
+    lines.push(
+      "",
+      "## Study tier",
+      "",
+      "Paper fills that missed the quality floor (spread ≤ 4%, ask ≥ $2, premium ≥ $100k, score ≥ 90) and passed the live floor (spread ≤ 10%, premium ≥ $10k, score ≥ 45), still under issuer/sector caps, ETF/index puts only, and the risk-off hold-back. Not used for the winner.",
+      "",
+      "| Book | Trades | Win rate | Avg return | Total P&L |",
+      "| --- | ---: | ---: | ---: | ---: |",
+    );
+    for (const b of score.books) {
+      if (!b.study) continue;
+      const wr = b.study.winRatePct == null ? "—" : `${b.study.winRatePct}% (${b.study.wins}–${b.study.losses})`;
+      lines.push(`| ${b.label} | ${b.study.trades} | ${wr} | ${pct(b.study.avgReturnPct)} | ${money(b.study.totalPnlUsd)} |`);
+    }
+  }
   if (score.trades.length) {
-    lines.push("", "## Trades", "");
+    lines.push("", "## Quality trades", "");
     for (const t of score.trades) {
+      lines.push(`- ${t.day} ${AI_TRADER_SOURCE_LABEL[t.book]} ${t.contract} ${pct(t.returnPct)} (${money(t.pnlUsd)})${t.closed ? "" : " open"}`);
+    }
+  }
+  if (studyTrades.length) {
+    lines.push("", "## Study trades", "");
+    for (const t of studyTrades) {
       lines.push(`- ${t.day} ${AI_TRADER_SOURCE_LABEL[t.book]} ${t.contract} ${pct(t.returnPct)} (${money(t.pnlUsd)})${t.closed ? "" : " open"}`);
     }
   }
   lines.push("");
   return lines.join("\n");
 }
+
+export type StudyBoostPanel = {
+  on: boolean;
+  /** Last session date the boost still runs (inclusive), or the configured end when it is off. */
+  until: string;
+  fillCap: number;
+  openRiskCapPct: number;
+};
 
 export type AiTraderPanel = {
   setting: "auto" | AiTraderSource;
@@ -480,9 +620,10 @@ export type AiTraderPanel = {
   floor: typeof AI_TRADER_FLOOR;
   week1Monday: string;
   minTrades: number;
+  studyBoost: StudyBoostPanel;
 };
 
-export function panelFrom(setting: "auto" | AiTraderSource, latest: WeekScore | null): AiTraderPanel {
+export function panelFrom(setting: "auto" | AiTraderSource, latest: WeekScore | null, studyBoost?: StudyBoostPanel): AiTraderPanel {
   const resolved = resolveMainSource(setting, latest);
   return {
     setting,
@@ -492,5 +633,6 @@ export function panelFrom(setting: "auto" | AiTraderSource, latest: WeekScore | 
     floor: AI_TRADER_FLOOR,
     week1Monday: AI_TRADER_WEEK1_MONDAY,
     minTrades: AI_TRADER_MIN_TRADES,
+    studyBoost: studyBoost ?? { on: false, until: AI_TRADER_STUDY_BOOST_END, fillCap: AI_TRADER_BOOST_FILL_CAP, openRiskCapPct: AI_TRADER_BOOST_OPEN_RISK },
   };
 }
