@@ -194,9 +194,11 @@ re-ranks or changes live picks, the AI review or paper fills.**
 `GET /api/paper` · card "Paper account" under AI picks. **Paper / test mode, not real money, not financial advice.**
 Never places orders and never changes live picks.
 
-- **Books:** `main` = Picks of the Day + Premove that the rules/AI actually **took** (`/api/ai-picks` `picks` +
-  `premove.picks`; watch-only, skipped and lockout picks never enter). Headline balance = main only. Test lanes
-  (`lottery`, `puts`, `lanes`, `earnings-calendar`) are separate $10k sub-books for comparison.
+- **Books:** `main` = weekly AI-trader winner's takes when set, else primary `/api/ai-picks` takes. Headline = main only.
+  **AI trader league** (`ai-grok`, `ai-claude`, `ai-gpt`): three separate $10k books on the same finalists (Grok mirrored
+  from AI picks; Claude/GPT peer-review when `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` are set). Quality bar for those books:
+  spread ≤ 4%, ask ≥ $2, premium ≥ $100k, score ≥ 90, max 3 takes/day. Friday after 15:30 ET scores the week; the winner
+  drives main until the next Friday. Other test lanes (`lottery`, `puts`, `lanes`, `earnings-calendar`) stay separate.
 - **Size:** 2% of the book value per trade (min 1 contract); skip if 1 contract > 5%; total open cost ≤ 10%.
   Lottery 0.5% per trade, open ≤ 5%.
 - **Fill:** live UW ask when the pick is taken (batched `option-contracts?option_symbol[]=…`, one call per underlying);

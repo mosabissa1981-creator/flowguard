@@ -18,6 +18,9 @@ const tone = (n: number) => (n > 0 ? "text-emerald-300" : n < 0 ? "text-rose-300
 const SOURCE: Record<string, string> = {
   "ai-pick": "Pick",
   premove: "Premove",
+  "ai-grok": "Grok",
+  "ai-claude": "Claude",
+  "ai-gpt": "GPT",
   lottery: "Lottery",
   puts: "Puts",
   "earnings-calendar": "Earn cal",
@@ -202,23 +205,53 @@ export function PaperPanel() {
             )}
           </details>
 
+          {data!.aiLeague != null ? (
+            <div className="mt-3 rounded-lg border border-violet-400/30 bg-violet-500/5 px-2.5 py-2">
+              <div className="text-[10px] font-medium uppercase tracking-wider text-violet-200/80">AI trader league · test</div>
+              <p className="mt-0.5 text-xs text-violet-100/90">
+                {data!.aiLeague.activeTrader
+                  ? `Main driven by ${data!.aiLeague.activeTrader.toUpperCase()} (week ${data!.aiLeague.weekStart}).`
+                  : "No Friday winner yet — main follows primary AI picks."}
+              </p>
+              <BookTable books={data!.books.filter((b) => b.book.startsWith("ai-"))} />
+              {testOpen.filter((p) => p.book.startsWith("ai-")).length > 0 ? (
+                <ul className="mt-2 grid gap-2 lg:grid-cols-2">
+                  {testOpen
+                    .filter((p) => p.book.startsWith("ai-"))
+                    .map((p) => (
+                      <OpenRow key={p.id} p={p} />
+                    ))}
+                </ul>
+              ) : null}
+            </div>
+          ) : (
+            <div className="mt-3">
+              <div className="mb-1 text-[11px] font-medium text-muted-foreground">AI trader books (Grok / Claude / GPT)</div>
+              <BookTable books={data!.books.filter((b) => b.book.startsWith("ai-"))} />
+            </div>
+          )}
+
           <details className="mt-1">
             <summary className="cursor-pointer select-none py-1 text-[11px] font-medium text-muted-foreground">
-              Test lanes, separate books ({testOpen.length} open)
+              Test lanes, separate books ({testOpen.filter((p) => !p.book.startsWith("ai-")).length} open)
             </summary>
-            <BookTable books={data!.books.filter((b) => b.book !== "main")} />
-            {testOpen.length > 0 ? (
+            <BookTable books={data!.books.filter((b) => b.book !== "main" && !b.book.startsWith("ai-"))} />
+            {testOpen.filter((p) => !p.book.startsWith("ai-")).length > 0 ? (
               <ul className="mt-2 grid gap-2 lg:grid-cols-2">
-                {testOpen.map((p) => (
-                  <OpenRow key={p.id} p={p} />
-                ))}
+                {testOpen
+                  .filter((p) => !p.book.startsWith("ai-"))
+                  .map((p) => (
+                    <OpenRow key={p.id} p={p} />
+                  ))}
               </ul>
             ) : null}
-            {data!.closedTest.length > 0 ? (
+            {data!.closedTest.filter((c) => !c.book.startsWith("ai-")).length > 0 ? (
               <ul className="mt-2">
-                {data!.closedTest.map((c) => (
-                  <ClosedRow key={`${c.id}:${c.exitedAt}`} c={c} />
-                ))}
+                {data!.closedTest
+                  .filter((c) => !c.book.startsWith("ai-"))
+                  .map((c) => (
+                    <ClosedRow key={`${c.id}:${c.exitedAt}`} c={c} />
+                  ))}
               </ul>
             ) : null}
           </details>

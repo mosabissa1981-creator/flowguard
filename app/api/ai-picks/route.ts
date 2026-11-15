@@ -2,6 +2,7 @@ import { timingSafeEqual } from "node:crypto";
 import { NextRequest, after } from "next/server";
 
 import { loadAiPicks } from "@/lib/ai-picks";
+import { runAiTraderLeagueQuietly } from "@/lib/ai-traders";
 import { triggerShadowQuietly } from "@/lib/shadow";
 import { paperTickQuietly } from "@/lib/paper";
 
@@ -29,6 +30,8 @@ export async function GET(request: NextRequest) {
   const payload = await loadAiPicks({ force });
   // Shadow modules annotate the same finalists after the response is sent (never changes this payload).
   after(triggerShadowQuietly);
+  // AI trader league (TEST): mirror Grok takes + optional Claude/GPT peers into separate paper books.
+  after(() => runAiTraderLeagueQuietly(payload));
   // Paper/test account: open TAKEN picks at the live ask + check exits (throttled; never changes this payload).
   after(() => paperTickQuietly(payload));
   return Response.json(payload, {

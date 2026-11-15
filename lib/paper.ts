@@ -22,6 +22,7 @@ import {
   entryFill,
   exitDecision,
   exitValue,
+  isAiTraderBook,
   levelsFor,
   newBalanceDoc,
   parseOcc,
@@ -38,6 +39,17 @@ import {
   type PaperMark,
   type PaperPosition,
 } from "@/lib/paper-core";
+import {
+  AI_TRADER_BOOK,
+  AI_TRADER_LABEL,
+  AI_TRADERS,
+  loadAiTraderLeague,
+  loadAiTraderTakes,
+  maybeScoreAiTraderWeek,
+  type AiTraderLeagueDoc,
+  type AiTraderTake,
+} from "@/lib/ai-traders";
+import { AI_TRADER_SPREAD_MAX_PCT } from "@/lib/ai-traders-core";
 import { SPREAD_MAX_PCT, resolveSpread, spreadSkipReason, type SpreadInfo } from "@/lib/spread-core";
 import { SINGLE_STOCK_PUT_REASON, blockedByPutsRule } from "@/lib/puts-rule";
 import type { AiPick, AiPicksResponse, WatchQuote } from "@/lib/types";
@@ -237,25 +249,18 @@ async function gatherCandidates(today: string, startedAt: string): Promise<Candi
   const blockLivePut = (side: string, ticker: string, issueType?: string | null) =>
     blockedByPutsRule(side, ticker, issueType) || blockedByRiskOffPuts(side, ticker, issueType, riskOff);
 
-  // Main: taken AI/rules picks + premove picks (hand-over doc, else the stored LLM answer).
-  let main = await kvGet<MainPicksDoc>(K_MAIN, { maxAgeMs: 30_000 });
-  if (main?.day !== today) {
-    const st = await loadAiPicksState();
-    main = mainPicksFrom(st?.day === today ? st.value : null, today);
-  }
   // LIVE exit rule for NEW entries (10/8/2026): +30% / −25% / time stop 2:30 PM CT on the 2nd session, whatever plan
   // the hand-over doc carried (older builds stored +40/+50% and 3–5 sessions). Already-open positions keep their levels.
   const lvl = (entry: number | undefined | null) =>
     entry && entry > 0
       ? { entry, target: Math.round(entry * (1 + TARGET_PCT_WHOLE / 100) * 100) / 100, stop: Math.round(entry * (1 + STOP_PCT_WHOLE / 100) * 100) / 100 }
       : null;
-  for (const p of main?.picks ?? []) {
-    if (blockLivePut(p.side, p.ticker, p.issueType)) continue; // LIVE puts + risk-off: not opened on paper main
-    const targetPct = TARGET_PCT_WHOLE;
-    const stopPct = STOP_PCT_WHOLE;
+
+  const pushTake = (book: PaperBookId, p: MainPickLite | AiTraderTake, source: string = p.source) => {
+    if (blockLivePut(p.side, p.ticker, p.issueType)) return;
     out.push({
-      book: "main",
-      source: p.source,
+      book,
+      source,
       day: today,
       contract: p.contract,
       ticker: p.ticker,
@@ -263,8 +268,8 @@ async function gatherCandidates(today: string, startedAt: string): Promise<Candi
       strike: p.strike,
       expiry: p.expiry,
       alertPrice: p.alertPrice,
-      targetPct,
-      stopPct,
+      targetPct: TARGET_PCT_WHOLE,
+      stopPct: STOP_PCT_WHOLE,
       timeStopDate: liveTimeStopDate(today, p.expiry),
       planLevels: lvl(p.plan?.entry),
       confidence: p.confidence,
@@ -272,6 +277,29 @@ async function gatherCandidates(today: string, startedAt: string): Promise<Candi
       alertAsk: p.alertAsk ?? null,
       issueType: p.issueType ?? null,
     });
+  };
+
+  // AI trader books (Grok / Claude / GPT) — separate $10k test books.
+  const traderDocs = await Promise.all(AI_TRADERS.map((t) => loadAiTraderTakes(t, today)));
+  for (let i = 0; i < AI_TRADERS.length; i++) {
+    const trader = AI_TRADERS[i];
+    const doc = traderDocs[i];
+    for (const p of doc?.picks ?? []) pushTake(AI_TRADER_BOOK[trader], p, `ai-${trader}`);
+  }
+
+  // Main: weekly AI-trader winner's takes when set; else primary /api/ai-picks hand-over.
+  const league = await loadAiTraderLeague().catch(() => null);
+  const active = league?.activeTrader ?? null;
+  if (active) {
+    const winnerDoc = traderDocs[AI_TRADERS.indexOf(active)];
+    for (const p of winnerDoc?.picks ?? []) pushTake("main", p, `ai-${active}`);
+  } else {
+    let main = await kvGet<MainPicksDoc>(K_MAIN, { maxAgeMs: 30_000 });
+    if (main?.day !== today) {
+      const st = await loadAiPicksState();
+      main = mainPicksFrom(st?.day === today ? st.value : null, today);
+    }
+    for (const p of main?.picks ?? []) pushTake("main", p);
   }
 
   const [lottery, puts, ...lanes] = await Promise.all([
@@ -400,7 +428,10 @@ async function runTick(opts: { force?: boolean; ai?: AiPicksResponse | null; now
   const today = et.day;
   const res: TickResult = { ran: true, reason: opts.force ? "forced" : "tick", opened: 0, closed: 0, skipped: 0, exitCheck: false };
 
-  // Equity at the first tick of the day (for "P&L today").
+  // Backfill AI-trader books on older balance docs, then equity at first tick of the day.
+  for (const b of PAPER_BOOKS) {
+    if (!bal.books[b]) bal.books[b] = { start: 10_000, balance: 10_000, realizedUsd: 0 };
+  }
   if (bal.dayOpen?.day !== today) {
     const equity: Partial<Record<PaperBookId, number>> = {};
     for (const b of PAPER_BOOKS) equity[b] = bookStats(b, bal.books[b], state.positions, state.closed).equity;
@@ -426,21 +457,27 @@ async function runTick(opts: { force?: boolean; ai?: AiPicksResponse | null; now
         skip("Contract already expired.");
         continue;
       }
-      // LIVE puts rule for main + lanes: ETF/index puts only (lottery / puts test books unchanged).
-      if ((c.book === "main" || c.book === "lanes") && blockedByPutsRule(c.side, c.ticker, c.issueType)) {
+      // LIVE puts rule for main + lanes + AI trader books: ETF/index puts only (lottery / puts test books unchanged).
+      if ((c.book === "main" || c.book === "lanes" || isAiTraderBook(c.book)) && blockedByPutsRule(c.side, c.ticker, c.issueType)) {
         skip(`${SINGLE_STOCK_PUT_REASON} (live rule)`);
         continue;
       }
-      // Spread at entry: live UW NBBO, else the alert's bid/ask. LIVE rule for main + lanes (> SPREAD_MAX_PCT
-      // of mid → skipped); lottery / puts only record it (test mode).
+      // Spread at entry: live UW NBBO, else the alert's bid/ask.
+      // Main + lanes: LIVE 10% gate. AI trader books: tighter 4% training gate. Lottery/puts: record only.
+      const spreadMax = isAiTraderBook(c.book) ? AI_TRADER_SPREAD_MAX_PCT : SPREAD_MAX_PCT;
       const lq = quotes[c.contract];
       const entrySpread: SpreadInfo = resolveSpread(
         lq && lq.quality !== "flow_print" ? { bid: lq.bid, ask: lq.ask } : null,
         { bid: c.alertBid, ask: c.alertAsk },
         now.toISOString(),
+        spreadMax,
       );
       if ((c.book === "main" || c.book === "lanes") && entrySpread.status === "wide") {
         skip(`${spreadSkipReason(entrySpread)} (live rule: over ${Math.round(SPREAD_MAX_PCT * 100)}% of mid)`);
+        continue;
+      }
+      if (isAiTraderBook(c.book) && entrySpread.status === "wide") {
+        skip(`${spreadSkipReason(entrySpread)} (AI trader quality: over ${Math.round(AI_TRADER_SPREAD_MAX_PCT * 100)}% of mid)`);
         continue;
       }
       const fill = entryFill(toFill(quotes[c.contract]), c.alertPrice);
@@ -585,9 +622,13 @@ async function runTick(opts: { force?: boolean; ai?: AiPicksResponse | null; now
 
   bal.skips = bal.skips.slice(-MAX_SKIPS_KEPT);
   bal.lastTickAt = now.toISOString();
+  // Friday after 15:30 ET (or force): score AI trader books and set next week's main driver.
+  await maybeScoreAiTraderWeek(state.closed, now, { force: Boolean(opts.force), etDay: et.day, etMinutes: et.minutes }).catch(
+    () => null,
+  );
   await saveState(state, prev);
   if (res.opened || res.closed || res.exitCheck || opts.force) {
-    await kvSet(snapKey(today), buildView(state, now), { tier: "rare", ttlSec: 120 * 86400 }).catch(() => false);
+    await kvSet(snapKey(today), await buildView(state, now), { tier: "rare", ttlSec: 120 * 86400 }).catch(() => false);
   }
   return res;
 }
@@ -720,6 +761,8 @@ export type PaperView = {
   skips: PaperBalanceDoc["skips"];
   uw: { day: string; quoteCalls: number; cap: number };
   rules: string[];
+  /** AI trader league (Grok / Claude / GPT paper books + Friday winner). */
+  aiLeague: AiTraderLeagueDoc | null;
   /** TRACKING ONLY — picks the 5% one-contract rule skipped, followed at 1 contract. Not in balances or stats. */
   tracking: {
     label: string;
@@ -729,14 +772,17 @@ export type PaperView = {
   };
 };
 
-function buildView(s: PaperState, now: Date): PaperView {
+async function buildView(s: PaperState, now: Date): Promise<PaperView> {
   const day = tradingDateET(now);
   const dayOpen = s.bal.dayOpen?.day === day ? s.bal.dayOpen.equity : null;
   const books = PAPER_BOOKS.map((b) => {
-    const st = bookStats(b, s.bal.books[b], s.positions, s.closed);
-    return dayOpen?.[b] != null ? bookStats(b, s.bal.books[b], s.positions, s.closed, dayOpen[b]) : { ...st, pnlTodayUsd: 0 };
+    const bal = s.bal.books[b] ?? { start: 10_000, balance: 10_000, realizedUsd: 0 };
+    const st = bookStats(b, bal, s.positions, s.closed);
+    return dayOpen?.[b] != null ? bookStats(b, bal, s.positions, s.closed, dayOpen[b]) : { ...st, pnlTodayUsd: 0 };
   });
   const byExit = (a: PaperClosed, b: PaperClosed) => b.exitedAt.localeCompare(a.exitedAt);
+  const aiLeague = await loadAiTraderLeague().catch(() => null);
+  const activeLabel = aiLeague?.activeTrader ? AI_TRADER_LABEL[aiLeague.activeTrader] : null;
   return {
     mode: "paper-test",
     disclaimer: PAPER_DISCLAIMER,
@@ -753,6 +799,7 @@ function buildView(s: PaperState, now: Date): PaperView {
     closedTest: s.closed.filter((c) => c.book !== "main").sort(byExit).slice(0, 10),
     closedToday: s.closed.filter((c) => tradingDateET(new Date(c.exitedAt)) === day).sort(byExit),
     skips: s.bal.skips.slice(-10).reverse(),
+    aiLeague,
     tracking: {
       label: "TRACKING ONLY — picks skipped by the 5% one-contract rule, would-be P&L at 1 contract. Not part of any balance; sizing unchanged.",
       open: s.tracking.open,
@@ -767,7 +814,11 @@ function buildView(s: PaperState, now: Date): PaperView {
     },
     uw: { day: s.bal.uw.day, quoteCalls: s.bal.uw.day === day ? s.bal.uw.quoteCalls : 0, cap: uwDailyCap() },
     rules: [
-      "Start $10,000 per book. Headline = main picks only (AI/rules-taken Picks of the Day + Premove). Test lanes are separate sub-books.",
+      "Start $10,000 per book. Headline = main (weekly AI-trader winner when set; else primary AI/rules takes). AI trader books (Grok/Claude/GPT) and other test lanes are separate.",
+      activeLabel
+        ? `Main is currently driven by ${activeLabel} (Friday league winner).`
+        : "Main follows primary /api/ai-picks until the first Friday AI-trader score sets a winner.",
+      "AI trader quality bar: spread ≤ 4%, ask ≥ $2, premium ≥ $100k, score ≥ 90, max 3 takes/day.",
       "Size: 2% of the book balance per trade (min 1 contract); skip if 1 contract > 5% of balance; total open cost ≤ 10%. Lottery: 0.5% per trade, open ≤ 5%.",
       "Fill: buy at the live UW ask when the pick is taken; no ask → alert price +5%.",
       "Exit: sell at the live bid when it reaches the pick's target or stop (same % as its exit plan, applied to the fill), or at the time stop (15:30 ET on its date). No bid → last −5%.",
@@ -781,6 +832,15 @@ export async function loadPaperView(now = new Date()): Promise<PaperView> {
   const state = await loadState();
   // First look at the account opens it ($10k per book, startedAt = now); later picks only.
   if (state.isNew && kvDurable()) await kvSet(K_BAL, state.bal, { tier: "rare" });
+  // Backfill missing AI-trader books on older balance docs.
+  let dirty = false;
+  for (const b of PAPER_BOOKS) {
+    if (!state.bal.books[b]) {
+      state.bal.books[b] = { start: 10_000, balance: 10_000, realizedUsd: 0 };
+      dirty = true;
+    }
+  }
+  if (dirty && kvDurable()) await kvSet(K_BAL, state.bal, { tier: "rare" });
   return buildView(state, now);
 }
 

@@ -3,9 +3,9 @@ import type { SpreadInfo } from "@/lib/spread-core";
  * PAPER / TEST MODE trading book — pure logic (no I/O). Fake money only; never touches live picks,
  * never places orders. Not financial advice.
  *
- * Books: "main" (AI/rules-taken Picks of the Day + Premove) is the headline balance. Test lanes
- * ("lottery", "puts", "lanes", "earnings-calendar") are separate sub-books with their own $10k so they
- * can be compared without polluting the headline.
+ * Books: "main" (weekly AI-trader winner, else primary AI/rules takes) is the headline balance.
+ * AI trader books ("ai-grok", "ai-claude", "ai-gpt") are separate $10k test books scored every Friday.
+ * Other test lanes ("lottery", "puts", "lanes", "earnings-calendar") stay separate too.
  *
  * Fills: buy at the live UW ask (sell legs at the bid); no ask → alert price +5% slippage.
  * Exits: sell at the live bid when target / stop / time stop hits; no bid → last −5% (or last mark).
@@ -18,16 +18,43 @@ export const TIME_STOP_ET_MINUTES = 15 * 60 + 30;
 export const MARKET_OPEN_ET_MINUTES = 9 * 60 + 30;
 export const MARKET_CLOSE_ET_MINUTES = 16 * 60;
 
-export type PaperBookId = "main" | "lottery" | "puts" | "lanes" | "earnings-calendar";
-export const PAPER_BOOKS: PaperBookId[] = ["main", "lottery", "puts", "lanes", "earnings-calendar"];
+export type PaperBookId =
+  | "main"
+  | "ai-grok"
+  | "ai-claude"
+  | "ai-gpt"
+  | "lottery"
+  | "puts"
+  | "lanes"
+  | "earnings-calendar";
+export const PAPER_BOOKS: PaperBookId[] = [
+  "main",
+  "ai-grok",
+  "ai-claude",
+  "ai-gpt",
+  "lottery",
+  "puts",
+  "lanes",
+  "earnings-calendar",
+];
 
 export const PAPER_BOOK_LABEL: Record<PaperBookId, string> = {
-  main: "Main picks (Picks of the Day + Premove)",
+  main: "Main picks (weekly AI winner)",
+  "ai-grok": "AI trader · Grok · test",
+  "ai-claude": "AI trader · Claude · test",
+  "ai-gpt": "AI trader · GPT · test",
   lottery: "Lottery · test",
   puts: "Puts · test",
   lanes: "Setup lanes · test",
   "earnings-calendar": "Earnings calendar · test",
 };
+
+/** AI trader paper books (Friday league). */
+export const AI_TRADER_PAPER_BOOKS: PaperBookId[] = ["ai-grok", "ai-claude", "ai-gpt"];
+
+export function isAiTraderBook(book: PaperBookId): boolean {
+  return book === "ai-grok" || book === "ai-claude" || book === "ai-gpt";
+}
 
 export type SizingRule = {
   /** Target cost per trade as a fraction of the book balance. */
@@ -40,6 +67,9 @@ export type SizingRule = {
 
 export const SIZING: Record<PaperBookId, SizingRule> = {
   main: { perTradePct: 0.02, maxOneContractPct: 0.05, openRiskCapPct: 0.1 },
+  "ai-grok": { perTradePct: 0.02, maxOneContractPct: 0.05, openRiskCapPct: 0.1 },
+  "ai-claude": { perTradePct: 0.02, maxOneContractPct: 0.05, openRiskCapPct: 0.1 },
+  "ai-gpt": { perTradePct: 0.02, maxOneContractPct: 0.05, openRiskCapPct: 0.1 },
   puts: { perTradePct: 0.02, maxOneContractPct: 0.05, openRiskCapPct: 0.1 },
   lanes: { perTradePct: 0.02, maxOneContractPct: 0.05, openRiskCapPct: 0.1 },
   "earnings-calendar": { perTradePct: 0.02, maxOneContractPct: 0.05, openRiskCapPct: 0.1 },

@@ -2,12 +2,15 @@
 import assert from "node:assert/strict";
 
 import {
+  AI_TRADER_PAPER_BOOKS,
+  PAPER_BOOKS,
   SIZING,
   bookStats,
   closePosition,
   entryFill,
   exitDecision,
   exitValue,
+  isAiTraderBook,
   levelsFor,
   newBalanceDoc,
   parseOcc,
@@ -90,5 +93,16 @@ assert.deepEqual(parseOcc("NFLX261023C00070000"), { ticker: "NFLX", expiry: "202
 assert.deepEqual(parseOcc("SPY261014C00786000"), { ticker: "SPY", expiry: "2026-10-14", side: "call", strike: 786 });
 assert.deepEqual(parseOcc("TRMD261016C00042500")?.strike, 42.5);
 assert.equal(parseOcc("NFLX"), null);
+
+// AI trader books present with main-like sizing.
+assert.ok(PAPER_BOOKS.includes("ai-grok"));
+assert.ok(PAPER_BOOKS.includes("ai-claude"));
+assert.ok(PAPER_BOOKS.includes("ai-gpt"));
+assert.deepEqual(AI_TRADER_PAPER_BOOKS, ["ai-grok", "ai-claude", "ai-gpt"]);
+assert.equal(isAiTraderBook("ai-grok"), true);
+assert.equal(isAiTraderBook("main"), false);
+assert.deepEqual(SIZING["ai-claude"], SIZING.main);
+const withAi = newBalanceDoc(new Date("2026-11-14T00:00:00Z"));
+assert.equal(withAi.books["ai-gpt"].balance, 10_000);
 
 console.log("paper-check: all assertions passed");
