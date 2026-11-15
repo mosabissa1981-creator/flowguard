@@ -3,9 +3,10 @@ import type { SpreadInfo } from "@/lib/spread-core";
  * PAPER / TEST MODE trading book — pure logic (no I/O). Fake money only; never touches live picks,
  * never places orders. Not financial advice.
  *
- * Books: "main" (AI/rules-taken Picks of the Day + Premove) is the headline balance. Test lanes
- * ("lottery", "puts", "lanes", "earnings-calendar") are separate sub-books with their own $10k so they
- * can be compared without polluting the headline.
+ * Books: "main" follows the weekly AI-trader winner (the rules-only quality book until one exists) plus
+ * Premove. It does not blindly fill Grok AI-picks takes. "ai-grok" / "ai-claude" / "ai-gpt" / "ai-rules"
+ * are separate $10k books on the same wide-pool rows. Test lanes ("lottery", "puts", "lanes",
+ * "earnings-calendar") stay separate so they can be compared without polluting the headline.
  *
  * Fills: buy at the live UW ask (sell legs at the bid); no ask → alert price +5% slippage.
  * Exits: sell at the live bid when target / stop / time stop hits; no bid → last −5% (or last mark).
@@ -18,15 +19,41 @@ export const TIME_STOP_ET_MINUTES = 15 * 60 + 30;
 export const MARKET_OPEN_ET_MINUTES = 9 * 60 + 30;
 export const MARKET_CLOSE_ET_MINUTES = 16 * 60;
 
-export type PaperBookId = "main" | "lottery" | "puts" | "lanes" | "earnings-calendar";
-export const PAPER_BOOKS: PaperBookId[] = ["main", "lottery", "puts", "lanes", "earnings-calendar"];
+export type PaperBookId =
+  | "main"
+  | "lottery"
+  | "puts"
+  | "lanes"
+  | "earnings-calendar"
+  | "ai-grok"
+  | "ai-claude"
+  | "ai-gpt"
+  | "ai-rules";
+export const PAPER_BOOKS: PaperBookId[] = [
+  "main",
+  "lottery",
+  "puts",
+  "lanes",
+  "earnings-calendar",
+  "ai-grok",
+  "ai-claude",
+  "ai-gpt",
+  "ai-rules",
+];
+
+/** Which AI-trader book the main paper account is copying. "rules" is the quality-floor baseline. */
+export type AiTraderSource = "grok" | "claude" | "gpt" | "rules";
 
 export const PAPER_BOOK_LABEL: Record<PaperBookId, string> = {
-  main: "Main picks (Picks of the Day + Premove)",
+  main: "Main picks (selected source + Premove)",
   lottery: "Lottery · test",
   puts: "Puts · test",
   lanes: "Setup lanes · test",
   "earnings-calendar": "Earnings calendar · test",
+  "ai-grok": "Grok takes · paper",
+  "ai-claude": "Claude takes · paper",
+  "ai-gpt": "GPT takes · paper",
+  "ai-rules": "Rules only · paper",
 };
 
 export type SizingRule = {
@@ -38,11 +65,18 @@ export type SizingRule = {
   openRiskCapPct: number;
 };
 
+const MAIN_SIZING: SizingRule = { perTradePct: 0.02, maxOneContractPct: 0.05, openRiskCapPct: 0.1 };
+
 export const SIZING: Record<PaperBookId, SizingRule> = {
-  main: { perTradePct: 0.02, maxOneContractPct: 0.05, openRiskCapPct: 0.1 },
-  puts: { perTradePct: 0.02, maxOneContractPct: 0.05, openRiskCapPct: 0.1 },
-  lanes: { perTradePct: 0.02, maxOneContractPct: 0.05, openRiskCapPct: 0.1 },
-  "earnings-calendar": { perTradePct: 0.02, maxOneContractPct: 0.05, openRiskCapPct: 0.1 },
+  main: MAIN_SIZING,
+  puts: MAIN_SIZING,
+  lanes: MAIN_SIZING,
+  "earnings-calendar": MAIN_SIZING,
+  // AI-trader books use the same size as main so the weekly comparison is on the takes, not the bet size.
+  "ai-grok": MAIN_SIZING,
+  "ai-claude": MAIN_SIZING,
+  "ai-gpt": MAIN_SIZING,
+  "ai-rules": MAIN_SIZING,
   // Lottery tickets: tiny size (most expire worthless).
   lottery: { perTradePct: 0.005, maxOneContractPct: 0.02, openRiskCapPct: 0.05 },
 };
@@ -95,6 +129,13 @@ export type PaperPosition = {
   confidence?: number | null;
   /** Bid/ask/spread% at entry (LIVE spread gate for main + lanes; record-only for lottery/puts/earnings calendar). */
   entrySpread?: SpreadInfo | null;
+  /**
+   * Set on main-book fills opened by the AI-trader source switch (rules until a weekly winner, then that winner).
+   * Absent on Premove and on older rows.
+   */
+  drivenBy?: AiTraderSource | null;
+  /** Why that source was selected at fill time. Kept on the fill so a later winner does not rewrite history. */
+  drivenByWhy?: string | null;
   note?: string;
   lastMark?: PaperMark | null;
 };

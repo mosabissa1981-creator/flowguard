@@ -194,9 +194,22 @@ re-ranks or changes live picks, the AI review or paper fills.**
 `GET /api/paper` · card "Paper account" under AI picks. **Paper / test mode, not real money, not financial advice.**
 Never places orders and never changes live picks.
 
-- **Books:** `main` = Picks of the Day + Premove that the rules/AI actually **took** (`/api/ai-picks` `picks` +
-  `premove.picks`; watch-only, skipped and lockout picks never enter). Headline balance = main only. Test lanes
-  (`lottery`, `puts`, `lanes`, `earnings-calendar`) are separate $10k sub-books for comparison.
+- **Books:** `main` follows the weekly AI-trader winner, plus Premove. Until a Friday score names a winner
+  (week 1 starts Mon 2026-11-16), main follows the rules-only quality book and does **not** fill Grok AI-picks
+  takes. `FLOWGUARD_PAPER_MAIN_SOURCE` overrides that (`auto` default, or `rules` / `grok` / `claude` / `gpt`).
+  Each main fill records `drivenBy`. Four separate $10k books — `ai-grok`, `ai-claude`, `ai-gpt`, `ai-rules` —
+  paper-fill the shared wide-pool rows (no new LLM calls). Grok/Claude/GPT fill only the rows that model
+  already marked TAKE. Rules fills every quality-floor row. Test lanes (`lottery`, `puts`, `lanes`,
+  `earnings-calendar`) are unchanged.
+- **AI-trader floor, before any of those fills:** spread ≤ 4% of mid, ask ≥ $2, premium ≥ $100k, score ≥ 90.
+  Existing guards still apply: ETF/index puts only, risk-off ETF-put hold-back, issuer/sector caps, and the
+  report-day 3-pick cap (risky days use that same list cap of 3). Exits and size match main (+30% / −25% /
+  2-session hold / 2:30 PM CT, 2% per trade).
+- **Friday score** (after 16:15 ET, from the existing paper tick and `/api/shadow/signals` cron — no new cron):
+  trades, win rate, avg return, total P&L, take-avg vs pass-avg vs the rules book. Winner = highest avg take
+  return that also beats rules with at least 5 trades; otherwise no winner. Written to
+  `study/ai-trader-books/week-YYYY-MM-DD.json` + `.md` when the disk is writable, always stored for the paper
+  card, and shown on the paper account. `npm run ai-trader-books-check` covers the pure rules.
 - **Size:** 2% of the book value per trade (min 1 contract); skip if 1 contract > 5%; total open cost ≤ 10%.
   Lottery 0.5% per trade, open ≤ 5%.
 - **Fill:** live UW ask when the pick is taken (batched `option-contracts?option_symbol[]=…`, one call per underlying);

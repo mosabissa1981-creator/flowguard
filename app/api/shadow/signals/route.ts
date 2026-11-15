@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 
+import { maybeScoreAiTraderWeek } from "@/lib/ai-trader-books";
 import { adminOk } from "@/lib/shadow/admin";
 import { refreshSignals } from "@/lib/shadow/signals";
 
@@ -18,5 +19,10 @@ export async function GET(request: NextRequest) {
     return Response.json(await refreshSignals({ force }), { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     return Response.json({ error: error instanceof Error ? error.message.slice(0, 200) : "failed" }, { status: 500 });
+  } finally {
+    // Friday after the close. Same cron that already runs at 21:30 UTC — no new Vercel cron entry.
+    await maybeScoreAiTraderWeek().catch((e) => {
+      console.warn(`[ai-trader] week score failed: ${e instanceof Error ? e.message : String(e)}`);
+    });
   }
 }
