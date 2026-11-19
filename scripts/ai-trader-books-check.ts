@@ -2,7 +2,10 @@
 import assert from "node:assert/strict";
 
 import {
+  AI_TRADER_FLOOR,
+  AI_TRADER_LIVE_FLOOR,
   AI_TRADER_MIN_TRADES,
+  AI_TRADER_SPREAD_MAX,
   applyDayCaps,
   askClearsFloor,
   bidFromAskSpread,
@@ -22,10 +25,20 @@ import {
 } from "@/lib/ai-trader-books-core";
 import {
   AI_TRADER_BOOST_FILL_CAP,
+  AI_TRADER_STUDY_BOOST_END,
   byScoreThenEarlier,
   projectQuietSpend,
   studyBoostEnabled,
 } from "@/lib/ai-trader-study-boost";
+import {
+  WIDE_REVIEW_TOKEN_USD_PER_M,
+  WIDE_RULE,
+  buildLessonsPrompt,
+  qualityBucketPhrase,
+  studyTierFloorPhrase,
+  studyTierPromptCostDelta,
+  wideReviewSystemPrompt,
+} from "@/lib/shadow/wide-review-prompt";
 
 function row(over: Partial<AiTraderRow> & Pick<AiTraderRow, "contract" | "ticker">): AiTraderRow {
   return {
@@ -321,5 +334,54 @@ assert.ok(spend.extraRows.grok > 0 && spend.extraRows.claude > 0 && spend.extraR
 assert.equal(spend.studyFillsPerAiBook, 8);
 assert.equal(spend.qualityListCapReportDay, 8);
 console.log("study-boost projection", JSON.stringify({ boost: spend, baseline }, null, 2));
+
+// Floors, the Friday rule, the study cap, and the boost end date stay put.
+assert.equal(AI_TRADER_SPREAD_MAX, 0.04);
+assert.equal(AI_TRADER_FLOOR.minAsk, 2);
+assert.equal(AI_TRADER_FLOOR.minPremiumUsd, 100_000);
+assert.equal(AI_TRADER_FLOOR.minScore, 90);
+assert.equal(AI_TRADER_LIVE_FLOOR.spreadMaxPct, 0.1);
+assert.equal(AI_TRADER_LIVE_FLOOR.minScore, 45);
+assert.equal(AI_TRADER_LIVE_FLOOR.minPremiumUsd, 10_000);
+assert.equal(AI_TRADER_MIN_TRADES, 5);
+assert.equal(AI_TRADER_BOOST_FILL_CAP, 8);
+assert.equal(AI_TRADER_STUDY_BOOST_END, "2026-12-11");
+assert.equal(spend.hardCapUsd, 3);
+
+const gptPrompt = wideReviewSystemPrompt("gpt");
+const grokPrompt = wideReviewSystemPrompt("grok");
+const claudePrompt = wideReviewSystemPrompt("claude");
+const livePrompt = buildLessonsPrompt();
+assert.equal(claudePrompt, grokPrompt);
+assert.equal(gptPrompt, buildLessonsPrompt({ extra: WIDE_RULE }));
+assert.ok(gptPrompt.includes("if none, pick fewer (0 is a valid answer)"));
+assert.ok(gptPrompt.includes("Skip: ask < $2, spread > 4%, premium < $100k, score < 90"));
+assert.equal(gptPrompt.includes('start why with "study tier:"'), false);
+assert.equal(livePrompt.includes('start why with "study tier:"'), false);
+assert.equal(buildLessonsPrompt({ extra: `${WIDE_RULE} gex context` }).includes('start why with "study tier:"'), false);
+assert.ok(livePrompt.includes("if none, pick fewer (0 is a valid answer)"));
+assert.ok(grokPrompt.includes('start why with "study tier:"'));
+assert.ok(grokPrompt.includes(studyTierFloorPhrase()));
+assert.ok(grokPrompt.includes(qualityBucketPhrase()));
+assert.equal(grokPrompt.includes("if none, pick fewer (0 is a valid answer)"), false);
+assert.ok(grokPrompt.includes("0 is a valid answer"));
+assert.ok(grokPrompt.includes("Do not force a take"));
+assert.ok(grokPrompt.includes("at most 3 takes"));
+assert.ok(grokPrompt.includes("Quality-bucket takes are unchanged"));
+assert.ok(studyTierFloorPhrase().includes("10%") && studyTierFloorPhrase().includes("45") && studyTierFloorPhrase().includes("$10k"));
+
+const batches = {
+  grok: Math.ceil(spend.lanes.grok.rows / 20),
+  claude: Math.ceil(spend.lanes.claude.rows / 20),
+};
+const costDelta = studyTierPromptCostDelta(grokPrompt.length - gptPrompt.length, batches);
+const todayLow = 2.3;
+const todayHigh = 2.7;
+assert.ok(costDelta.addedUsd > 0 && costDelta.addedUsd < 0.5, `study-tier prompt add ${costDelta.addedUsd} looks wrong`);
+assert.ok(todayHigh + costDelta.addedUsd < spend.hardCapUsd, `today high + prompt add ${todayHigh + costDelta.addedUsd} crosses $3`);
+assert.ok(spend.totalUsd + costDelta.addedUsd <= spend.hardCapUsd, `projection ${spend.totalUsd} + ${costDelta.addedUsd} crosses $3`);
+assert.equal(WIDE_REVIEW_TOKEN_USD_PER_M.grok.output, 6);
+assert.equal(WIDE_REVIEW_TOKEN_USD_PER_M.claude.output, 15);
+console.log("study-tier prompt cost", JSON.stringify({ todayLow, todayHigh, withPrompt: { low: Math.round((todayLow + costDelta.addedUsd) * 100) / 100, high: Math.round((todayHigh + costDelta.addedUsd) * 100) / 100 }, projectionWithPrompt: Math.round((spend.totalUsd + costDelta.addedUsd) * 100) / 100, costDelta }, null, 2));
 
 console.log("ai-trader-books-check: ok");

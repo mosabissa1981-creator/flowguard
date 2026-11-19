@@ -4,17 +4,17 @@ import { byScoreThenEarlier, claudeSecondPace, studyBoostEnabled } from "@/lib/a
 import { ledgerSpend, TEST_MODE_GROK_DAY_CAP_USD, quietTestBatchGate } from "@/lib/llm-ledger";
 import { tradingDateET } from "@/lib/session";
 import { etClock } from "@/lib/shadow/budget";
-import { lessonsSystemPrompt } from "@/lib/shadow/lessons-review";
+import { wideReviewSystemPrompt } from "@/lib/shadow/wide-review-prompt";
 import { anthropicLlmConfig, callShadowLlm, reviewBatchCeiling } from "@/lib/shadow/llm";
 import { loadDoc, saveDoc } from "@/lib/shadow/store";
 import type { LlmUsageRecord } from "@/lib/shadow/types";
-import { grokWideEnabled, loadWideDay, parseBatch, WIDE_RULE, type WideDoc } from "@/lib/shadow/wide-pool";
+import { grokWideEnabled, loadWideDay, parseBatch, type WideDoc } from "@/lib/shadow/wide-pool";
 import { wideFactLine, type WideGrade, type WideJudgement } from "@/lib/shadow/wide-pool-core";
 
 /**
  * TEST MODE ONLY — Claude second-opinion lane (lane id claude-second).
- * Sees the SAME wide-pool candidates + lessons prompt the current Grok wide reviewer already judged
- * (no GEX/DEX extras — fair provider comparison). Own day doc (kind "claude-second") so the study book /
+ * Sees the SAME wide-pool candidates and the same study-tier lessons prompt the Grok wide reviewer uses
+ * (no GEX/DEX extras). Own day doc (kind "claude-second") so the study book /
  * Friday score can compare Claude vs current Grok vs rules on identical rows.
  * Rides /api/shadow/tick after the wide step (no new cron).
  *
@@ -127,7 +127,7 @@ async function reviewStep(now: Date): Promise<{ note: string; uwCalls: number }>
   doc.updatedAt = now.toISOString();
   await saveDoc(KIND, day, doc); // claim the slot before billing
 
-  const system = lessonsSystemPrompt(WIDE_RULE);
+  const system = wideReviewSystemPrompt("claude");
   let judged = 0;
   let skippedForTotal = 0;
   for (let i = 0; i < todo.length; i += BATCH) {

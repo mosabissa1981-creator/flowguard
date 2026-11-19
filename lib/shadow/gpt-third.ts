@@ -4,17 +4,18 @@ import { byScoreThenEarlier, gptThirdPace, studyBoostEnabled } from "@/lib/ai-tr
 import { ledgerSpend, TEST_MODE_GROK_DAY_CAP_USD, quietTestBatchGate } from "@/lib/llm-ledger";
 import { tradingDateET } from "@/lib/session";
 import { etClock } from "@/lib/shadow/budget";
-import { lessonsSystemPrompt } from "@/lib/shadow/lessons-review";
+import { wideReviewSystemPrompt } from "@/lib/shadow/wide-review-prompt";
 import { openaiLlmConfig, callShadowLlm, reviewBatchCeiling } from "@/lib/shadow/llm";
 import { loadDoc, saveDoc } from "@/lib/shadow/store";
 import type { LlmUsageRecord } from "@/lib/shadow/types";
-import { grokWideEnabled, loadWideDay, parseBatch, WIDE_RULE, type WideDoc } from "@/lib/shadow/wide-pool";
+import { grokWideEnabled, loadWideDay, parseBatch, type WideDoc } from "@/lib/shadow/wide-pool";
 import { wideFactLine, type WideGrade, type WideJudgement } from "@/lib/shadow/wide-pool-core";
 
 /**
  * TEST MODE ONLY — GPT third-opinion lane (lane id gpt-third).
- * Sees the SAME wide-pool candidates + lessons prompt the current Grok wide reviewer already judged
- * (no GEX/DEX extras — fair provider comparison). Own day doc (kind "gpt-third") so the study book /
+ * Sees the SAME wide-pool candidates the current Grok wide reviewer already judged, on the shared
+ * lessons sheet (no study-tier addendum — this lane already takes those rows). No GEX/DEX extras.
+ * Own day doc (kind "gpt-third") so the study book /
  * Friday score can compare Claude vs current Grok vs rules on identical rows.
  * Rides /api/shadow/tick after the wide step (no new cron).
  *
@@ -127,7 +128,8 @@ async function reviewStep(now: Date): Promise<{ note: string; uwCalls: number }>
   doc.updatedAt = now.toISOString();
   await saveDoc(KIND, day, doc); // claim the slot before billing
 
-  const system = lessonsSystemPrompt(WIDE_RULE);
+  // GPT already takes study-tier rows on the shared sheet. Do not add the Grok/Claude study-tier wording here.
+  const system = wideReviewSystemPrompt("gpt");
   let judged = 0;
   let skippedForTotal = 0;
   for (let i = 0; i < todo.length; i += BATCH) {

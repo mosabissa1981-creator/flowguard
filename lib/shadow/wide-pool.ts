@@ -9,7 +9,8 @@ import { rankAlerts } from "@/lib/scoring";
 import { tradingDateET } from "@/lib/session";
 import { getSessionTape } from "@/lib/session-tape";
 import { etClock } from "@/lib/shadow/budget";
-import { lessonsSystemPrompt, lessonsTestEnabled } from "@/lib/shadow/lessons-review";
+import { lessonsTestEnabled } from "@/lib/shadow/lessons-review";
+import { wideReviewSystemPrompt } from "@/lib/shadow/wide-review-prompt";
 import { callShadowLlm, parseJsonObject, reviewBatchCeiling, shadowLlmConfig } from "@/lib/shadow/llm";
 import { loadDoc, saveDoc } from "@/lib/shadow/store";
 import type { LlmUsageRecord, ShadowDay } from "@/lib/shadow/types";
@@ -25,7 +26,8 @@ import { gradeWide, selectWide, wideFactLine, type WideCandidate, type WideGrade
  *
  * OFF unless FLOWGUARD_GROK_WIDE=1 AND FLOWGUARD_LESSONS_TEST=1. Never touches the morning board, picks, premove,
  * ai-picks, pings, or Telegram, and never writes the shadow day doc (it only reads it to skip today's finalists).
- * The study boost may paper-fill this lane's takes. It still does not change live picks.
+ * The study boost may paper-fill this lane's takes. The prompt may take a study-tier row and label it
+ * "study tier" (same live floor the books already use). It still does not change live picks.
  *
  * Cost guards:
  *  - Grok: own ledger scope "grok-wide" with its own daily cap FLOWGUARD_GROK_WIDE_USD (default $1, hard max $3); never uses
@@ -100,8 +102,7 @@ export async function loadWideDay(day: string): Promise<WideDoc | null> {
   return loadDoc<WideDoc>(KIND, day, { fresh: true });
 }
 
-export const WIDE_RULE =
-  "These candidates are a WIDE study pool: setups the live lists ranked below their cut (lanes=wide-pool+pool) or just under the score floor (wide-pool+near-miss), judged only so the desk learns.";
+export { WIDE_RULE } from "@/lib/shadow/wide-review-prompt";
 
 /** Parse one batch reply; enforce the module contract (≤ 3 takes, one per issuer, by confidence). Unreturned rows stay unjudged. */
 export function parseBatch(text: string, batch: WideCandidate[], at: string): Record<string, WideJudgement> {
@@ -170,7 +171,7 @@ async function reviewStep(now: Date): Promise<string> {
   doc.llm.lastError = undefined;
   doc.updatedAt = now.toISOString();
   await saveDoc(KIND, day, doc); // claim the slot before billing
-  const system = lessonsSystemPrompt(WIDE_RULE);
+  const system = wideReviewSystemPrompt("grok");
   let judged = 0;
   let skippedForTotal = 0;
   const attempted = new Set<string>();
