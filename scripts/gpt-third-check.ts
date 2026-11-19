@@ -7,9 +7,9 @@ import assert from "node:assert/strict";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 
 import { TEST_MODE_GROK_DAY_CAP_USD, TEST_MODE_GROK_SCOPES, testModeGrokBatchFits } from "../lib/llm-ledger";
-import { lessonsSystemPrompt } from "../lib/shadow/lessons-review";
 import { estimateCost, openaiLlmConfig } from "../lib/shadow/llm";
-import { parseBatch, WIDE_RULE } from "../lib/shadow/wide-pool";
+import { parseBatch } from "../lib/shadow/wide-pool";
+import { wideReviewSystemPrompt } from "../lib/shadow/wide-review-prompt";
 import { wideFactLine, type WideCandidate, type WideJudgement } from "../lib/shadow/wide-pool-core";
 import { gptThirdEnabled, gptThirdLimits } from "../lib/shadow/gpt-third";
 
@@ -75,7 +75,7 @@ async function dryRun(day: string) {
   const limit = Math.max(1, Math.min(60, Number(process.env.REVIEW_LIMIT) || 20));
   const batch = (doc.rows ?? []).filter((r) => r.candidate && r.grok).slice(0, limit);
   assert.ok(batch.length > 0);
-  const system = lessonsSystemPrompt(WIDE_RULE);
+  const system = wideReviewSystemPrompt("gpt");
   const user = `As of ${new Date().toISOString()}. Candidates:\n${batch.map((r) => wideFactLine(r.candidate!)).join("\n")}`;
   const ceiling = estimateCost(cfg.model, Math.ceil((system.length + user.length) / 3), 0, 1500 + batch.length * 250, 0, 0);
   console.log(`calling GPT ${cfg.model} on ${batch.length} rows (ceiling ~$${ceiling.toFixed(4)})…`);

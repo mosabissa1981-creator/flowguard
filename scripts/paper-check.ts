@@ -20,6 +20,10 @@ import {
 assert.deepEqual(sizeTrade(1.83, 10_000, 0, SIZING.main), { ok: true, qty: 1, costUsd: 183 });
 assert.deepEqual(sizeTrade(0.5, 10_000, 0, SIZING.main), { ok: true, qty: 4, costUsd: 200 });
 assert.equal(sizeTrade(6, 10_000, 0, SIZING.main).ok, false);
+// Named one-contract costs ($1,143, $1,660, $1,675) against a $10k book. The 5% cap is $500, so all three are skipped.
+const oversizedUsd = [1143, 1660, 1675];
+const oversizedSkipped = oversizedUsd.filter((usd) => sizeTrade(usd / 100, 10_000, 0, SIZING["ai-grok"]).ok === false);
+assert.equal(oversizedSkipped.length, 3);
 // $4.80 → 1 contract ($480) allowed (≤ 5%).
 assert.deepEqual(sizeTrade(4.8, 10_000, 0, SIZING.main), { ok: true, qty: 1, costUsd: 480 });
 // Open-risk cap 10% ($1,000): $900 open + $183 → skip; $700 open + 4×$50 → fits.

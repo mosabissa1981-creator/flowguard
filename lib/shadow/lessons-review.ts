@@ -1,8 +1,7 @@
 import "server-only";
 
-import { GROK_LESSONS_EXAMPLES, GROK_LESSONS_SHEET } from "@/lib/shadow/grok-lessons";
-import { GROK_LESSONS_WEEKLY } from "@/lib/shadow/grok-lessons-weekly";
 import { callShadowLlm, parseJsonObject } from "@/lib/shadow/llm";
+import { buildLessonsPrompt } from "@/lib/shadow/wide-review-prompt";
 import type { LlmUsageRecord, ShadowCandidate, ShadowVerdict } from "@/lib/shadow/types";
 
 /**
@@ -18,22 +17,18 @@ export function lessonsTestEnabled(): boolean {
   return process.env.FLOWGUARD_LESSONS_TEST === "1";
 }
 
-const SYSTEM = [
-  "You are the risk-aware desk reviewer for FlowGuard, an unusual-options-flow screener (paper-trading study, not financial advice).",
-  "You do NOT predict prices. For each candidate say take or pass. Most should be pass: take at most 3 and never two from one issuer.",
-  "Trades are bought at the ask and exited at +30% target, -25% stop, or after 2 sessions. Use the lessons sheet and real examples below.",
-  'Return JSON only: {"reviews":[{"contract":"","judge":"take|pass","confidence":0-100,"why":"<=120 chars"}]}',
-].join(" ");
-
 function factLine(c: ShadowCandidate): string {
   const ct = new Intl.DateTimeFormat("en-US", { timeZone: "America/Chicago", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(c.printTimeUtc));
   return `${c.contract} | ${c.ticker} ${c.side} K${c.strike} dte${c.dte} px${c.underlying} ask$${c.optionPrint} premium$${Math.round(c.premiumUsd / 1000)}k askShare${c.askSharePct}% score${Math.round(c.rawScore)} lanes=${c.lanes.join("+")} t=${ct}CT`;
 }
 
-/** System prompt = reviewer rules + lessons sheet + weekly study-book section + real examples. `extra` is appended to the rules line (wide pool). */
+/**
+ * System prompt = reviewer rules + lessons sheet + weekly study-book section + real examples.
+ * `extra` is appended to the rules line (wide pool, GEX/DEX). This copy does not allow study-tier takes.
+ * Grok wide and Claude second use wideReviewSystemPrompt, which does.
+ */
 export function lessonsSystemPrompt(extra?: string): string {
-  const weekly = GROK_LESSONS_WEEKLY.trim();
-  return `${SYSTEM}${extra ? ` ${extra}` : ""}\n\n${GROK_LESSONS_SHEET}${weekly ? `\n\n${weekly}` : ""}\n\n${GROK_LESSONS_EXAMPLES}`;
+  return buildLessonsPrompt({ extra });
 }
 
 export async function runLessonsReview(cands: ShadowCandidate[], now: Date): Promise<{ results: Record<string, LessonsJudgement>; usage: LlmUsageRecord }> {
