@@ -1,9 +1,9 @@
 {
  "mode": "TEST MODE study only: lessons_review shadow verdicts graded on the study book. Never affects live picks.",
- "generated_at": "2026-11-20T22:33:50+00:00",
+ "generated_at": "2026-11-27T22:26:38+00:00",
  "window": {
   "since": "2026-10-12",
-  "until": "2026-11-20"
+  "until": "2026-11-27"
  },
  "label_rule": "study book: EOD mark vs flow print (or skip-time mid), +/-15% = winner/loser, else flat",
  "verdicts": 228,
@@ -226,6 +226,22 @@
   "2026-11-20": {
    "shadow_doc": true,
    "verdicts": 9
+  },
+  "2026-11-23": {
+   "shadow_doc": false,
+   "verdicts": 0
+  },
+  "2026-11-24": {
+   "shadow_doc": false,
+   "verdicts": 0
+  },
+  "2026-11-25": {
+   "shadow_doc": false,
+   "verdicts": 0
+  },
+  "2026-11-27": {
+   "shadow_doc": true,
+   "verdicts": 0
   }
  },
  "rows": [
