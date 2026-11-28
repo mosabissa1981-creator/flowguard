@@ -52,16 +52,18 @@ export async function POST(request: NextRequest) {
   }
 
   const probeBody = probe.status === 429 ? await probe.clone().text().catch(() => "") : "";
-  if (probe.status === 429 && !/concurrent request/i.test(probeBody)) {
-    const { tripUwQuota } = await import("@/lib/uw-quota");
-    await tripUwQuota("key-probe 429");
-    await persistUnusualWhalesKey(key);
-    return Response.json({
-      configured: true,
-      replaced: true,
-      quotaBlocked: true,
-      warning: "Key saved. Unusual Whales is at the daily cap — live tape waits until UTC midnight.",
-    });
+  if (probe.status === 429) {
+    const { isConcurrencyHttp, tripUwQuota } = await import("@/lib/uw-quota");
+    if (!isConcurrencyHttp(probe.status, probeBody)) {
+      await tripUwQuota("key-probe 429");
+      await persistUnusualWhalesKey(key);
+      return Response.json({
+        configured: true,
+        replaced: true,
+        quotaBlocked: true,
+        warning: "Key saved. Unusual Whales is at the daily cap — live tape waits until UTC midnight.",
+      });
+    }
   }
 
   if (!probe.ok) {
