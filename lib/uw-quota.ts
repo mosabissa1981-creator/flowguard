@@ -38,19 +38,31 @@ export function isUwQuotaError(error: unknown): error is UwQuotaError {
 }
 
 /**
- * UW plan limit "You have exceeded 3 concurrent requests" comes back as HTTP 429. It is NOT a quota
- * problem: the request should simply be retried a moment later. Treating it as a quota hit used to trip
- * the 90 s UW circuit (shared via Redis) on every burst, and /api/quote then answered source="alert"
- * for every contract (seen after the close Oct 5–6 when several routes + quote checks ran at once).
+ * UW plan limit of 3 in-flight requests per account (across all API tokens) comes back as HTTP 429.
+ * Bodies seen in production:
+ * - "You have exceeded 3 concurrent requests"
+ * - "Too many requests in flight. ... 3 API requests running at a time ... temporary concurrency limit,
+ *   not your daily request quota"
+ * That second body mentions "daily" only to say this is NOT the daily cap. Retry it. Treating it as
+ * quota used to trip the shared UW circuit, and /api/quote then answered source="alert" for every
+ * contract (seen after the close Oct 5–6 when several routes + quote checks ran at once).
  */
+const CONCURRENCY_HTTP = /concurrent request|in flight|running at a time|concurrency limit/i;
+
 export function isConcurrencyHttp(status: number, body: string): boolean {
-  return status === 429 && /concurrent request/i.test(body);
+  return status === 429 && CONCURRENCY_HTTP.test(body);
+}
+
+/** A real daily-cap phrase. Concurrency copy that only denies the daily quota does not match. */
+export function isDailyLimitBody(body: string): boolean {
+  if (CONCURRENCY_HTTP.test(body)) return false;
+  return /daily_request_limit_hit|daily request limit/i.test(body);
 }
 
 export function isQuotaHttp(status: number, body: string): boolean {
   if (isConcurrencyHttp(status, body)) return false;
   if (status === 429) return true;
-  return /daily_request_limit_hit|daily request limit/i.test(body);
+  return isDailyLimitBody(body);
 }
 
 export function quotaResetUtcMs(now = Date.now()): number {
@@ -149,7 +161,7 @@ export async function isUwBlocked(): Promise<boolean> {
 export async function isUwHardBlocked(): Promise<boolean> {
   const c = await getCircuit();
   if (!c) return false;
-  return /daily/i.test(c.reason) || c.untilMs - Date.now() > 10 * 60_000;
+  return isDailyLimitBody(c.reason) || c.untilMs - Date.now() > 10 * 60_000;
 }
 
 /** Non-secret circuit summary for diagnostics. */

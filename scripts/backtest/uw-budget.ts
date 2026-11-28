@@ -33,6 +33,20 @@ function key(): string {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+/**
+ * Same phrases as isConcurrencyHttp in lib/uw-quota.ts. This file cannot import that module
+ * (`server-only`). A concurrency 429 says "not your daily request quota" — the word "daily"
+ * there is a denial, not the cap.
+ */
+function isConcurrencyBody(body: string): boolean {
+  return /concurrent request|in flight|running at a time|concurrency limit/i.test(body);
+}
+
+function isDailyCapBody(body: string): boolean {
+  if (isConcurrencyBody(body)) return false;
+  return /daily_request_limit_hit|daily request limit/i.test(body);
+}
+
 /** UW_OFFLINE=1: cache-only run, never calls UW (e.g. before the 8 pm ET reset once the day's budget is spent). */
 const OFFLINE = process.env.UW_OFFLINE === "1";
 export function canSpend(n = 1): boolean {
@@ -70,10 +84,11 @@ export async function uwJson<T = unknown>(pathAndQuery: string): Promise<T> {
     if (res.ok) return (await res.json()) as T;
     const body = (await res.text()).slice(0, 300);
     budget.errors += 1;
-    if (res.status === 429 && /daily/i.test(body)) {
+    if (res.status === 429 && isDailyCapBody(body)) {
       budget.stopped = "UW daily request limit hit";
       throw new BudgetStop(budget.stopped);
     }
+    // Concurrency 429s are temporary (3 in flight per account) and are retried, same as other 429s / 5xx.
     if ((res.status === 429 || res.status >= 500) && attempt < 4) {
       await sleep(1500 * 2 ** attempt);
       continue;

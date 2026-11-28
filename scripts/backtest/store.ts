@@ -84,7 +84,7 @@ async function pageWindow(loMs: number, hiMs: number, out: Map<string, FlowAlert
   }
 }
 
-/** Fetch one session's flow alerts (09:30–16:15 ET) in parallel 30-min windows. Resumable per day. */
+/** Fetch one session's flow alerts (09:30–16:15 ET) in 30-min windows, two at a time. Resumable per day. */
 export async function fetchFlowDay(day: string): Promise<{ count: number; uwCalls: number; cached: boolean }> {
   const existing = readJson<FlowDay>(flowFile(day));
   if (existing?.complete) return { count: existing.count, uwCalls: 0, cached: true };
@@ -101,7 +101,8 @@ export async function fetchFlowDay(day: string): Promise<{ count: number; uwCall
       await pageWindow(lo, hi, out, calls);
     }
   };
-  await Promise.all(Array.from({ length: 4 }, worker)); // BudgetStop propagates: nothing written for a partial day
+  // UW allows 3 in-flight requests per account. Two workers stay under that (four did not).
+  await Promise.all(Array.from({ length: 2 }, worker)); // BudgetStop propagates: nothing written for a partial day
   const alerts = [...out.values()].filter((a) => {
     const ms = Date.parse(a.created_at);
     return ms >= open && ms <= end;

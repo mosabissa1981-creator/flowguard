@@ -16,6 +16,7 @@ import {
   UwQuotaError,
   cachedCall,
   isConcurrencyHttp,
+  isDailyLimitBody,
   isQuotaHttp,
   isUwBlocked,
   isUwHardBlocked,
@@ -86,10 +87,11 @@ function buildUrl(path: string, params?: Record<string, string | number | boolea
 const UW_TIMEOUT_MS = 15_000;
 
 /**
- * UW plan cap: 3 concurrent requests per key (429 "exceeded 3 concurrent requests" beyond that). The box
- * study/history jobs share the key, so each server instance keeps at most UW_MAX_CONCURRENCY (default 2)
- * UW requests in flight and queues the rest; a concurrency 429 that still slips through is retried with
- * a short jittered backoff instead of tripping the quota circuit.
+ * UW plan cap: 3 in-flight requests per account across all API tokens (429 "concurrent requests",
+ * "requests in flight", or "running at a time" — a temporary concurrency limit, not the daily quota).
+ * The box study/history jobs share the account, so each server instance keeps at most UW_MAX_CONCURRENCY
+ * (default 2) UW requests in flight and queues the rest; a concurrency 429 that still slips through is
+ * retried with a short jittered backoff instead of tripping the quota circuit.
  */
 const UW_MAX_INFLIGHT = (() => {
   const v = Number(process.env.UW_MAX_CONCURRENCY);
@@ -187,7 +189,7 @@ async function uwRequest<T>(url: URL, ttlMs = 0, bust = false, opts: UwRequestOp
           throw new Error(`Unusual Whales ${url.pathname} 429 (concurrency, after ${attempt + 1} tries): ${body.slice(0, 120)}`);
         }
         if (isQuotaHttp(response.status, body)) {
-          const daily = /daily_request_limit_hit|daily request limit/i.test(body);
+          const daily = isDailyLimitBody(body);
           const retryAfter = Number(response.headers.get("retry-after"));
           const until = daily
             ? quotaResetUtcMs()
